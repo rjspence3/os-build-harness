@@ -155,6 +155,11 @@ meaningless on empty screens. The full doctrine is in `harness/CLAUDE.md`.
 - Captures, snapshots, and tenant/app identifiers in `builds/home_banking/` are example artifacts
   from the reference build; point the harness at your own tenant and apps.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, keeping the suite green, where doctrine vs
+build-specific notes belong, and how to add a build.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Vendored assets under `assets/` carry their own upstream licenses
