@@ -1,0 +1,114 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "task_tracker",
+    "description": "A minimal, COMPLETE example spec: a two-screen task tracker. Unlike the illustrative excerpt embedded in the schema, this passes `harness-verify <spec> --phase spec` (no cross-reference holes). Copy it as the starting point for your own spec-driven build.",
+    "roles": ["Member"]
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "TaskList",
+        "description": "A named list that groups tasks.",
+        "attributes": [
+          { "name": "Id", "dataType": "Identifier", "isIdentifier": true, "mandatory": true },
+          { "name": "Title", "dataType": "Text", "mandatory": true, "length": 100 }
+        ]
+      },
+      {
+        "name": "Task",
+        "description": "A single task belonging to a list.",
+        "attributes": [
+          { "name": "Id", "dataType": "Identifier", "isIdentifier": true, "mandatory": true },
+          { "name": "Title", "dataType": "Text", "mandatory": true, "length": 200 },
+          { "name": "IsDone", "dataType": "Boolean", "mandatory": true, "default": false },
+          { "name": "ListId", "dataType": "Identifier", "mandatory": true, "references": "TaskList" }
+        ]
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "lists",
+      "name": "Lists",
+      "route": "/lists",
+      "uiFlow": "MainFlow",
+      "roles": ["Member"],
+      "components": [
+        { "id": "listsTable", "type": "Table", "boundTo": "TaskList", "label": "Your lists" },
+        { "id": "openTasksBtn", "type": "Button", "label": "Open" }
+      ],
+      "actions": [
+        { "name": "GoToTasks", "trigger": { "onComponent": "openTasksBtn", "event": "onClick" }, "does": ["Navigate"] }
+      ],
+      "navigation": [
+        { "fromComponent": "openTasksBtn", "event": "onClick", "toScreen": "tasks", "params": ["ListId"] }
+      ],
+      "acceptance": {
+        "assertions": [
+          { "kind": "entityExists", "entity": "TaskList" },
+          { "kind": "attribute", "entity": "TaskList", "attribute": "Title", "dataType": "Text", "mandatory": true },
+          { "kind": "componentPresent", "componentId": "listsTable" },
+          { "kind": "binding", "componentId": "listsTable", "boundTo": "TaskList" },
+          { "kind": "navigates", "fromComponent": "openTasksBtn", "event": "onClick", "toScreen": "tasks" }
+        ]
+      }
+    },
+    {
+      "id": "tasks",
+      "name": "Tasks",
+      "route": "/tasks",
+      "uiFlow": "MainFlow",
+      "roles": ["Member"],
+      "inputParameters": [
+        { "name": "ListId", "dataType": "Identifier", "isRequired": true, "references": "TaskList" }
+      ],
+      "components": [
+        { "id": "tasksTable", "type": "Table", "boundTo": "Task", "label": "Tasks" },
+        { "id": "addTaskBtn", "type": "Button", "label": "Add task" }
+      ],
+      "actions": [
+        { "name": "CreateTask", "trigger": { "onComponent": "addTaskBtn", "event": "onClick" }, "does": ["CreateEntity"] }
+      ],
+      "acceptance": {
+        "assertions": [
+          { "kind": "entityExists", "entity": "Task" },
+          { "kind": "attribute", "entity": "Task", "attribute": "IsDone", "dataType": "Boolean", "mandatory": true },
+          { "kind": "componentPresent", "componentId": "tasksTable" },
+          { "kind": "binding", "componentId": "tasksTable", "boundTo": "Task" }
+        ]
+      }
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "Browse lists",
+      "description": "A member views their task lists and opens one.",
+      "roles": ["Member"],
+      "screens": ["lists"],
+      "entities": ["TaskList"],
+      "actions": ["GoToTasks"],
+      "steps": [
+        { "description": "Open the Lists screen and see all lists.", "screen": "lists" },
+        { "description": "Click Open to drill into a list's tasks.", "screen": "lists", "action": "GoToTasks" }
+      ]
+    },
+    {
+      "name": "Manage tasks",
+      "description": "A member views and adds tasks within a list.",
+      "roles": ["Member"],
+      "screens": ["tasks"],
+      "entities": ["Task"],
+      "actions": ["CreateTask"],
+      "steps": [
+        { "description": "Open the Tasks screen for the selected list.", "screen": "tasks" },
+        { "description": "Add a new task.", "screen": "tasks", "action": "CreateTask" }
+      ]
+    }
+  ],
+  "design": {
+    "source": "generated",
+    "mode": "light",
+    "notes": "Novel app — no reference product. A real build would point design.source at a reference product or a /design-layer output."
+  }
+}

@@ -14,7 +14,53 @@ which are as important as the runner.
 > Extracted from a working lab and curated for reuse. The **`home_banking`** build is the
 > complete worked example / benchmark (build #0); it clones an OutSystems first-party demo app.
 
+**New here? Read [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md).** It takes you from
+clone → install → your first build, and explains the one thing the rest of this README assumes:
+
+## How it works (read this first)
+
+This is **not** a `python build.py` that emits an app. The harness is a *tool belt* driven by an
+orchestrator, and **the orchestrator is a [Claude Code](https://claude.com/claude-code) session
+running inside a build root** (`builds/<app>/`). That session is the CPU; the harness pieces are
+its program:
+
+- the **OutSystems Mentor MCP** is the *only* actuator — every entity, screen, and action is
+  authored by the session calling the MCP;
+- the **recipes / app spec** are the source of truth for what to build;
+- **`harness-verify`** / **`pixel_diff`** are the judge — they confirm built state against that
+  source of truth.
+
+The Python CLIs (`scripts/build_banking.py`, `harness-verify`, …) **prepare and check** work; they
+don't author the app. So there's an important boundary:
+
+- **Offline** (runs anywhere, no tenant): render recipe batches (`--dry-run`), validate a spec
+  (`harness-verify --phase spec`), run the unit tests.
+- **Live** (needs your ODC tenant + an authenticated MCP session in Claude Code): actually build,
+  publish, and verify.
+
 ## What's here
+
+```
+harness/
+  banking_runner/    # the recipe runner — renders recipes → Mentor MCP batches, tracks state
+  schemas/           # app_spec.v0.json — the spec schema for spec-driven builds
+  cdp_helpers.py     # CDP (Chrome DevTools) connection helpers for runtime capture
+  capture.py verify.py prompt_step.py   # harness-capture / harness-verify / harness-prompt-step
+  CLAUDE.md          # SHARED DOCTRINE — the build loop, walls protocol, authoring patterns
+  launch_build.sh    # scaffolds builds/<app>/ from _template and starts a build session
+builds/
+  home_banking/      # build #0 — the reference clone (OutSystems demo app)
+    MCP_RECIPES/     # the recipe library + DISPATCH_PLAYBOOK + RUNBOOK + per-app captures
+    theme/
+  _template/         # starting point for a new build root (see its README)
+docs/                # GETTING_STARTED.md — the onboarding walkthrough
+examples/            # task_tracker/app_spec.json — a complete, validated example spec
+assets/              # shared OutSystems UI / FontAwesome / ECharts bundle (vendored, see LICENSEs)
+scripts/             # build_banking.py (entrypoint) + render/diff/capture tooling
+tests/               # banking_runner unit tests
+HARNESS_DECISIONS.md # the architectural decision log
+ROADMAP.md           # where this is headed (generalizing the runner into a spec-driven harness)
+```
 
 ```
 harness/
@@ -48,7 +94,9 @@ The harness supports two ways of defining "the source of truth" — a build root
 
 ## Requirements
 
-- Python 3.10+
+- **Python 3.11+**
+- **[Claude Code](https://claude.com/claude-code)** — the orchestrator that drives the build loop.
+  *(The offline commands below need none of the items past this point.)*
 - An **OutSystems ODC tenant** with the **Mentor MCP** server available, and authority to
   create/modify apps in it. The harness is the *only* actuator — it builds entirely through the MCP.
 - `node`/`npx` (the runner spawns `mcp-remote` to reach the tenant MCP endpoint).
@@ -60,24 +108,29 @@ The harness supports two ways of defining "the source of truth" — a build root
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pip install -e .
+pip install -e .          # installs the harness-verify / harness-capture / harness-prompt-step CLIs
 
-# No tenant needed for these — they exercise the runner offline:
-pytest tests/ -q
-python scripts/build_banking.py --list-apps
+# No tenant needed for these — they exercise the harness offline:
+pytest tests/ -q                                                  # → 173 passed
+python scripts/build_banking.py --list-apps                       # the home_banking manifest
 python scripts/build_banking.py --app core --dry-run --out /tmp/hb_run
 #   → rendered Mentor batches land under /tmp/hb_run/core/batches/
+harness-verify examples/task_tracker/app_spec.json --phase spec   # validate a spec, offline
 ```
 
-Configure your tenant before any **live** run:
+To go **live**, configure your tenant, then drive a build from a Claude Code session:
 
 ```bash
 cp .env.example .env
 # edit .env → set OUTSYSTEMS_MCP_TENANT=<your-tenant>.outsystems.dev
+
+# scaffold builds/my_app/ from the example spec and start a build session:
+harness/launch_build.sh my_app examples/task_tracker
 ```
 
-Then authenticate the `outsystems` MCP server in your session and drive a build following the
-loop in **`harness/CLAUDE.md`** + **`builds/home_banking/MCP_RECIPES/DISPATCH_PLAYBOOK.md`**.
+Authenticate the `outsystems` MCP server in that session and drive the loop per
+**`harness/CLAUDE.md`** + **`builds/home_banking/MCP_RECIPES/DISPATCH_PLAYBOOK.md`**.
+**See [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) for the full walkthrough.**
 
 ## The method, in one breath
 
@@ -95,6 +148,10 @@ meaningless on empty screens. The full doctrine is in `harness/CLAUDE.md`.
 - `banking_runner` was built around the `home_banking` clone and is **not yet generalized** — paths
   resolve to `builds/home_banking/`. Mirror that layout under `builds/<name>/` and parameterize when
   adding a build (see `ROADMAP.md`).
+- The `home_banking` build is a worked example to **study**, not a push-button reproducible build:
+  its live verification compares against the original Home Banking app and tenant-specific app keys
+  that exist only in the author's tenant. The recipes, doctrine, and offline `--dry-run` are fully
+  usable; the exact live clone is not re-runnable without that original app present.
 - Captures, snapshots, and tenant/app identifiers in `builds/home_banking/` are example artifacts
   from the reference build; point the harness at your own tenant and apps.
 
