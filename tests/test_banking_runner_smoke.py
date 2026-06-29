@@ -143,16 +143,23 @@ def test_collect_fk_targets():
 def test_fk_resolution_block_for_known_targets():
     static_names = {"LoanRequestStatus", "HBDocumentType"}
     server_names = {"HBCustomer", "HBAccount"}
-    cs, lookup = render_fk_resolution_block(
+    cs, lookup, var_lookup = render_fk_resolution_block(
         ["User", "HBCustomer", "LoanRequestStatus", "Employee"], server_names, static_names
     )
-    # lookup is keyed by entity name; values are the C# variable expressions
-    assert lookup["User"] == "userIdentType"
-    assert lookup["HBCustomer"] == "hBCustomerEntity.IdentifierType"
-    assert lookup["LoanRequestStatus"] == "loanRequestStatusStatic.IdentifierType"
-    assert lookup["Employee"] == "employeeEntity.IdentifierType"
+    # lookup is keyed by entity name; values are null-safe IdentifierType
+    # expressions: `.First()` was replaced by FirstOrDefault + a TextType
+    # coalesce so a missing/hallucinated FK target degrades to Text instead of
+    # throwing at runtime and aborting the whole batch.
+    assert lookup["User"] == "(userEntity?.IdentifierType ?? eSpace.TextType)"
+    assert lookup["HBCustomer"] == "(hBCustomerEntity?.IdentifierType ?? eSpace.TextType)"
+    assert lookup["LoanRequestStatus"] == "(loanRequestStatusStatic?.IdentifierType ?? eSpace.TextType)"
+    assert lookup["Employee"] == "(employeeEntity?.IdentifierType ?? eSpace.TextType)"
+    # var_lookup maps the target to the bare entity variable (callers append
+    # `?.IdentifierType` at the call site). User now declares an entity var too.
+    assert var_lookup["User"] == "userEntity"
+    assert var_lookup["HBCustomer"] == "hBCustomerEntity"
     # And the C# block declares the variables
-    assert "userIdentType" in cs
+    assert "userEntity" in cs
     assert "hBCustomerEntity" in cs
     assert "loanRequestStatusStatic" in cs
 

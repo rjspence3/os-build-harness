@@ -90,9 +90,8 @@ meaningless on empty screens. The full doctrine is in `harness/CLAUDE.md`.
 
 ## Caveats
 
-- **7 unit tests fail and are pre-existing** (test-vs-code API drift inherited from the original
-  monorepo, e.g. a renderer returning a 3-tuple while a test unpacks 2). They are not setup
-  artifacts; fixing them is open work.
+- The full unit suite passes (`pytest tests/ -q` → 173 passed). The renderers are pure
+  (AST → C# string), so the tests run offline with no tenant or live Mentor dispatch.
 - `banking_runner` was built around the `home_banking` clone and is **not yet generalized** — paths
   resolve to `builds/home_banking/`. Mirror that layout under `builds/<name>/` and parameterize when
   adding a build (see `ROADMAP.md`).

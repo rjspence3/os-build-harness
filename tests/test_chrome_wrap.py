@@ -164,25 +164,28 @@ def test_render_wrap_finds_marker_by_strip_name():
     that T2.2 would have given it."""
     m = _hbicon_chrome_site_manifest()
     cs = render_chrome_wrap(m)
-    expected_marker = strip_marker_name("HBIcon", "1.2")  # "_chrome_HBIcon_1_2"
+    expected_marker = strip_marker_name("HBIcon", "1.2")  # "chrome_HBIcon_1_2"
     assert expected_marker in cs
 
 
 def test_render_wrap_creates_block_instance():
     cs = render_chrome_wrap(_hbicon_chrome_site_manifest())
-    # Block signature lookup (own flow OR references)
+    # Block signature lookup: LOCAL block first (IReference.Blocks does not exist
+    # — CS1061 — so the old eSpace.References.SelectMany(r => r.Blocks) was dropped),
+    # then cross-app via the signature interfaces.
     assert 'b.Name == "HBIcon"' in cs
-    assert 'eSpace.References.SelectMany(r => r.Blocks)' in cs
+    assert 'eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())' in cs
     # Block instance created INSIDE the marker via CreateWidget<IMobileBlockInstanceWidget>
     assert 'marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("CheckMark")' in cs
-    # Source block set via reflection (SourceWebBlock not on the static interface)
-    assert 'bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig)' in cs
+    # Source block set via reflection for local blocks (SourceWebBlock not on the
+    # static interface; null-conditional guards the missing-property case)
+    assert 'bi.GetType().GetProperty("SourceWebBlock")?.SetValue(bi, blockSig)' in cs
 
 
 def test_render_wrap_binds_parameters():
     cs = render_chrome_wrap(_hbicon_chrome_site_manifest())
-    # Block input params are DEFERRED to the LOGIC phase — recorded as a comment.
-    assert "params (bind in LOGIC phase)" in cs
+    # Captured block-input binds are DEFERRED to the LOGIC phase — recorded as a comment.
+    assert "captured binds (bind in LOGIC phase)" in cs
     assert "IconName" in cs
 
 
@@ -235,8 +238,8 @@ def test_marker_naming_is_deterministic():
     """Same source_block + path → same marker name. This is the contract
     that lets T2.5 find what T2.2 set."""
     assert strip_marker_name("HBIcon", "1.2.3") == strip_marker_name("HBIcon", "1.2.3")
-    assert strip_marker_name("Menu", "1") == "_chrome_Menu_1"
-    assert strip_marker_name("HBIcon", "1.2.3.T.1") == "_chrome_HBIcon_1_2_3_T_1"
+    assert strip_marker_name("Menu", "1") == "chrome_Menu_1"
+    assert strip_marker_name("HBIcon", "1.2.3.T.1") == "chrome_HBIcon_1_2_3_T_1"
 
 
 def test_t22_marker_matches_t25_lookup():

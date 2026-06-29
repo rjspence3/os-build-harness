@@ -258,9 +258,9 @@ def render_fk_resolution_block(
     fk_targets: list[str],
     local_entities: set[str],
     local_statics: set[str],
-) -> tuple[str, dict[str, str]]:
+) -> tuple[str, dict[str, str], dict[str, str]]:
     """For each FK target, emit a C# `var ...` declaration that resolves the
-    target's IdentifierType. Returns (csharp_block, lookup_dict).
+    target's IdentifierType. Returns (csharp_block, lookup_dict, var_lookup_dict).
 
     Resolution rules:
       - "User" → eSpace.References (System).User → IdentifierType

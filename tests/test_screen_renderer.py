@@ -146,9 +146,13 @@ Aggregates: (none)
     cs = render_screen_dechromed(ast)
     # Container creation under screen via CreateWidget<IContainer>
     assert 'screen.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>(' in cs
-    # Text + Button under the container var (c1)
+    # Text under the container var (c1)
     assert 'c1.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>(' in cs
-    assert 'c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>(' in cs
+    # Button is DECHROMED to a Container placeholder — an OS UI Button has a
+    # mandatory OnClick; without a real handler the OML validator rejects publish.
+    # The real Button + wired OnClick is restored in the CHROME/LOGIC phase.
+    assert "DECHROMED Button 'SaveBtn'" in cs
+    assert 'c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("SaveBtn")' in cs
     # Text content
     assert '"Hello"' in cs
 
@@ -185,8 +189,10 @@ Aggregates: (none)
     assert 'SourceBlock=HBHeader' in cs
     # Should still create the inner Text widget
     assert '"Inside chrome"' in cs
-    # The stripped block becomes a named placeholder Container for chrome wrap
-    assert 'CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBHeader' in cs
+    # The stripped block becomes a named placeholder Container for chrome wrap.
+    # No leading underscore: the Model API silently strips it from widget Names,
+    # so the marker persists as `chrome_<block>_<path>` (see strip_marker_name).
+    assert 'CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("chrome_HBHeader' in cs
 
 
 def test_os_ui_standard_block_kept():

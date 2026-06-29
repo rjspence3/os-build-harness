@@ -83,10 +83,14 @@ def test_render_block_basic():
     # Flow lookup + block creation
     assert 'MobileFlows.FirstOrDefault(f => f.Name == "Common")' in cs
     assert 'flow.CreateBlock("HBIcon")' in cs
-    # Public flag (IMobileBlock uses .Public, not .IsPublic)
-    assert 'block.Public = true;' in cs
-    # Idempotency guard
-    assert 'Status: ALREADY_EXISTS' in cs
+    # Public is forced false: IMobileBlock.Public = true compiles but triggers
+    # OS-BLD-40409 at publish, so the renderer pins it false (is_public is
+    # preserved on the AST for a future v2). See block_renderer._emit_block_setup.
+    assert 'block.Public = false;' in cs
+    # Self-healing idempotency: delete-then-author on re-dispatch (the old
+    # "bail with ALREADY_EXISTS" guard was replaced — it short-circuited the
+    # Public=false fix when a prior partial publish left the block at true).
+    assert 'replaced existing block' in cs
 
 
 def test_render_block_input_parameter():
