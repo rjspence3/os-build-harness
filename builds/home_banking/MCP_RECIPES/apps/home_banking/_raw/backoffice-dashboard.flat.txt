@@ -1,0 +1,117 @@
+# NOTE: wrapper truncated tool_end.result; ~38079 chars of stdoutOutput
+# were dropped before save. Partial widget tree below.
+
+=== Screen: Dashboard ===
+Inputs: 
+Locals: RequestStatusIdFilter:LoanRequestStatus Identifier (EntityIdentifierType:u+E9PPH5WkCq+WIxkKVewA.#IdentifierType), TableSort:Text (BasicTypes.Text:uROOBXPvQEyU76NWO+1uxQ), StartIndex:Integer (BasicTypes.Integer:j2Lc0phK0kuggij4gQYfAw), MaxRecords:Integer (BasicTypes.Integer:j2Lc0phK0kuggij4gQYfAw), RequestTypeIdFilter:LoanRequestType Identifier (EntityIdentifierType:TG1oNDxJzkqZcPiSUQsxew.#IdentifierType), EmployeeIdAssignedFilter:Employee Identifier (EntityIdentifierType:ZL3ahhlS2kmJZYU1JgqzCQ.#IdentifierType), DateFilter:Date (BasicTypes.Date:DnfdUFhShE2uIYCwnadVLQ), SearchKeyword:Text (BasicTypes.Text:uROOBXPvQEyU76NWO+1uxQ), SelectedAll:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), EnableAssignSelected:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), ShowAssigningPopup:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), SelectedEmployeeIdToAssign:Employee Identifier (EntityIdentifierType:ZL3ahhlS2kmJZYU1JgqzCQ.#IdentifierType), SelectedRequestIdsToAssignEmp:LoanRequest Identifier List (ListType:os95do6cCkOBkieCIJmGwQ), EnableSelectAll:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), ChatMessages:ChatMessage List (ListType:_DyMhK650k+HAo+_KJcRqg), LoadingDateTime:Date Time (BasicTypes.DateTime:TI32kQokwEyLhBq6zdg2Tw)
+
+--- WIDGETS (flat, document order) ---
+[1] WebBlockInstance ''
+[2] TextMetadata 'CreatedFromNL'
+[3] ParsedExpression ''
+[4] TextMetadata 'CreatedFromNL'
+[5] ParsedExpression ''
+[6] TextMetadata 'CreatedFromNL'
+[7] ParsedExpression ''
+[8] TextMetadata 'CreatedFromNL'
+[9] ParsedExpression ''
+[10] ParsedExpression ''
+[11] TextMetadata 'CreatedFromNL'
+[12] ParsedExpression ''
+[13] If '' Condition="index=GetChartDataMonthly.List.Length [Condition[ServiceStudio.Expressions.Abstr..."
+[14] If '' Condition="Counter<GetChartDataMonthly.List.Length [Condition[ServiceStudio.Expressions.Abs..."
+[15] ParsedExpression ''
+[16] ParsedExpression ''
+[17] ParsedExpression ''
+[18] GenericInputParameter 'RequestStatusId'
+[19] GenericInputParameter 'NewStartIndex'
+[20] GenericInputParameter 'RequestId'
+[21] GenericInputParameter 'ChartWidgetId'
+[22] GenericInputParameter 'IsAgents'
+[23] GenericInputParameter 'FirebaseEvent'
+[24] If '' Condition="DiffSeconds(LoadingDateTime,FirebaseEvent.EventDateTime)<0 [Condition[ServiceStu..."
+[25] If '' Condition="IsAgents [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[26] GenericInputParameter 'ChartWidgetId'
+[27] If '' Condition="GetRequests.List.Current.LoanRequest.AssignedToEmpId <> NullIdentifier() [Condit..."
+[28] GenericInputParameter 'SortBy'
+[29] If '' Condition="TableSort = SortBy and SortBy <> "" [Condition[ServiceStudio.Expressions.Abstrac..."
+[30] If '' Condition="SelectedEmployeeIdToAssign=GetSampleUserEmpId.EmpId [Condition[ServiceStudio.Exp..."
+[31] PlaceholderArgument 'Navigation'
+[32] PlaceholderArgument 'Header'
+[33] PlaceholderArgument 'Breadcrumbs'
+[34] PlaceholderArgument 'Title'
+[35] PlaceholderArgument 'Actions'
+[36] PlaceholderArgument 'MainContent'
+[37] PlaceholderArgument 'Footer'
+[38] ParsedExpression ''
+[39] ParsedExpression ''
+[40] ParsedExpression ''
+[41] ParsedExpression ''
+[42] ParsedExpression ''
+[43] ParsedExpression ''
+[44] ParsedExpression ''
+[45] ParsedExpression ''
+[46] ParsedExpression ''
+[47] TextMetadata 'CreatedFromNL'
+[48] ParsedExpression ''
+[49] ParsedExpression ''
+[50] ParsedExpression ''
+[51] TextMetadata 'CreatedFromNL'
+[52] TextMetadata 'CreatedFromNL'
+[53] TextMetadata 'CreatedFromNL'
+[54] ParsedExpression ''
+[55] ParsedExpression ''
+[56] ParsedExpression ''
+[57] ParsedExpression ''
+[58] ParsedExpression ''
+[59] ParsedExpression ''
+[60] JSInputParameter 'ChartWidgetId'
+[61] JSInputParameter 'Locale'
+[62] ParsedExpression ''
+[63] ParsedExpression ''
+[64] ParsedExpression ''
+[65] ParsedExpression ''
+[66] JSInputParameter 'ChartWidgetId'
+[67] ParsedExpression ''
+[68] ParsedExpression ''
+[69] ParsedExpression ''
+[70] ParsedExpression ''
+[71] ParsedExpression ''
+[72] ParsedExpression ''
+[73] ParsedExpression ''
+[74] ParsedExpression ''
+[75] ParsedExpression ''
+[76] ParsedExpression ''
+[77] WebBlockInstance ''
+[78] WebBlockInstance ''
+[79] Expression '' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[80] Button '' Style=""btn btn-primary" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[81] Container 'Counters' Style=""dashboard-counters" [ValueExpression[ServiceStudio.Expressions.AbstractExpressi..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[82] Container '' Style=""margin-top-xxl" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[83] Container '' Style=""margin-top-base" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[84] Container 'IsTableLoadingOrEmpty' Style=""margin-top-base" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[85] Container '' Style=""margin-top-xxl" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[86] WebBlockInstance ''
+[87] Popup 'AssigningPopup' Style=""popup-dialog" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[88] If '' Condition="False [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[89] ParsedExpression ''
+[90] ParsedExpression ''
+[91] ParsedExpression ''
+[92] ParsedExpression ''
+[93] ParsedExpression ''
+[94] ParsedExpression ''
+[95] ParsedExpression ''
+[96] ParsedExpression ''
+[97] ParsedExpression ''
+[98] ParsedExpression ''
+[99] ParsedExpression ''
+[100] ParsedExpression ''
+[101] ParsedExpression ''
+[102] ParsedExpression ''
+[103] ParsedExpression ''
+[104] ParsedExpression ''
+[105] ParsedExpression ''
+[106] ParsedExpression ''
+[107] ParsedExpression ''
+[108] ParsedExpression ''
+[109] ParsedExpression 

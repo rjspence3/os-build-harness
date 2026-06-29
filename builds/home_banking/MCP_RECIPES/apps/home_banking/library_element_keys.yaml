@@ -1,0 +1,186 @@
+# Library element keys for the `addReferenceToElements` MCP tool.
+#
+# Discovered via `mcp__outsystems__context_search`
+#   objects=["Blocks"], search_type="full-text", query="*", limit=100
+#   per app, paginated with offset.
+# Date: 2026-06-08, tenant: rob's ODC.
+#
+# Shape required by addReferenceToElements: {elementKey, producerKey} pairs.
+#   producerKey = library app `assetKey` (UUID of the library app)
+#   elementKey  = block `key` (UUID of the block inside that app)
+#
+# OutSystemsUI returned 116 total blocks (100 on page 0, 16 on page 1).
+# InputMasks returned 5 total blocks (single page).
+
+libraries:
+  OutSystemsUI:
+    producerKey: 8be17f2a-431c-4958-b894-c77b988a7271
+    blocks:
+      # --- chrome_wrap explicit requests ---
+      Tag: 8a67ba94-c4c8-4792-a082-33aeb0de5590
+      Counter: a49c658c-dba8-4520-9833-85bad9b11429
+      InputWithIcon: 1190fddf-d5b0-4a2d-8d23-355f086907fd
+      ButtonLoading: b6fb29b1-5745-4f43-b887-e98b7a5eb5d1
+      AlignCenter: 434b4277-ddfd-4e70-a05c-69a2ad693502
+      Card: 57a5fe1e-02aa-4ada-89ca-750832d53968
+      Section: 4abf510d-4b64-4a9c-affa-60858799d672
+
+      # --- columns family (Columns2/3/4/5/6 present; no Columns7+; no Columns1) ---
+      Columns2: 84239fde-5c20-41b9-b32f-bcc9c73e85f9
+      Columns3: c7a1c185-ed59-44ce-8f78-eba943d77de1
+      Columns4: fd88b813-4856-4427-83b6-aa173e7a6202
+      Columns5: 9f574145-6aec-42e4-94af-d6c9632a84df
+      Columns6: c1d4c10e-245d-4b3d-819d-7c20dda15669
+      ColumnsMediumLeft: b426eeac-1f4b-4953-9aab-fb9d05e746e7
+      ColumnsMediumRight: bd35a975-d57d-4ef2-8296-6fab865891fe
+      ColumnsSmallLeft: 6b3dda93-83c7-44e5-b4de-26faac4fc9af
+      ColumnsSmallRight: 6a410a74-133a-4f6e-961a-b353a934448e
+
+      # --- notification family ---
+      # No "Toast" or "SimpleAlert" by those literal names.
+      # Closest matches: Notification (page 0), Alert (page 1).
+      Notification: 62678292-2a58-4283-a983-b2d0cb152106
+      Alert: 3f398694-7451-4ab4-ad1d-b27e38ed9490
+
+      # --- card family ---
+      CardItem: 3ad57f01-6c5d-4747-bbdb-8aca699bb1ba
+      CardBackground: 322fc264-beef-464f-9d49-2037975a7578
+      CardSectioned: 08294a72-da0e-451a-9f32-5b86b586a9a9
+
+      # --- other broadly-useful blocks for home banking UX ---
+      Badge: 94a98cbf-411d-4033-8d1d-53ffda1583a9
+      IconBadge: ec03c701-f425-4016-9f49-a9ead02c8861
+      BlankSlate: 7dafe718-172c-4583-aefa-0c9bd4823126
+      Breadcrumbs: 6c02be85-908a-4e34-b2ac-01acbc328cb2
+      BreadcrumbsItem: 27905926-04b3-45f0-9998-a11ad1106fb9
+      Carousel: 322c145b-0e8d-472c-b394-9fc44623687f
+      CenterContent: c7011d06-3c00-4100-8b25-1697fb100315
+      ChatMessage: 8677baf2-1ed0-437e-8e4e-ca1417f004d7
+      DatePicker: 21cf54a0-37ac-4322-adf9-0b8ddc77d237
+      DatePickerRange: 950628e8-8fbb-4f1a-a106-9137cf710955
+      MonthPicker: c9a58908-0ad9-407c-a6d1-fd7a86e10760
+      TimePicker: 886e23f2-1a57-44ef-b3a8-7e1f39184ad1
+      DropdownSearch: b808428c-a355-4da5-ae16-6203477cd31c
+      DropdownServerSide: 55cca43f-dd56-4203-aab3-7bdb57042dc6
+      DropdownServerSideItem: c9914187-fe75-4a68-bdf9-a1f77cd5db39
+      DropdownTags: f3149916-897e-4082-bf17-5785e672f0ec
+      FlipContent: 724a06f1-42b7-4d07-8827-0363998527cc
+      FloatingActions: fa304e38-44cb-43a4-b315-909c6826c078
+      FloatingActionsItem: 665682ae-3127-46e8-8086-66874c5add64
+      FloatingContent: 2f661817-c5e7-4aee-80d6-5521f8f66189
+      Gallery: 858e3702-ebcf-4395-b63d-04282d7f04b6
+      InlineSVG: 58181461-a594-47fd-bfd1-2188b1380220
+      LightBox: 20c5f26b-302b-4591-8baf-71e0405cdab4
+      LightboxImage: 120d8541-d847-45a7-a57a-b20cf68b4a15
+      ListItemContent: f37459e7-1aeb-4187-bf16-bb5b4a1b8c1f
+      MarginContainer: 8fa97d12-eda9-4bd6-80dc-0d43329a8660
+      MasterDetail: 446147b1-9704-4d0c-913c-046a4b89bed8
+      OverflowMenu: cee177d5-8eba-43e6-b7b4-55994865541f
+      Pagination: 16c74e3e-972a-450e-81f4-1da5b3d8606e
+      ProgressBar: aa878163-7d92-4bc9-acce-392b67407218
+      ProgressCircle: ae7a1572-bf6e-49ca-9914-0979235a8c97
+      ProviderLoginButton: c89a03f6-fa00-4bb9-a79a-774d8fa454fb
+      RangeSlider: 138fa76c-5dd0-4fec-b2a5-f0ad3a369a81
+      RangeSliderInterval: 33756962-0b0b-44ba-8389-d2f259163f30
+      Rating: 5b620d10-93dc-4232-8db0-79fbc4bf83b9
+      ScrollableArea: 52c33e9f-72b4-4d92-9f0c-01c51e409a2b
+      Search: 4fa4ad57-278f-47ec-9dd8-527c45a0eac9
+      SectionGroup: 36b183d9-5fd6-4ebc-94b2-1aab7396d93e
+      SectionIndex: 68aae9f5-a13e-4429-8195-64190c9adac5
+      SectionIndexItem: 9a70b95b-8772-4366-ad95-2478ad379e55
+      Separator: 39080a9d-eba3-40c0-bcd0-df9437a23bd4
+      Sidebar: 8dbd8a4f-a81a-4fe1-9206-f0f7e108babe
+      StackedCards: 9080ee14-1bc0-4b3e-bd71-428df79f5fbf
+      Submenu: 6b4cff29-1363-499e-b791-59661402e794
+      Tabs: 3025cc59-1e44-46a6-b0d0-ec1a339f36d6
+      TabsContentItem: ab717706-de5b-407c-9157-5c6a715777bb
+      TabsHeaderItem: e79bc3ad-4d68-4711-9fd2-e7269cd2ec87
+      TimelineItem: 558b8633-fcbe-470f-9c6b-e13e0b3ca54a
+      Tooltip: 283641ee-368d-43a2-a20e-4fc47dd869fb
+      UserAvatar: 8fc25ace-aad9-4e38-805d-8882d7d9165a
+      Video: fc04396f-c304-42d9-bc09-22d07773c7e3
+      Wizard: d77eab3d-b0dd-4236-8453-6d0a8c9a770f
+      WizardItem: a464a45b-2897-42b1-ab7d-a8ca3ccc3d1c
+      Accordion: b0de35c7-6f06-4c98-9424-4a464a2aad73
+      AccordionItem: 134819e6-1d9a-40b6-af70-2db47cca1e94
+      ActionSheet: 4a2ed3b7-d299-41f5-a385-2c9d470299da
+      AnimatedLabel: 24da8401-f5f4-46bb-b63a-32f0e5f522cd
+      Animate: 071b5238-628d-49bd-ae22-a392fceff908
+      BottomBarItem: d79ab315-2bb1-4098-b112-4d368de99365
+      BottomSheet: 4fb64c61-8941-44be-b854-da0b608a625b
+      MenuDrag: 99cc2beb-5d4d-41af-838d-82eae4e36402
+      PullToRefresh: 760c25d0-962f-4127-8268-dabb167dce11
+
+      # --- event/utility blocks (no visual output, but agents sometimes ref them) ---
+      ApplicationLoadEvents: e90e438e-4ef3-4e36-bc75-f3cbb3c2b15e
+      MouseEvents: b01e42e0-4b51-4033-b59a-a8b35cb11233
+      NetworkStatusChanged: d1feb84a-1589-4104-91d4-53dbc9add189
+      OfflineDataSyncCore: f926b4ec-9a60-481c-bb0d-a03dda97f3df
+      PasswordPolicy: 98f4a100-e907-494e-8fc0-7cc17fefb0e0
+      SwipeEvents: b860daa9-4eca-42bb-8539-625ca1b6fd6f
+      TouchEvents: f7ecc35c-38b1-4d25-956d-47508c2eb320
+      DisplayOnDevice: 558f2ce5-0350-4196-8060-44e236bc40af
+      Licenses: 1b0f228c-01f5-4288-9298-06ca627a2b7c
+
+  InputMasks:
+    # NOTE: app's display name is "Input Masks" (with space) — app_list:
+    # assetKey=c616ffa7-c700-45da-ac8d-44bec05336e7, assetType=LowCodeLibrary, rev 2.
+    # context_search.assetName is the no-space "InputMasks" identifier.
+    producerKey: c616ffa7-c700-45da-ac8d-44bec05336e7
+    blocks:
+      MaskText: 72eb7df0-cd8a-4aae-bdb5-6f4f99027375
+      MaskCurrency: 92e12bcb-fbf3-43e6-b5d0-e0c450ed345b
+      MaskNumber: 21805e26-fc58-4f1e-addd-cb429ecec7b1
+      MaskDate: 2e2ec72a-9143-475d-a3ea-12aba52423d3
+      MaskPercentage: 77ce3bd6-4df2-4de8-b657-952cc331611e
+      # No MaskPhone, MaskCPF, MaskCNPJ, MaskZip, MaskTime, or MaskEmail in this version.
+
+  # --- LowCodeLibrary producer ACTIONS (not blocks) — V20 fix, 2026-06-12 ---
+  # Earlier this file catalogued Blocks only (discovered via context_search
+  # objects=["Blocks"]); producer ACTIONS were never collected, so Phase 0
+  # imported entities-only and downstream action bodies could not call them.
+  # Shape is identical to blocks ({name: elementKey}); the loader reads
+  # `actions:` into the same name→ElementRef map. elementKeys are decoded from
+  # known globalKeys via library_keys.compute_global_key (reversible) — verified
+  # round-trip 2026-06-12.
+  AgentsCommonResources:
+    producerKey: 0d6e0ed8-79f8-42c2-a664-b4656db187eb
+    actions:
+      # globalKey 2A5uDfh5wkKmZLRlbbGH6w*RqhsG84kiECGEOl_4g_2_Q (producer*element)
+      GetLabelByLocale: 1b6ca846-24ce-4088-8610-e97fe20ff6fd
+    blocks:
+      # HBIcon: single-placeholder icon wrapper. Consumers drop a Text widget
+      # whose text is an icon-font ligature (e.g. "eyeshow") into the IconName
+      # placeholder. Block key from _raw/HBIcon.block.tree.md. NOTE: the block
+      # alone does not render glyphs — the icon FONT (custom @font-face) must
+      # also be present in the consuming app's theme (V22).
+      HBIcon: dad9f4b3-33b0-4bda-81f9-d6b9edf2e4ee
+
+# Blocks requested by chrome_wrap but NOT discoverable in the tenant.
+# Some are primitive widgets (not blocks); some only exist as DEPRECATED_*;
+# some are non-existent under the requested name in OS UI 2.x.
+missing:
+  - name: AlignLeft
+    reason: Not a block; primitive widget alignment handled via CSS classes / Container.HorizontalAlign.
+  - name: AlignRight
+    reason: Not a block; primitive widget alignment handled via CSS classes / Container.HorizontalAlign.
+  - name: AlignJustify
+    reason: Not a block; primitive widget alignment handled via CSS classes / Container.HorizontalAlign.
+  - name: Button
+    reason: Primitive widget (IButton), not a block. Use ButtonLoading for spinner/loading state.
+  - name: ButtonGroup
+    reason: Not present as a block in OS UI 2.x. Achieve via Container + Button widgets + CSS.
+  - name: Icon
+    reason: Primitive widget (IIcon / FontAwesome class) — not a block. Use IconBadge if you need an icon-with-counter block.
+  - name: Heading
+    reason: Not a block. Use IExpression / Text widget with heading CSS classes (h1..h6).
+  - name: Header
+    reason: Not a block in this tenant. Layout headers come from the Layout block in Common (per-app).
+  - name: Toast
+    reason: No block by that name. Closest matches captured under Notification + Alert. OS UI announcement claims Toast pattern but tenant inventory disagrees.
+  - name: SimpleAlert
+    reason: No block by that literal name. Alert (uuid 3f398694-7451-4ab4-ad1d-b27e38ed9490) is the closest match.
+
+# Counts: 116 OutSystemsUI blocks total (51 listed above + 65 unlisted, mostly
+# DEPRECATED_* variants — search again with grep on DEPRECATED_ if you need them).
+# All DEPRECATED_* keys are reachable in the same context_search response.

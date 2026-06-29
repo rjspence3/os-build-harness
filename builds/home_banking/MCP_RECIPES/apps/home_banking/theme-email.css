@@ -1,0 +1,59 @@
+/* ================================================================================ */
+/*  Home Banking — Email Theme (shared between Portal + Backoffice)                  */
+/*  Source: MCP context_themes from Portal/Backoffice rev 5, theme name "EmailTheme" */
+/*  This is a stripped-down stylesheet used by transactional emails. Both apps       */
+/*  carry an identical copy.                                                         */
+/* ================================================================================ */
+
+/* Widgets */
+.table {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    border-spacing: 0;
+    display: block;
+    empty-cells: show;
+    overflow: auto;
+    position: relative;
+    white-space: nowrap;
+    width: 100%;
+    word-break: keep-all;
+}
+
+.table-header th {
+    border-bottom: 1px solid #dee2e6;
+    color: #4f575e;
+    font-weight: 400;
+    height: 48px;
+    padding: 0 24px;
+    text-align: left;
+    width: 100%;
+}
+
+.table-header th:first-child { border-radius: 4px 0 0 0; }
+.table-header th:last-child { border-radius: 0 4px 0 0; }
+
+.table-row td {
+    border-bottom: 1px solid #dee2e6;
+    height: 56px;
+    padding: 8px 24px;
+    vertical-align: inherit;
+}
+
+.table-row-small td { height: 48px; }
+.table-row-medium td { height: 64px; }
+.table-row-stripping:nth-child(even) td { background: #f8f9fa; }
+.table-row:hover td { background: #f1f3f5; }
+.table .table-row:last-child td:first-child { border-radius: 0 0 0 4px; }
+.table .table-row:last-child td:last-child {border-radius: 0 0 4px 0; }
+.table .table-row:last-child td { border-bottom: none; }
+td:not([data-header]):before { display: none; }
+
+.list-item {
+    border-bottom: 1px solid #dee2e6;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+}
+.list-item:last-of-type { border-bottom: none; }
+.list .list-item { background-color: #fff; }

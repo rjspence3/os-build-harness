@@ -1,0 +1,682 @@
+You are executing a Mentor MCP recipe from a debugged library. The library is
+a defined methodology — recipes compose in phase order (STRUCTURE → LOGIC →
+CHROME → VERIFY) and each recipe defines as much as possible explicitly. The
+API surface and patterns are pre-resolved — do NOT explore, probe, reflect,
+or call get_app_summary.
+
+CONSTRAINTS (non-negotiable):
+
+1. ONE applyModelApiCode call per recipe. No reflection, no exploratory reads.
+2. Use the EXACT code provided. Do not "improve" it.
+3. If the call throws compile or runtime error: STOP and report the error
+   verbatim. Do NOT iterate, do NOT regenerate, do NOT attempt a fix.
+4. Print only the diagnostic output the recipe specifies. No extra summarization.
+5. Do NOT publish from inside the recipe. The caller runs publish_start
+   separately.
+6. The recipe's PHASE annotation determines what the call may touch:
+   - STRUCTURE: entities, statics, roles, dechromed screens, default screen.
+     Uses ONLY standard OutSystemsUI widgets + the manifest's own custom
+     types. Custom blocks (Menu, Header, brand icons) are NOT yet authored —
+     do not reference them.
+   - LOGIC: server/service/client actions; expressions referencing the
+     STRUCTURE phase's entities. No widget/screen mutations.
+   - CHROME: custom blocks, theme CSS, chrome-wrap (replacing dechromed
+     widget shells with custom-block instances). Assumes STRUCTURE + LOGIC
+     phases published successfully.
+   - VERIFY: read-only context_* / applyModelApiCode probes that compare
+     published state vs manifest expectations.
+   A phase-violating call (e.g. a STRUCTURE recipe trying to wrap a screen
+   in HBIcon) is a recipe-library bug — STOP and report.
+
+API SURFACE PRE-RESOLVED (do not rediscover):
+
+- Server entity creation: eSpace.CreateServerEntity(name)
+- PK setup: entity.IdentifierAttribute = idAttr (assign AFTER attr created, BEFORE
+  any other attribute). idAttr.IsAutoNumber = OutSystems.Model.Enumerations.AutoNumber.Yes;
+  idAttr.IsMandatory = true; idAttr.DataType = eSpace.LongIntegerType.
+  (IsAutoNumber is an enum, NOT bool. Values: No | Yes | YesIfEmpty)
+- FK attributes: a.DataType = <staticEntity>.IdentifierType or
+  userIdentType (resolved via eSpace.References)
+- FK DeleteRule: ALWAYS set to OutSystems.Model.Enumerations.DeleteRule.Ignore
+  (Protect is deprecated and causes OS-BLD-40409 at publish time)
+- Static entity creation: eSpace.CreateStaticEntity(name)
+- Role creation: eSpace.CreateRole(name); role.Public = false
+- Server action: eSpace.CreateServerAction(name); action.Public = bool
+- SQL node: action.CreateNode<ISQLNode>("name"); sqlNode.Statement = "SQL";
+  sqlNode.CreateInputParameter(name); sqlNode.SetArgumentValue(param, "expr")
+- Screen creation: BLOCKED on some apps by a platform bug — recipe must declare
+  if it touches CreateScreen and the caller will route accordingly
+- DefaultScreen: eSpace.DefaultScreen = some IScreen reference
+- Publish: external to recipes; caller runs publish_start then publish_status
+
+CORPUS REFERENCES (relevant memories, already encoded into recipes):
+
+- odc_mcp_entity_auto_actions_incomplete — PK required before publish
+- odc_db_upgrade_pk_change_blocked — never alter PK post-publish; delete+recreate
+- odc_mcp_sql_node_api — ISQLNode surface
+- odc_mcp_publish_terminal_success_gate — never cancel a session you intend to publish
+- odc_mcp_screen_creation_broken_complianceops — known per-app CreateScreen bug
+- odc_mcp_record_literal_via_typed_local — Server Action record creation pattern
+- odc_long_integer_to_identifier_cast — LongIntegerToIdentifier for ID arguments
+- odc_mcp_assign_node_iteration_not_flow_order — identify Assign nodes by Variable name
+
+REQUIRED IMPORTS (always include these in the imports array):
+
+System.Linq
+OutSystems.Model
+OutSystems.Model.Data
+OutSystems.Model.Logic
+OutSystems.Model.Logic.Nodes
+OutSystems.Model.Enumerations
+OutSystems.Model.Types
+
+DIAGNOSTIC OUTPUT FORMAT:
+
+End the C# block with ONE Console.WriteLine that prints, on a single line:
+"Recipe <NN>: <Name> | Created: <comma list> | Status: OK"
+
+If any intermediate step asserts a non-null pre-condition that fails, print:
+"Recipe <NN>: <Name> | FAILED at <step name>: <what was unexpected>"
+and return from the lambda. The caller treats this as a fatal stop.
+
+Now execute the following recipe:
+
+```csharp
+eSpace => {
+    // ─── Chrome Wrap: Dashboard (Recipe 23) ─────────────
+    var flow = eSpace.MobileFlows.FirstOrDefault(f => f.Name == "MainFlow");
+    if (flow == null) { Console.WriteLine($"FAILED: MobileFlow MainFlow not found"); return; }
+    var screen = flow.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileScreen>().FirstOrDefault(s => s.Name == "Dashboard");
+    if (screen == null) { Console.WriteLine($"FAILED: Screen Dashboard not found"); return; }
+    int wrapped = 0, missing = 0;
+    
+    // Wrap site: 2 → BlockInstance SourceBlock=Menu
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Menu_2");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Menu_2 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Menu")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Menu");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Menu not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "MenuInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "ActiveItem"); if (p != null) p.SetValue("0"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 3 → BlockInstance SourceBlock=Header
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Header_3");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Header_3 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Header")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Header");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Header not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "HeaderInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "HasAIChat"); if (p != null) p.SetValue("True"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "NotificationCount"); if (p != null) p.SetValue("GetEmployeeTasks.EmployeeTasks.Length"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 6 → BlockInstance SourceBlock=HBIcon
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_HBIcon_6");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_HBIcon_6 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "HBIconInstance";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 12 → BlockInstance SourceBlock=Counter
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Counter_12");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Counter_12 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Counter")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Counter");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Counter not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "CounterInstance";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 14 → BlockInstance SourceBlock=CounterTag
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_CounterTag_14");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_CounterTag_14 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "CounterTag")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "CounterTag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block CounterTag not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "CounterTagInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Percentage"); if (p != null) p.SetValue("GetCounters.PendingDiff"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "IsReversed"); if (p != null) p.SetValue("True"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 16 → BlockInstance SourceBlock=Counter
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Counter_16");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Counter_16 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Counter")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Counter");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Counter not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "CounterInstance2";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 18 → BlockInstance SourceBlock=CounterTag
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_CounterTag_18");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_CounterTag_18 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "CounterTag")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "CounterTag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block CounterTag not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "CounterTagInstance2";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Percentage"); if (p != null) p.SetValue("GetCounters.CompletedDiff"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 20 → BlockInstance SourceBlock=Counter
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Counter_20");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Counter_20 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Counter")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Counter");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Counter not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "CounterInstance3";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 23 → BlockInstance SourceBlock=CounterTag
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_CounterTag_23");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_CounterTag_23 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "CounterTag")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "CounterTag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block CounterTag not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "CounterTagInstance3";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Percentage"); if (p != null) p.SetValue("GetCounters.ProgressDiff"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 24 → BlockInstance SourceBlock=ProgressBar
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_ProgressBar_24");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_ProgressBar_24 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "ProgressBar")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "ProgressBar");
+            if (blockSig == null) { Console.WriteLine($"WARN: block ProgressBar not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "ProgressBarInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Progress"); if (p != null) p.SetValue("GetCounters.Progress"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "ProgressColor"); if (p != null) p.SetValue("TextToIdentifier(GetCounters.ProgressColor)"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 41 → BlockInstance SourceBlock=InputWithIcon
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_InputWithIcon_41");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_InputWithIcon_41 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "InputWithIcon")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "InputWithIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block InputWithIcon not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "InputWithIconInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "ExtendedClass"); if (p != null) p.SetValue(" If(IsPhone(),\" margin-bottom-s\",\"\")"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 42 → BlockInstance SourceBlock=HBIcon
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_HBIcon_42");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_HBIcon_42 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "HBIconInstance2";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 48 → BlockInstance SourceBlock=HBIcon
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_HBIcon_48");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_HBIcon_48 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "HBIconInstance3";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 55 → BlockInstance SourceBlock=HBIcon
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_HBIcon_55");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_HBIcon_55 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "HBIconInstance4";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 91 → BlockInstance SourceBlock=AlignCenter
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_AlignCenter_91");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_AlignCenter_91 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "AlignCenter")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "AlignCenter");
+            if (blockSig == null) { Console.WriteLine($"WARN: block AlignCenter not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "AlignCenterInstance";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 96 → BlockInstance SourceBlock=EmployeePhoto
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_EmployeePhoto_96");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_EmployeePhoto_96 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "EmployeePhoto")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "EmployeePhoto");
+            if (blockSig == null) { Console.WriteLine($"WARN: block EmployeePhoto not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "EmployeePhotoInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "EmployeeId"); if (p != null) p.SetValue("GetRequests.List.Current.Employee.Id"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "IsSmallSize"); if (p != null) p.SetValue("True"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 98 → BlockInstance SourceBlock=HBIcon
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_HBIcon_98");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_HBIcon_98 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "HBIconInstance5";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 102 → BlockInstance SourceBlock=Tag
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Tag_102");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Tag_102 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Tag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Tag not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "TagInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Color"); if (p != null) p.SetValue("TextToIdentifier(GetRequests.List.Current.LoanRequestStatus.Color)"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 118 → BlockInstance SourceBlock=ChartLegend
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_ChartLegend_118");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_ChartLegend_118 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "ChartLegend")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "ChartLegend");
+            if (blockSig == null) { Console.WriteLine($"WARN: block ChartLegend not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "ChartLegendInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Styling"); if (p != null) p.SetValue("{ ItemsDistance: 40 }"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 127 → BlockInstance SourceBlock=DonutChart
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_DonutChart_127");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_DonutChart_127 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "DonutChart")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "DonutChart");
+            if (blockSig == null) { Console.WriteLine($"WARN: block DonutChart not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "DonutChartInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "DataPointList"); if (p != null) p.SetValue("GetDonutChartData.ChartDataPoints"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Height"); if (p != null) p.SetValue("250"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "InnerSize"); if (p != null) p.SetValue("\"85%\""); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Initialized"); if (p != null) p.SetValue("DonutChartInitialized(ChartWidgetId=ChartWidgetId)"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 128 → BlockInstance SourceBlock=ChartLegend
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_ChartLegend_128");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_ChartLegend_128 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "ChartLegend")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "ChartLegend");
+            if (blockSig == null) { Console.WriteLine($"WARN: block ChartLegend not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "ChartLegendInstance2";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Position"); if (p != null) p.SetValue("Entities.LegendPosition.Right"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 135 → BlockInstance SourceBlock=AgentSidebar
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_AgentSidebar_135");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_AgentSidebar_135 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "AgentSidebar")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "AgentSidebar");
+            if (blockSig == null) { Console.WriteLine($"WARN: block AgentSidebar not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "AgentSidebarInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "InputPrompt"); if (p != null) p.SetValue("\"Ask about loan requests\""); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 137 → BlockInstance SourceBlock=SidebarTask
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_SidebarTask_137");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_SidebarTask_137 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "SidebarTask")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "SidebarTask");
+            if (blockSig == null) { Console.WriteLine($"WARN: block SidebarTask not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "SidebarTaskInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "EmployeeTasks"); if (p != null) p.SetValue("GetEmployeeTasks.EmployeeTasks"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 138 → BlockInstance SourceBlock=SidebarChat
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_SidebarChat_138");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_SidebarChat_138 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "SidebarChat")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "SidebarChat");
+            if (blockSig == null) { Console.WriteLine($"WARN: block SidebarChat not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "SidebarChatInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "UserPicture"); if (p != null) p.SetValue("GetLoginUserPicture.List.Current.EmployeePicture.PictureBinary"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 145 → BlockInstance SourceBlock=HBIcon
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_HBIcon_145");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_HBIcon_145 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "HBIconInstance6";
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 156 → BlockInstance SourceBlock=FirebaseReceiver
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_FirebaseReceiver_156");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_FirebaseReceiver_156 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "FirebaseReceiver")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "FirebaseReceiver");
+            if (blockSig == null) { Console.WriteLine($"WARN: block FirebaseReceiver not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "FirebaseReceiverInstance";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "TargetIdentifier"); if (p != null) p.SetValue("FirebaseData.Firebase_TargetIdentifier+\"_\"+GetUserId()"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Token"); if (p != null) p.SetValue("FirebaseData.Firebase_Token"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "FBDatabaseURL"); if (p != null) p.SetValue("FirebaseData.Firebase_DatabaseURL"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "ProjectId"); if (p != null) p.SetValue("FirebaseData.Firebase_ProjectId"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "AlertEventReceived"); if (p != null) p.SetValue("FirebaseReceiverAlertEventReceived(FirebaseEvent=FirebaseEvent,"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "IsAgents"); if (p != null) p.SetValue("False)"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "MissingData"); if (p != null) p.SetValue("FirebaseReceiverMissingData"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 157 → BlockInstance SourceBlock=FirebaseReceiver
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_FirebaseReceiver_157");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_FirebaseReceiver_157 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "FirebaseReceiver")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "FirebaseReceiver");
+            if (blockSig == null) { Console.WriteLine($"WARN: block FirebaseReceiver not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                bi.Name = "FirebaseReceiverInstance2";
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "TargetIdentifier"); if (p != null) p.SetValue("FirebaseData.Firebase_TargetIdentifier+\"_\"+GetUserId()+\"_agents\""); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Token"); if (p != null) p.SetValue("FirebaseData.Firebase_Token"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "ProjectId"); if (p != null) p.SetValue("FirebaseData.Firebase_ProjectId"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "FBDatabaseURL"); if (p != null) p.SetValue("FirebaseData.Firebase_DatabaseURL"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "AlertEventReceived"); if (p != null) p.SetValue("FirebaseReceiverAlertEventReceived(FirebaseEvent=FirebaseEvent,"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "IsAgents"); if (p != null) p.SetValue("True)"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "MissingData"); if (p != null) p.SetValue("FirebaseReceiverMissingData"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    Console.WriteLine($"Recipe 23: Dashboard | wrapped={wrapped}/27, missing={missing} | Status: {(wrapped == 27 && missing == 0 ? \"OK\" : \"PARTIAL\")}");
+}
+```
+
+Required imports for the `imports` array on the applyModelApiCode call:
+  - System.Linq
+  - OutSystems.Model
+  - OutSystems.Model.Data
+  - OutSystems.Model.Logic
+  - OutSystems.Model.Logic.Nodes
+  - OutSystems.Model.UI.Mobile
+  - OutSystems.Model.UI.Mobile.Widgets
+  - OutSystems.Model.Enumerations
+  - ServiceStudio.Plugin.NRWidgets

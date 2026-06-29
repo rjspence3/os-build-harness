@@ -1,0 +1,568 @@
+You are executing a Mentor MCP recipe from a debugged library. The library is
+a defined methodology — recipes compose in phase order (STRUCTURE → LOGIC →
+CHROME → VERIFY) and each recipe defines as much as possible explicitly. The
+API surface and patterns are pre-resolved — do NOT explore, probe, reflect,
+or call get_app_summary.
+
+CONSTRAINTS (non-negotiable):
+
+1. ONE applyModelApiCode call per recipe. No reflection, no exploratory reads.
+2. Use the EXACT code provided. Do not "improve" it.
+3. If the call throws compile or runtime error: STOP and report the error
+   verbatim. Do NOT iterate, do NOT regenerate, do NOT attempt a fix.
+4. Print only the diagnostic output the recipe specifies. No extra summarization.
+5. Do NOT publish from inside the recipe. The caller runs publish_start
+   separately.
+6. The recipe's PHASE annotation determines what the call may touch:
+   - STRUCTURE: entities, statics, roles, dechromed screens, default screen.
+     Uses ONLY standard OutSystemsUI widgets + the manifest's own custom
+     types. Custom blocks (Menu, Header, brand icons) are NOT yet authored —
+     do not reference them.
+   - LOGIC: server/service/client actions; expressions referencing the
+     STRUCTURE phase's entities. No widget/screen mutations.
+   - CHROME: custom blocks, theme CSS, chrome-wrap (replacing dechromed
+     widget shells with custom-block instances). Assumes STRUCTURE + LOGIC
+     phases published successfully.
+   - VERIFY: read-only context_* / applyModelApiCode probes that compare
+     published state vs manifest expectations.
+   A phase-violating call (e.g. a STRUCTURE recipe trying to wrap a screen
+   in HBIcon) is a recipe-library bug — STOP and report.
+
+API SURFACE PRE-RESOLVED (do not rediscover):
+
+- Server entity creation: eSpace.CreateServerEntity(name)
+- PK setup: entity.IdentifierAttribute = idAttr (assign AFTER attr created, BEFORE
+  any other attribute). idAttr.IsAutoNumber = OutSystems.Model.Enumerations.AutoNumber.Yes;
+  idAttr.IsMandatory = true; idAttr.DataType = eSpace.LongIntegerType.
+  (IsAutoNumber is an enum, NOT bool. Values: No | Yes | YesIfEmpty)
+- FK attributes: a.DataType = <staticEntity>.IdentifierType or
+  userIdentType (resolved via eSpace.References)
+- FK DeleteRule: ALWAYS set to OutSystems.Model.Enumerations.DeleteRule.Ignore
+  (Protect is deprecated and causes OS-BLD-40409 at publish time)
+- Static entity creation: eSpace.CreateStaticEntity(name)
+- Role creation: eSpace.CreateRole(name); role.Public = false
+- Server action: eSpace.CreateServerAction(name); action.Public = bool
+- SQL node: action.CreateNode<ISQLNode>("name"); sqlNode.Statement = "SQL";
+  sqlNode.CreateInputParameter(name); sqlNode.SetArgumentValue(param, "expr")
+- Screen creation: BLOCKED on some apps by a platform bug — recipe must declare
+  if it touches CreateScreen and the caller will route accordingly
+- DefaultScreen: eSpace.DefaultScreen = some IScreen reference
+- Publish: external to recipes; caller runs publish_start then publish_status
+
+CORPUS REFERENCES (relevant memories, already encoded into recipes):
+
+- odc_mcp_entity_auto_actions_incomplete — PK required before publish
+- odc_db_upgrade_pk_change_blocked — never alter PK post-publish; delete+recreate
+- odc_mcp_sql_node_api — ISQLNode surface
+- odc_mcp_publish_terminal_success_gate — never cancel a session you intend to publish
+- odc_mcp_screen_creation_broken_complianceops — known per-app CreateScreen bug
+- odc_mcp_record_literal_via_typed_local — Server Action record creation pattern
+- odc_long_integer_to_identifier_cast — LongIntegerToIdentifier for ID arguments
+- odc_mcp_assign_node_iteration_not_flow_order — identify Assign nodes by Variable name
+
+REQUIRED IMPORTS (always include these in the imports array):
+
+System.Linq
+OutSystems.Model
+OutSystems.Model.Data
+OutSystems.Model.Logic
+OutSystems.Model.Logic.Nodes
+OutSystems.Model.Enumerations
+OutSystems.Model.Types
+
+DIAGNOSTIC OUTPUT FORMAT:
+
+End the C# block with ONE Console.WriteLine that prints, on a single line:
+"Recipe <NN>: <Name> | Created: <comma list> | Status: OK"
+
+If any intermediate step asserts a non-null pre-condition that fails, print:
+"Recipe <NN>: <Name> | FAILED at <step name>: <what was unexpected>"
+and return from the lambda. The caller treats this as a fatal stop.
+
+Now execute the following recipe:
+
+Now execute the following recipe:
+
+```csharp
+eSpace => {
+    // ─── Chrome Wrap: Requests (Recipe 23) ─────────────
+    var flow = eSpace.MobileFlows.FirstOrDefault(f => f.Name == "MainFlow");
+    if (flow == null) { flow = eSpace.CreateMobileFlow("MainFlow"); Console.WriteLine($"Created missing MobileFlow MainFlow"); }
+    var screen = flow.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileScreen>().FirstOrDefault(s => s.Name == "Requests");
+    if (screen == null) { Console.WriteLine($"FAILED: Screen Requests not found"); return; }
+    int wrapped = 0, missing = 0;
+    
+    // Wrap site: 2 → block instance of Menu inside marker chrome_Menu_2
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_Menu_2");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_Menu_2 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Menu")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Menu")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Menu");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Menu not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_Menu_2 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_2");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on Menu: {ex.Message}"); }
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 4 → block instance of Columns3 inside marker chrome_Columns3_4
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_Columns3_4");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_Columns3_4 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Columns3")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Columns3")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Columns3");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Columns3 not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_Columns3_4 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_4");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on Columns3: {ex.Message}"); }
+                    // captured binds (bind in LOGIC phase): {'TabletBehavior': 'Entities.BreakColumns.Last', 'PhoneBehavior': 'Entities.BreakColumns.All'}
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 8 → block instance of HBIcon inside marker chrome_HBIcon_8
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_HBIcon_8");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_HBIcon_8 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_HBIcon_8 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_8");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on HBIcon: {ex.Message}"); }
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 18 → block instance of HBIcon inside marker chrome_HBIcon_18
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_HBIcon_18");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_HBIcon_18 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_HBIcon_18 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_18");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on HBIcon: {ex.Message}"); }
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 56 → block instance of InputWithIcon inside marker chrome_InputWithIcon_56
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_InputWithIcon_56");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_InputWithIcon_56 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "InputWithIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "InputWithIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "InputWithIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block InputWithIcon not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_InputWithIcon_56 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_56");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on InputWithIcon: {ex.Message}"); }
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 57 → block instance of HBIcon inside marker chrome_HBIcon_57
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_HBIcon_57");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_HBIcon_57 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_HBIcon_57 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_57");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on HBIcon: {ex.Message}"); }
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 66 → block instance of HBIcon inside marker chrome_HBIcon_66
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_HBIcon_66");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_HBIcon_66 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "HBIcon");
+            if (blockSig == null) { Console.WriteLine($"WARN: block HBIcon not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_HBIcon_66 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_66");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on HBIcon: {ex.Message}"); }
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 108 → block instance of Tag inside marker chrome_Tag_108
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_Tag_108");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_Tag_108 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Tag not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_Tag_108 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_108");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on Tag: {ex.Message}"); }
+                    // captured binds (bind in LOGIC phase): {'Color': 'TextToIdentifier(…Color)', 'ExtendedClass': 'background-tag-is-premium'}
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 111 → block instance of Tag inside marker chrome_Tag_111
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_Tag_111");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_Tag_111 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Tag not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_Tag_111 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_111");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on Tag: {ex.Message}"); }
+                    // captured binds (bind in LOGIC phase): {'Color': 'TextToIdentifier(…Color)', 'ExtendedClass': 'background-tag-not-premium'}
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 114 → block instance of Tag inside marker chrome_Tag_114
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_Tag_114");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_Tag_114 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Tag not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_Tag_114 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_114");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on Tag: {ex.Message}"); }
+                    // captured binds (bind in LOGIC phase): {'Color': 'TextToIdentifier(…Color)', 'ExtendedClass': 'background-tag-not-premium'}
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 116 → block instance of Tag inside marker chrome_Tag_116
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_Tag_116");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_Tag_116 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "Tag");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Tag not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_Tag_116 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_116");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on Tag: {ex.Message}"); }
+                    // captured binds (bind in LOGIC phase): {'Color': 'Entities.Color.Blue', 'ExtendedClass': 'background-tag-not-premium'}
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    // Wrap site: 122 → block instance of FirebaseReceiver inside marker chrome_FirebaseReceiver_122
+    {
+        var marker = screen.GetAllDescendantsOfType<ServiceStudio.Plugin.NRWidgets.IContainer>()
+            .FirstOrDefault(c => c.Name == "chrome_FirebaseReceiver_122");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker chrome_FirebaseReceiver_122 not found — skipping"); missing++; }
+        else {
+            object blockSig = (object)eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "FirebaseReceiver")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlockSignature>())
+                .FirstOrDefault(b => b.Name == "FirebaseReceiver")
+                ?? (object)eSpace.References.SelectMany(r => r.GetAllDescendantsOfType<OutSystems.Model.UI.Web.IWebBlockSignature>())
+                .FirstOrDefault(b => b.Name == "FirebaseReceiver");
+            if (blockSig == null) { Console.WriteLine($"WARN: block FirebaseReceiver not found — skipping"); missing++; }
+            else {
+                if (marker.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>().Any()) {
+                    Console.WriteLine($"SKIP: marker chrome_FirebaseReceiver_122 already wrapped — preserving existing BlockInstance"); wrapped++;
+                } else {
+                    var bi = marker.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.IMobileBlockInstanceWidget>("inst_122");
+                    bi.GetType().GetProperty("SourceWebBlock").SetValue(bi, blockSig);
+                    try {
+                        var ipsObj = blockSig.GetType().GetProperty("InputParameters")?.GetValue(blockSig);
+                        var ipCount = (int)(ipsObj?.GetType().GetProperty("Count")?.GetValue(ipsObj) ?? 0);
+                        var itemProp = ipsObj?.GetType().GetProperty("Item", new[] { typeof(int) });
+                        var createArgMethod = bi.GetType().GetMethods().FirstOrDefault(m => m.Name == "CreateArgument" && m.GetParameters().Length == 1);
+                        for (int idx = 0; idx < ipCount; idx++) {
+                            var ip = itemProp?.GetValue(ipsObj, new object[] { idx });
+                            if (ip == null) continue;
+                            bool isMand = (bool)(ip.GetType().GetProperty("IsMandatory")?.GetValue(ip) ?? false);
+                            if (!isMand) continue;
+                            if (createArgMethod != null) createArgMethod.Invoke(bi, new object[] { ip });
+                        }
+                    } catch (Exception ex) { Console.WriteLine($"WARN: mandatory-param-bind failed on FirebaseReceiver: {ex.Message}"); }
+                    // captured binds (bind in LOGIC phase): {'FBDatabaseURL': 'FirebaseData.Firebase_DatabaseURL', 'Token': 'FirebaseData.Firebase_Token', 'TargetIdentifier': 'FirebaseData.Firebase_TargetIdentifier', 'ProjectId': 'FirebaseData.Firebase_ProjectId'}
+                    wrapped++;
+                }
+            }
+        }
+    }
+    
+    Console.WriteLine($"Recipe 23: Requests | wrapped={wrapped}/12, missing={missing} | Status: {(wrapped == 12 && missing == 0 ? \"OK\" : \"PARTIAL\")}");
+}
+```
+
+Required imports for the `imports` array on the applyModelApiCode call:
+  - System.Linq
+  - OutSystems.Model
+  - OutSystems.Model.Data
+  - OutSystems.Model.UI.Mobile
+  - OutSystems.Model.UI.Mobile.Widgets
+  - OutSystems.Model.Enumerations
+  - ServiceStudio.Plugin.NRWidgets

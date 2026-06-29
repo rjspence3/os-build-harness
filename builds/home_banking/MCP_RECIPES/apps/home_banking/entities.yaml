@@ -1,0 +1,746 @@
+# Home Banking — Entities Manifest
+#
+# Source: extracted via MCP context_entities from app key 695efc5b-8f39-4a53-8d71-35c59097d245
+# (Home Banking Core), 2026-05-26. The Core app holds the canonical data layer; Portal,
+# Backoffice, Loan Request, and Mobile all reference these entities.
+#
+# To rebuild: drive each entity through `data/MCP_RECIPES/02_entity_static.md` or
+# `data/MCP_RECIPES/01_entity_server.md` (chosen by `kind`). Static entities first, then
+# server entities in dependency order (entities whose FKs target other local entities go LAST).
+
+app: home_banking_core
+app_assetKey: 695efc5b-8f39-4a53-8d71-35c59097d245
+revision_at_extract: 5
+entity_count: 35
+
+# ─── STATIC ENTITIES (build first; server entities below reference these) ───
+
+static_entities:
+  - name: ChartDataOption
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: LabelLocale, dataType: Text, length: 200 }
+    records: ["Quarterly", "Weekly", "Monthly"]
+
+  - name: ExtraCoverage
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: MonthlyCost, dataType: Integer }
+    records: ["Lifeinsurance"]
+
+  - name: Goal
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: ImageURL, dataType: Text, length: 50 }
+      - { name: LabelLocale, dataType: Text, length: 200 }
+    records: ["Other", "Mobility", "Home", "Holiday", "Technology", "Leisure", "Health", "Education", "Future"]
+
+  - name: HBAIRecommendationOption
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: TaskLabel, dataType: Text, length: 100 }
+      - { name: IconName, dataType: Text, length: 50 }
+      - { name: LabelLocale, dataType: Text, length: 500 }
+      - { name: TaskLocale, dataType: Text, length: 1000 }
+    records: ["EmailReady", "Approve", "Valid", "Invalid", "Deny", "ManualReview"]
+
+  - name: HBAccountName
+    description: "Static entity to map for account name under multi locale"
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: LabelLocale, dataType: Text, length: 1000 }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+    records: ["CapitalHill", "PensionPlan", "Visa", "AutoPolicy", "HomePolicy", "Checking"]
+
+  - name: HBAgentDecisionStatus
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+    records: ["EmailSent", "Started", "Approved", "Rejected", "Pending", "NoActionNeeded"]
+
+  - name: HBAgentType
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: LogDescription, dataType: Text, length: 50 }
+      - { name: LabelLocale, dataType: Text, length: 1000 }
+      - { name: LogLocale, dataType: Text, length: 1000 }
+    records: ["Intake", "OfferAgent", "Underwriter", "Enrichment", "Communicator"]
+
+  - name: HBAgentsProgressSteps
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: LoadingLabel, dataType: Text, length: 150, isMandatory: true }
+      - { name: CompletedLabel, dataType: Text, length: 150, isMandatory: true }
+      - { name: DurationSecond, dataType: Integer }
+      - { name: HideOnApprove, dataType: Boolean }
+      - { name: HideOnReject, dataType: Boolean }
+      - { name: AgentTypeId, dataType: HBAgentType Identifier }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+    records: ["Communicator1_Approve", "Enrichment3", "Intake3", "Communicator3_Approve", "Underwriter2", "Communicator1", "Communicator2_Reject", "Enrichment1", "Enrichment2", "Underwriter3", "Underwriter1", "Intake2", "Intake1"]
+
+  - name: HBDocumentType
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+    records: ["TaxForm", "OfferLetter", "BankStatements", "Identification", "PayStubs"]
+
+  - name: HBFrequency
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: IsMonthly, dataType: Boolean }
+    records: ["Every20thDay", "Every10thDay", "EveryFriday", "EveryMonday"]
+
+  - name: LoanRequestInfoOption
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: LabelLocale, dataType: Text, length: 250 }
+    records: ["MissingDocument", "ExplainRequest"]
+
+  - name: LoanRequestStatus
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: LogLabel, dataType: Text, length: 100 }
+      - { name: LogDescription, dataType: Text, length: 50 }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: Color, dataType: Text, length: 50 }
+      - { name: LabelLocale, dataType: Text, length: 300 }
+      - { name: LogLocale, dataType: Text, length: 500 }
+      - { name: LogDescLocale, dataType: Text, length: 750 }
+    records: ["Pending", "Approved", "Submitted", "InProgress", "WaitResubmission", "Rejected", "Draft"]
+
+  - name: LoanRequestType
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: Color, dataType: Text, length: 50 }
+      - { name: LabelLocale, dataType: Text, length: 300 }
+    records: ["PersonalLoan", "CreditCard", "Account", "PersonalGoal", "CarLoan", "HomeInsurance"]
+
+  - name: ProductType
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: Color, dataType: Text, length: 50 }
+      - { name: LabelLocale, dataType: Text, length: 250 }
+    records: ["CreditCard", "Investment", "Checking", "Loan", "Goal", "Saving"]
+
+  - name: SidebarAction
+    pk: { name: Id, dataType: Text, length: 50 }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+    records: ["Edit", "Reject", "Return", "Approve", "SubmitMoreInfo", "DownlaodAttachment", "SubmitRejection", "Email", "Copy"]
+
+  - name: TransactionCategory
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: LabelLocale, dataType: Text, length: 300 }
+    records: ["Education", "Subscriptions", "ShoppingAndServices", "CarAndTransportation", "Technology", "Uncategorized", "HealthAndSports", "SalonAndSelfCare", "Loans", "Restaurants", "CoffeeAndPastries", "Groceries"]
+
+  - name: TransactionType
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+      - { name: IconNameEN, dataType: Text, length: 50 }
+      - { name: IsIncrease, dataType: Boolean }
+      - { name: Color, dataType: Text, length: 50 }
+      - { name: LabelLocale, dataType: Text, length: 500 }
+    records: ["DirectDepositSalary", "TransferOut", "Purchase", "Deposit", "BillPayment", "CreditCardPayment", "TransferIn", "OnlinePurchase", "DebitCardPurchase", "Payment", "InterestCredit", "Refund", "Withdrawal", "CheckDeposit", "Fee", "ATMWithdrawal", "OnlineTransfer"]
+
+  - name: TransferDateOption
+    pk: { name: Id, dataType: Integer }
+    attributes:
+      - { name: Label, dataType: Text, length: 50, isMandatory: true }
+      - { name: Order, dataType: Integer, isMandatory: true }
+      - { name: Is_Active, dataType: Boolean, isMandatory: true }
+    records: ["Regular1to2workingdays", "Immediate", "Schedule"]
+
+# ─── SERVER ENTITIES (build after statics; build in dependency order — see comment per entity) ───
+
+server_entities:
+  - name: ChartData
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: Quarter
+        dataType: Text
+        length: 50
+        isMandatory: true
+      - name: Month
+        dataType: Text
+        length: 50
+        isMandatory: true
+      - name: Week
+        dataType: Text
+        length: 50
+        isMandatory: true
+      - name: Income
+        dataType: Integer
+        isMandatory: true
+      - name: Expenses
+        dataType: Integer
+        isMandatory: true
+      - name: Order
+        dataType: Integer
+      - name: LoanProducts
+        dataType: Integer
+      - name: AccountServices
+        dataType: Integer
+      - name: InvestmentProducts
+        dataType: Integer
+      - name: InsuranceProducts
+        dataType: Integer
+
+  - name: CustomerGoal
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: CustomerId
+        dataType: HBCustomer Identifier
+        fk_target: HBCustomer
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: GoalName
+        dataType: Text
+        length: 50
+      - name: TargetAmount
+        dataType: Currency
+      - name: TargetDate
+        dataType: Date
+      - name: IsRecurringDeposit
+        dataType: Boolean
+      - name: IsMonthlyTransfer
+        dataType: Boolean
+      - name: Frequency
+        dataType: HBFrequency Identifier
+        fk_target: HBFrequency
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: TransferOnDay
+        dataType: Integer
+      - name: TransferAmount
+        dataType: Currency
+      - name: SourceAccountId
+        dataType: HBAccount Identifier
+        fk_target: HBAccount
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: TargetAccountId
+        dataType: HBAccount Identifier
+        fk_target: HBAccount
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: GoalId
+        dataType: Goal Identifier
+        fk_target: Goal
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: IsActive
+        dataType: Boolean
+      - name: CreatedOn
+        dataType: Date Time
+      - name: CreatedBy
+        dataType: User Identifier
+        fk_target: (System).User
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+
+  - name: CustomerLoan
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: CustomerId
+        dataType: HBCustomer Identifier
+        fk_target: HBCustomer
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: RequestTypeId
+        dataType: LoanRequestType Identifier
+        fk_target: LoanRequestType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: Amount
+        dataType: Currency
+      - name: PeriodMonth
+        dataType: Integer
+      - name: InterestRatePercentage
+        dataType: Decimal
+        length: 37
+        decimals: 8
+      - name: EffectiveInterestRatePercent
+        dataType: Decimal
+        length: 37
+        decimals: 8
+      - name: ProcessingFeePercentage
+        dataType: Decimal
+        length: 37
+        decimals: 8
+      - name: TransferAccountId
+        dataType: HBAccount Identifier
+        fk_target: HBAccount
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: IncludeLifeInsurance
+        dataType: Boolean
+      - name: HasSpecialRate
+        dataType: Boolean
+      - name: IsActive
+        dataType: Boolean
+      - name: CreatedOn
+        dataType: Date Time
+      - name: CreatedBy
+        dataType: User Identifier
+        fk_target: (System).User
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+
+  - name: CustomerPicture
+    pk: { name: CustomerId, dataType: HBCustomer Identifier }  # NON-CANONICAL — verify
+    attributes:
+      - name: PictureBinary
+        dataType: Binary Data
+      - name: Filename
+        dataType: Text
+        length: 50
+
+  - name: DataSettings
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: CurrentRegionName
+        dataType: Text
+        length: 150
+
+  - name: GoalPicture
+    pk: { name: Id, dataType: Goal Identifier }  # NON-CANONICAL — verify
+    attributes:
+      - name: Binary
+        dataType: Binary Data
+
+  - name: HAgentsResponse
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: RequestId
+        dataType: LoanRequest Identifier
+        fk_target: LoanRequest
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: AgentypeId
+        dataType: HBAgentType Identifier
+        fk_target: HBAgentType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: RecommendationId
+        dataType: HBAIRecommendationOption Identifier
+        fk_target: HBAIRecommendationOption
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: Title
+        dataType: Text
+        length: 5000
+      - name: Description
+        dataType: Text
+        length: 500000
+      - name: DataSummary
+        dataType: Text
+        length: 50000000
+      - name: AgentDecisionStatusId
+        dataType: HBAgentDecisionStatus Identifier
+        fk_target: HBAgentDecisionStatus
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: LastUpdatedOn
+        dataType: Date Time
+
+  - name: HBAccount
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: Name
+        dataType: Text
+        length: 50
+      - name: AccountNameId
+        dataType: HBAccountName Identifier
+        fk_target: HBAccountName
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: AccountNumber
+        dataType: Long Integer
+        isMandatory: true
+      - name: ProductTypeId
+        dataType: ProductType Identifier
+        isMandatory: true
+        fk_target: ProductType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: CustomerId
+        dataType: HBCustomer Identifier
+        isMandatory: true
+        fk_target: HBCustomer
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: AssignedToEmpId
+        dataType: Employee Identifier
+        fk_target: <referenced>.Employee
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: IsPersonal
+        dataType: Boolean
+      - name: BranchId
+        dataType: HBBranch Identifier
+        fk_target: HBBranch
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: PeriodMonth
+        dataType: Integer
+      - name: IsActive
+        dataType: Boolean
+      - name: CreatedOn
+        dataType: Date Time
+      - name: CreatedBy
+        dataType: User Identifier
+        fk_target: (System).User
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+
+  - name: HBBranch
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: Name
+        dataType: Text
+        length: 50
+        isMandatory: true
+      - name: Address
+        dataType: Text
+        length: 250
+        isMandatory: true
+      - name: PhoneNumber
+        dataType: Phone Number
+        length: 20
+        isMandatory: true
+      - name: Fax
+        dataType: Phone Number
+        length: 20
+        isMandatory: true
+      - name: Email
+        dataType: Email
+        length: 256
+        isMandatory: true
+      - name: Latitude
+        dataType: Decimal
+        length: 37
+        decimals: 8
+        isMandatory: true
+      - name: Longitude
+        dataType: Decimal
+        length: 37
+        decimals: 8
+        isMandatory: true
+
+  - name: HBCustomer
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: Name
+        dataType: Text
+        length: 50
+        isMandatory: true
+      - name: Mobile
+        dataType: Phone Number
+        length: 20
+        isMandatory: true
+      - name: Email
+        dataType: Email
+        length: 256
+        isMandatory: true
+      - name: CardID
+        dataType: Long Integer
+      - name: CreditScore
+        dataType: Integer
+      - name: UserId
+        dataType: User Identifier
+        fk_target: (System).User
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: ClientSince
+        dataType: Date Time
+      - name: IsPremium
+        dataType: Boolean
+      - name: SSN
+        dataType: Text
+        length: 50
+      - name: BirthDate
+        dataType: Date
+      - name: BranchId
+        dataType: HBBranch Identifier
+        fk_target: HBBranch
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: EmploymentStatus
+        dataType: Text
+        length: 50
+      - name: EmployerName
+        dataType: Text
+        length: 50
+      - name: Position
+        dataType: Text
+        length: 50
+      - name: EmploymentStartDate
+        dataType: Date
+      - name: AnnualIncome
+        dataType: Currency
+      - name: OtherSourceofIncome
+        dataType: Text
+        length: 50
+      - name: HomeOwnership
+        dataType: Text
+        length: 50
+      - name: Address
+        dataType: Text
+        length: 250
+      - name: Latitude
+        dataType: Decimal
+        length: 37
+        decimals: 8
+      - name: Longitude
+        dataType: Decimal
+        length: 37
+        decimals: 8
+
+  - name: HBDocument
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: HistoryLogId
+        dataType: HistoryLog Identifier
+        fk_target: HistoryLog
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: DocumentTypeId
+        dataType: HBDocumentType Identifier
+        fk_target: HBDocumentType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: FileName
+        dataType: Text
+        length: 150
+      - name: IsActive
+        dataType: Boolean
+
+  - name: HBDocumentBinary
+    pk: { name: DocumentId, dataType: HBDocument Identifier }  # NON-CANONICAL — verify
+    attributes:
+      - name: Binary
+        dataType: Binary Data
+
+  - name: HBUpload
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: Binary
+        dataType: Binary Data
+      - name: GUID
+        dataType: Text
+        length: 50
+      - name: HBDocumentTypeId
+        dataType: HBDocumentType Identifier
+        fk_target: HBDocumentType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: CreatedOn
+        dataType: Date Time
+
+  - name: HistoryLog
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: RequestId
+        dataType: LoanRequest Identifier
+        fk_target: LoanRequest
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: RequestStatusId
+        dataType: LoanRequestStatus Identifier
+        fk_target: LoanRequestStatus
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: AgentTypeId
+        dataType: HBAgentType Identifier
+        fk_target: HBAgentType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: Comment
+        dataType: Text
+        length: 1500
+      - name: IsEdited
+        dataType: Boolean
+      - name: IsEmailSent
+        dataType: Boolean
+      - name: IsAssigned
+        dataType: Boolean
+      - name: CreatedOn
+        dataType: Date Time
+      - name: CreatedBy
+        dataType: User Identifier
+        fk_target: (System).User
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+
+  - name: LoanRequest
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: CustomerId
+        dataType: HBCustomer Identifier
+        fk_target: HBCustomer
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: TypeId
+        dataType: LoanRequestType Identifier
+        fk_target: LoanRequestType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: AccountId
+        dataType: HBAccount Identifier
+        fk_target: HBAccount
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: CustomerLoanId
+        dataType: CustomerLoan Identifier
+        fk_target: CustomerLoan
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: CustomerGoalId
+        dataType: CustomerGoal Identifier
+        fk_target: CustomerGoal
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: StatusId
+        dataType: LoanRequestStatus Identifier
+        fk_target: LoanRequestStatus
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: AssignedToEmpId
+        dataType: Employee Identifier
+        fk_target: <referenced>.Employee
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: RequestInfoOptionId
+        dataType: LoanRequestInfoOption Identifier
+        fk_target: LoanRequestInfoOption
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: LocaleId
+        dataType: Text
+        length: 50
+      - name: ApprovalReason
+        dataType: Text
+        length: 500
+      - name: CreatedOn
+        dataType: Date Time
+      - name: CreatedBy
+        dataType: User Identifier
+        fk_target: (System).User
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: ClosedOn
+        dataType: Date Time
+      - name: LastUpdatedOn
+        dataType: Date Time
+      - name: IsApprovalNotificationOpened
+        dataType: Boolean
+      - name: CreditScore
+        dataType: Long Integer
+      - name: TotalDept
+        dataType: Long Integer
+      - name: OnTimePaymentPercentage
+        dataType: Long Integer
+      - name: CreditCardUsePercentage
+        dataType: Long Integer
+      - name: DerogatoryMarksCount
+        dataType: Long Integer
+      - name: TotalInquiriesCount
+        dataType: Long Integer
+      - name: AverageAccountAgeYears
+        dataType: Long Integer
+      - name: CreditInquiries
+        dataType: Long Integer
+      - name: MortgageDebtPercentage
+        dataType: Long Integer
+      - name: AutoLoanDebtPercentage
+        dataType: Long Integer
+      - name: CreditCardDebtPercentage
+        dataType: Long Integer
+      - name: IsFromPhone
+        dataType: Boolean
+      - name: FirstSubmission
+        dataType: Boolean
+      - name: DeviceId
+        dataType: Text
+        length: 50
+
+  - name: Region
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: Region
+        dataType: Text
+        length: 50
+        isMandatory: true
+      - name: DemoLatitude
+        dataType: Decimal
+        length: 37
+        decimals: 8
+        isMandatory: true
+      - name: DemoLongitude
+        dataType: Decimal
+        length: 37
+        decimals: 8
+        isMandatory: true
+      - name: Area
+        dataType: Text
+        length: 50
+        isMandatory: true
+
+  - name: Transaction
+    pk: { name: Id, dataType: Long Integer, isAutoNumber: true }  # canonical
+    attributes:
+      - name: AcountId
+        dataType: HBAccount Identifier
+        isMandatory: true
+        fk_target: HBAccount
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: Amount
+        dataType: Currency
+        isMandatory: true
+      - name: TypeId
+        dataType: TransactionType Identifier
+        isMandatory: true
+        fk_target: TransactionType
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: Category
+        dataType: TransactionCategory Identifier
+        fk_target: TransactionCategory
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: Description
+        dataType: Text
+        length: 50
+        isMandatory: true
+      - name: CustomerGoalId
+        dataType: CustomerGoal Identifier
+        fk_target: CustomerGoal
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: CustomerLoanId
+        dataType: CustomerLoan Identifier
+        fk_target: CustomerLoan
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: ToAccountId
+        dataType: HBAccount Identifier
+        fk_target: HBAccount
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+      - name: ToPhoneNumber
+        dataType: Phone Number
+        length: 20
+      - name: ToAccountNumber
+        dataType: Long Integer
+      - name: ToIBAN
+        dataType: Text
+        length: 50
+      - name: CreatedOn
+        dataType: Date Time
+      - name: CreatedBy
+        dataType: User Identifier
+        fk_target: (System).User
+        deleteRule: Ignore  # mandatory — see odc_db_upgrade_pk_change_blocked + OS-BLD-40409
+

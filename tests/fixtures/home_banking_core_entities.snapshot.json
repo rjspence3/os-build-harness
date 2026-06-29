@@ -1,0 +1,538 @@
+{
+  "data": [
+    {
+      "additionalData": {
+        "attributes": [
+          {
+            "dataType": "Long Integer",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": true,
+            "key": "38895c9e-8f99-492d-bd50-b40b725e415c",
+            "length": "",
+            "name": "Id"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "dbc4e97f-0333-4ea8-a1fb-f71b837d6e68",
+            "length": "50",
+            "name": "Name"
+          },
+          {
+            "dataType": "Phone Number",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "b0462ca5-5e86-4fc5-a001-2473980bbda6",
+            "length": "20",
+            "name": "Mobile"
+          },
+          {
+            "dataType": "Email",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "3276d591-f123-4dde-9efb-a19ca59552f8",
+            "length": "256",
+            "name": "Email"
+          },
+          {
+            "dataType": "Long Integer",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "e88de263-6712-46e1-be86-a4cea7103c4e",
+            "length": "",
+            "name": "CardID"
+          },
+          {
+            "dataType": "Integer",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "9dc91609-4993-45bd-8a4d-71d4768973f3",
+            "length": "",
+            "name": "CreditScore"
+          },
+          {
+            "dataType": "User Identifier",
+            "decimals": "",
+            "foreignKey": {
+              "attributeKey": "4c712cf9-e372-42f5-9f99-e5234343ab12",
+              "entityKey": "b04fd63d-2183-41df-ad66-4cbd5e2177a7",
+              "globalKey": "uXCIR2Atc0+es3zYuZSnNw*LYIWpF+Ey0aicHD144NUTA"
+            },
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "948ec52b-5727-4a22-b268-61a564bd7d6d",
+            "length": "",
+            "name": "UserId"
+          },
+          {
+            "dataType": "Date Time",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "ecf342cb-7fa8-4f14-8823-4bdfddf7f21c",
+            "length": "",
+            "name": "ClientSince"
+          },
+          {
+            "dataType": "Boolean",
+            "decimals": "",
+            "description": "Is Permium or standard?",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "606315fb-8abb-4f2d-bea3-67a81f8766c3",
+            "length": "",
+            "name": "IsPremium"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "3d0cdda1-fac3-44bf-abe8-47eb4d353c7a",
+            "length": "50",
+            "name": "SSN"
+          },
+          {
+            "dataType": "Date",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "d9c95ee2-0a8a-4907-bd63-6ae9b25ea4b0",
+            "length": "",
+            "name": "BirthDate"
+          },
+          {
+            "dataType": "HBBranch Identifier",
+            "decimals": "",
+            "foreignKey": {
+              "attributeKey": "8dc65bd2-c8c6-4f3a-96da-64c5430aa122",
+              "entityKey": "73ba6ff3-ea46-480b-87c7-acf65a0ff175",
+              "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*82+6c0bqC0iHx6z2Wg_xdQ"
+            },
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "1fd6e315-2967-4bdc-af4e-966bfcce1aa7",
+            "length": "",
+            "name": "BranchId"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "e08e45d1-d36f-4acf-9b48-7ab66a691623",
+            "length": "50",
+            "name": "EmploymentStatus"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "5eef00c6-627f-4290-8937-6ed892f7351c",
+            "length": "50",
+            "name": "EmployerName"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "0f7393e1-728a-47dd-bf8d-431dbeaf359e",
+            "length": "50",
+            "name": "Position"
+          },
+          {
+            "dataType": "Date",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "4a962653-b0f1-4323-b3da-0f91942a3e5c",
+            "length": "",
+            "name": "EmploymentStartDate"
+          },
+          {
+            "dataType": "Currency",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "5d224a17-8126-42a6-94cd-cfee47738f54",
+            "length": "",
+            "name": "AnnualIncome"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "20878e09-a375-4b66-9c51-70df487f37f8",
+            "length": "50",
+            "name": "OtherSourceofIncome"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "26aba6c7-083f-4c5e-bd5a-438bce6b78a3",
+            "length": "50",
+            "name": "HomeOwnership"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "2a051789-e39c-433e-aee9-f3938c672a50",
+            "length": "250",
+            "name": "Address"
+          },
+          {
+            "dataType": "Decimal",
+            "decimals": "8",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "acfe2d50-172f-436b-9382-f3fc5c2cc34b",
+            "length": "37",
+            "name": "Latitude"
+          },
+          {
+            "dataType": "Decimal",
+            "decimals": "8",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "86a5294c-135e-41cc-908d-bfae78e69f0e",
+            "length": "37",
+            "name": "Longitude"
+          }
+        ],
+        "footer": {},
+        "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*zHl+nwK7QECsncDCg7cZWA",
+        "header": {},
+        "identifierAttributeKey": "38895c9e-8f99-492d-bd50-b40b725e415c",
+        "layout": {},
+        "menu": {},
+        "portfolioKey": "f060491c-1aa9-4e19-941e-d38cd930b69a"
+      },
+      "assetKey": "695efc5b-8f39-4a53-8d71-35c59097d245",
+      "assetName": "HomeBankingCore",
+      "assetType": "CrossDevice",
+      "description": null,
+      "isPublic": true,
+      "isReferenced": false,
+      "isStatic": false,
+      "key": "9f7e79cc-bb02-4040-ac9d-c0c283b71958",
+      "name": "HBCustomer",
+      "objectType": "entities",
+      "ownerAppKey": "695efc5b-8f39-4a53-8d71-35c59097d245",
+      "physicalName": "hbcus_6guj7yv695ytjqj_guvf_dv2",
+      "providerName": null,
+      "timestamp": "2026-06-09T17:08:41.166000+00:00"
+    },
+    {
+      "additionalData": {
+        "attributes": [
+          {
+            "dataType": "Long Integer",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": true,
+            "key": "a77276f3-e762-4168-8c1c-66a00f3e6141",
+            "length": "",
+            "name": "Id"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "c2c7cf8f-7f60-4c4e-bc12-ddcb33f81694",
+            "length": "50",
+            "name": "Name"
+          },
+          {
+            "dataType": "HBAccountName Identifier",
+            "decimals": "",
+            "description": "Id of account name",
+            "foreignKey": {
+              "attributeKey": "926b443f-404f-4d8a-9d07-1966af9316be",
+              "entityKey": "8db59729-3589-4f3b-ab5b-313810d94b8d",
+              "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*KZe1jYk1O0+rWzE4ENlLjQ"
+            },
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "35b41970-d1fe-4b5c-8e07-3bb2a9f7d3d0",
+            "length": "",
+            "name": "AccountNameId"
+          },
+          {
+            "dataType": "Long Integer",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "c199600d-a9b9-4d03-9084-404ae049950d",
+            "length": "",
+            "name": "AccountNumber"
+          },
+          {
+            "dataType": "ProductType Identifier",
+            "decimals": "",
+            "foreignKey": {
+              "attributeKey": "2370060a-686b-4840-ae70-58aed54e758c",
+              "entityKey": "8b118fc6-2253-415b-ad29-f5dfabb47e8f",
+              "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*xo8Ri1MiW0GtKfXfq7R+jw"
+            },
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "1194bbbf-e1a2-45e1-b920-218c7d70616c",
+            "length": "",
+            "name": "ProductTypeId"
+          },
+          {
+            "dataType": "HBCustomer Identifier",
+            "decimals": "",
+            "foreignKey": {
+              "attributeKey": "38895c9e-8f99-492d-bd50-b40b725e415c",
+              "entityKey": "9f7e79cc-bb02-4040-ac9d-c0c283b71958",
+              "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*zHl+nwK7QECsncDCg7cZWA"
+            },
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "6ec2c1dd-0e9f-4fba-bda1-9fa641067782",
+            "length": "",
+            "name": "CustomerId"
+          },
+          {
+            "dataType": "Employee Identifier",
+            "decimals": "",
+            "foreignKey": {
+              "attributeKey": "c51cfa82-a3da-4e99-b72f-db1589d2401e",
+              "entityKey": "86dabd64-5219-49da-8965-8535260ab309",
+              "globalKey": "7nWgS1a7okOtwqgScfpe4g*NhdArZzjwU235L3l5_35vQ"
+            },
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "61d556fa-a1fe-444f-a65d-1af5bc2668a9",
+            "length": "",
+            "name": "AssignedToEmpId"
+          },
+          {
+            "dataType": "Boolean",
+            "decimals": "",
+            "description": "Is sersonal or business?",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "60f8a0bb-ec1e-4e96-bafa-58852b9a341b",
+            "length": "",
+            "name": "IsPersonal"
+          },
+          {
+            "dataType": "HBBranch Identifier",
+            "decimals": "",
+            "foreignKey": {
+              "attributeKey": "8dc65bd2-c8c6-4f3a-96da-64c5430aa122",
+              "entityKey": "73ba6ff3-ea46-480b-87c7-acf65a0ff175",
+              "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*82+6c0bqC0iHx6z2Wg_xdQ"
+            },
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "d2bb8de5-e211-42f2-bed7-e16d0c4326c6",
+            "length": "",
+            "name": "BranchId"
+          },
+          {
+            "dataType": "Integer",
+            "decimals": "",
+            "description": "End date (months) of the account or expireation peroid",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "b3a4e82b-37b1-4ba6-a35a-f2b9ba891bc6",
+            "length": "",
+            "name": "PeriodMonth"
+          },
+          {
+            "dataType": "Boolean",
+            "decimals": "",
+            "defaultValue": "False [DefaultValue[ServiceStudio.Expressions.AbstractExpression]]",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "529b0e72-5855-451e-98e2-2a2e1c5a39d2",
+            "length": "",
+            "name": "IsActive"
+          },
+          {
+            "dataType": "Date Time",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "24fc8467-42d2-4e7c-8c8a-16fb0a4e49ca",
+            "length": "",
+            "name": "CreatedOn"
+          },
+          {
+            "dataType": "User Identifier",
+            "decimals": "",
+            "foreignKey": {
+              "attributeKey": "4c712cf9-e372-42f5-9f99-e5234343ab12",
+              "entityKey": "b04fd63d-2183-41df-ad66-4cbd5e2177a7",
+              "globalKey": "uXCIR2Atc0+es3zYuZSnNw*LYIWpF+Ey0aicHD144NUTA"
+            },
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "cae42c91-b070-4271-b719-f7aa3700b6ba",
+            "length": "",
+            "name": "CreatedBy"
+          }
+        ],
+        "footer": {},
+        "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*OCwl90zre0mTN7C73AkeXg",
+        "header": {},
+        "identifierAttributeKey": "a77276f3-e762-4168-8c1c-66a00f3e6141",
+        "layout": {},
+        "menu": {},
+        "portfolioKey": "f060491c-1aa9-4e19-941e-d38cd930b69a"
+      },
+      "assetKey": "695efc5b-8f39-4a53-8d71-35c59097d245",
+      "assetName": "HomeBankingCore",
+      "assetType": "CrossDevice",
+      "description": null,
+      "isPublic": true,
+      "isReferenced": false,
+      "isStatic": false,
+      "key": "f7252c38-eb4c-497b-9337-b0bbdc091e5e",
+      "name": "HBAccount",
+      "objectType": "entities",
+      "ownerAppKey": "695efc5b-8f39-4a53-8d71-35c59097d245",
+      "physicalName": "hbacc_6guj7yv695yr8uuo4im_sav2",
+      "providerName": null,
+      "timestamp": "2026-06-09T17:08:41.166000+00:00"
+    },
+    {
+      "additionalData": {
+        "attributes": [
+          {
+            "dataType": "Integer",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": true,
+            "key": "e808e093-0447-47cf-a265-71c3a31800ee",
+            "length": "",
+            "name": "Id"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "49258e45-426f-4493-9eaa-417bc71befaf",
+            "length": "50",
+            "name": "Label"
+          },
+          {
+            "dataType": "Integer",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "c5b88cbd-eacf-4ffd-873b-4b9589f7f83c",
+            "length": "",
+            "name": "Order"
+          },
+          {
+            "dataType": "Boolean",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": true,
+            "isPrimaryKey": false,
+            "key": "c482aeca-a5f9-4029-81e2-db5a4a197cb8",
+            "length": "",
+            "name": "Is_Active"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "808a6c40-e120-48dd-8a00-f133e56bc133",
+            "length": "50",
+            "name": "ImageURL"
+          },
+          {
+            "dataType": "Text",
+            "decimals": "",
+            "foreignKey": {},
+            "isMandatory": false,
+            "isPrimaryKey": false,
+            "key": "f77e1e47-1945-4470-a0e0-cc3217bdce8a",
+            "length": "200",
+            "name": "LabelLocale"
+          }
+        ],
+        "footer": {},
+        "globalKey": "W_xeaTmPU0qNcTXFkJfSRQ*FRou+OuL_Eu5246Y8wH0yQ",
+        "header": {},
+        "identifierAttributeKey": "e808e093-0447-47cf-a265-71c3a31800ee",
+        "layout": {},
+        "menu": {},
+        "portfolioKey": "f060491c-1aa9-4e19-941e-d38cd930b69a",
+        "records": "[\"Mobility\",\"Home\",\"Education\",\"Future\",\"Holiday\",\"Health\",\"Other\",\"Leisure\",\"Technology\"]"
+      },
+      "assetKey": "695efc5b-8f39-4a53-8d71-35c59097d245",
+      "assetName": "HomeBankingCore",
+      "assetType": "CrossDevice",
+      "description": null,
+      "isPublic": true,
+      "isReferenced": false,
+      "isStatic": true,
+      "key": "f82e1a15-8beb-4bfc-b9db-8e98f301f4c9",
+      "name": "Goal",
+      "objectType": "entities",
+      "ownerAppKey": "695efc5b-8f39-4a53-8d71-35c59097d245",
+      "physicalName": "goal_6guj7yv695y_wkj3t7pxyj53",
+      "providerName": null,
+      "timestamp": "2026-06-09T17:08:41.166000+00:00"
+    }
+  ],
+  "pagination": {
+    "limit": 3,
+    "nextPageOffset": null,
+    "offset": 0
+  }
+}

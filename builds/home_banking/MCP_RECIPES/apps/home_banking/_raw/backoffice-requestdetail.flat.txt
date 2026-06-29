@@ -1,0 +1,132 @@
+# NOTE: wrapper truncated tool_end.result; ~108853 chars of stdoutOutput
+# were dropped before save. Partial widget tree below.
+
+=== Screen: RequestDetail ===
+Inputs: RequestId:LoanRequest Identifier (EntityIdentifierType:tbS97HSe2EaE0+ZieIUXfw.#IdentifierType), IsSidebarOpen:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg)
+Locals: ShowNewNoteForm:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), SelectedLogId:HistoryLog Identifier (EntityIdentifierType:gCLBDp5KnUm9dzZgzLYeVg.#IdentifierType), ShowRejectionPopup:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), isResubmission:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), NotificationCount:Integer (BasicTypes.Integer:j2Lc0phK0kuggij4gQYfAw), IsEnrichmentAgentCompleted:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), IsRequestCompleted:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), HasCreditScore:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), LoadingDateTime:Date Time (BasicTypes.DateTime:TI32kQokwEyLhBq6zdg2Tw), ShowSSN:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg)
+
+--- WIDGETS (flat, document order) ---
+[1] SerializableInputParameter 'RequestId'
+[2] SerializableInputParameter 'IsSidebarOpen'
+[3] WebBlockInstance ''
+[4] TextMetadata 'CreatedFromNL'
+[5] ParsedExpression ''
+[6] TextMetadata 'CreatedFromNL'
+[7] ParsedExpression ''
+[8] TextMetadata 'CreatedFromNL'
+[9] ParsedExpression ''
+[10] TextMetadata 'CreatedFromNL'
+[11] ParsedExpression ''
+[12] TextMetadata 'CreatedFromNL'
+[13] ParsedExpression ''
+[14] TextMetadata 'CreatedFromNL'
+[15] ParsedExpression ''
+[16] TextMetadata 'CreatedFromNL'
+[17] ParsedExpression ''
+[18] ParsedExpression ''
+[19] ParsedExpression ''
+[20] ParsedExpression ''
+[21] ParsedExpression ''
+[22] ParsedExpression ''
+[23] ParsedExpression ''
+[24] If '' Condition="GetLogById.List.Empty [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[25] GenericInputParameter 'DocumentId'
+[26] GenericInputParameter 'FirebaseEvent'
+[27] If '' Condition="DiffSeconds(LoadingDateTime,FirebaseEvent.EventDateTime)<0 [Condition[ServiceStu..."
+[28] If '' Condition="FormRejection2.Valid [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[29] If '' Condition="HasCreditScore [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[30] GenericInputParameter 'LogId'
+[31] If '' Condition="SubmitsCount > 1 [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[32] If '' Condition="GetLogsByRequestId.List.Current.LoanRequestStatus.Id = Entities.LoanRequestStatu..."
+[33] PlaceholderArgument 'Navigation'
+[34] PlaceholderArgument 'Header'
+[35] PlaceholderArgument 'Breadcrumbs'
+[36] PlaceholderArgument 'Title'
+[37] PlaceholderArgument 'Details'
+[38] PlaceholderArgument 'Wizard'
+[39] PlaceholderArgument 'MainContent'
+[40] PlaceholderArgument 'Footer'
+[41] ParsedExpression ''
+[42] ParsedExpression ''
+[43] ParsedExpression ''
+[44] ParsedExpression ''
+[45] ParsedExpression ''
+[46] ParsedExpression ''
+[47] ParsedExpression ''
+[48] ParsedExpression ''
+[49] ParsedExpression ''
+[50] ParsedExpression ''
+[51] ParsedExpression ''
+[52] ParsedExpression ''
+[53] ParsedExpression ''
+[54] ParsedExpression ''
+[55] ParsedExpression ''
+[56] ParsedExpression ''
+[57] ParsedExpression ''
+[58] ParsedExpression ''
+[59] ParsedExpression ''
+[60] ParsedExpression ''
+[61] ParsedExpression ''
+[62] ParsedExpression ''
+[63] ParsedExpression ''
+[64] ParsedExpression ''
+[65] ParsedExpression ''
+[66] ParsedExpression ''
+[67] ParsedExpression ''
+[68] ParsedExpression ''
+[69] ParsedExpression ''
+[70] ParsedExpression ''
+[71] ParsedExpression ''
+[72] ParsedExpression ''
+[73] ParsedExpression ''
+[74] ParsedExpression ''
+[75] ParsedExpression ''
+[76] WebBlockInstance ''
+[77] WebBlockInstance ''
+[78] WebBlockInstance ''
+[79] Container '' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[80] Container '' Style=""margin-right-l margin-top-s" [ValueExpression[ServiceStudio.Expressions.Abstrac..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[81] Container '' Style=""margin-right-l margin-top-s" [ValueExpression[ServiceStudio.Expressions.Abstrac..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[82] Container '' Style=""margin-right-l margin-top-s" [ValueExpression[ServiceStudio.Expressions.Abstrac..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[83] Container '' Style=""margin-right-l margin-top-s" [ValueExpression[ServiceStudio.Expressions.Abstrac..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[84] Container '' Style=""margin-right-l margin-top-s" [ValueExpression[ServiceStudio.Expressions.Abstrac..." Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[85] Container '' Style="" margin-top-s" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]"
+[86] WebBlockInstance ''
+[87] If '' Condition="GetRequestById.List.Current.LoanRequest.StatusId = Entities.LoanRequestStatus.Pe..."
+[88] WebBlockInstance 'tabs'
+[89] If '' Condition="GetFirebaseData.IsDataFetched [Condition[ServiceStudio.Expressions.AbstractExpre..."
+[90] WebBlockInstance ''
+[91] If 'IsPhone' Condition="False// isPhone() [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[92] Popup 'RejectionPopup' Style=""popup-dialog" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[93] ParsedExpression ''
+[94] ParsedExpression ''
+[95] ParsedExpression ''
+[96] ParsedExpression ''
+[97] ParsedExpression ''
+[98] ParsedExpression ''
+[99] ParsedExpression ''
+[100] ParsedExpression ''
+[101] ParsedExpression ''
+[102] ParsedExpression ''
+[103] ParsedExpression ''
+[104] ParsedExpression ''
+[105] ParsedExpression ''
+[106] ParsedExpression ''
+[107] ParsedExpression ''
+[108] ParsedExpression ''
+[109] ParsedExpression ''
+[110] ParsedExpression ''
+[111] ParsedExpression ''
+[112] ParsedExpression ''
+[113] ParsedExpression ''
+[114] ParsedExpression ''
+[115] ParsedExpression ''
+[116] ParsedExpression ''
+[117] ParsedExpression ''
+[118] ParsedExpression ''
+[119] ParsedExpression ''
+[120] ParsedExpression ''
+[121] ParsedExpression ''
+[122] ParsedExpression ''
+[123] ParsedExpression ''
+[124] ParsedExpress

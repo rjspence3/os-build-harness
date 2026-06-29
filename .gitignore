@@ -1,0 +1,21 @@
+.env
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+*.db
+*.log
+.pytest_cache/
+*.egg-info/
+build/
+
+# Throwaway diagnostic outputs (regenerable)
+*.png
+# ...but _raw/resources/ PNGs are real UI assets to re-host in the clone (keep tracked)
+!builds/*/MCP_RECIPES/apps/*/_raw/resources/*.png
+builds/*/banking_runner_out/
+builds/*/runner_state.db
+
+# Figma PAT (never commit)
+.figma_token
+*.figma_token

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "buildharness"
+version = "0.1.0"
+description = "Spec-driven OutSystems build harness (orchestrator tool belt + banking_runner)."
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+harness-verify = "harness.verify:main"
+harness-capture = "harness.capture:main"
+harness-prompt-step = "harness.prompt_step:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+include = ["harness*"]
+
+[tool.setuptools.package-data]
+"harness.schemas" = ["*.json"]

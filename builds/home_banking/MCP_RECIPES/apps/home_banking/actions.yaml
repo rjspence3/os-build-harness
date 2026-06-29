@@ -1,0 +1,1851 @@
+# Home Banking — Actions Manifest
+#
+# Source: MCP context_actions × 3 apps (Core/Portal/Backoffice), 2026-05-26.
+# Capture is SIGNATURES ONLY — action bodies (flow logic) require separate
+# Mentor MCP applyModelApiCode reads per action. See `actions-bodies.md` (TBD).
+#
+# Rebuild order:
+#   1. Core actions first (after Core entities + statics published)
+#   2. Portal/Backoffice actions second (depend on Core public elements via Manage Dependencies)
+
+# ════════════════════════════════════════════════════════════════════
+# CORE — Home Banking Core (100 actions)
+# Asset key: 695efc5b-8f39-4a53-8d71-35c59097d245
+# ════════════════════════════════════════════════════════════════════
+
+core:
+  app_assetKey: 695efc5b-8f39-4a53-8d71-35c59097d245
+  action_count: 100
+
+  server_actions:  # 62 server actions
+      - name: AgentsResponseCreate
+        actionType: ServerAction
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+            description: "AgentsResponse record to create"
+          - name: Id
+            direction: Output
+            dataType: HAgentsResponse Identifier
+            description: "AgentsResponse identifier created"
+
+      - name: AgentsResponseCreateOrUpdate
+        actionType: ServerAction
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+            description: "AgentsResponse record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: HAgentsResponse Identifier
+            description: "AgentsResponse identifier created or modified"
+
+      - name: AgentsResponseDelete
+        actionType: ServerAction
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: HAgentsResponse Identifier
+            isMandatory: true
+            description: "AgentsResponse identifier to delete"
+
+      - name: AgentsResponseSave
+        actionType: ServerAction
+        parameters:
+          - name: AgentsResponseRecord
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+          - name: DoAudit
+            direction: Input
+            dataType: Boolean
+
+      - name: AgentsResponseUpdate
+        actionType: ServerAction
+        parameters:
+          - name: AgentsResponse
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+
+      - name: BootstrapAccounts
+        actionType: ServerAction
+        description: "Populates the database with the accounts from the excel file if the corresponding database table is still empty"
+
+      - name: BootstrapBranches
+        actionType: ServerAction
+        description: "Populates the database with the branches from the excel file if the corresponding database table is still empty"
+        parameters:
+          - name: RegionName
+            direction: Input
+            dataType: Text
+            isMandatory: true
+
+      - name: BootstrapChartData
+        actionType: ServerAction
+        description: "Populates the database with the chart data from the excel file if the corresponding database table is still empty"
+
+      - name: BootstrapCustomerGoal
+        actionType: ServerAction
+        description: "Populates the database with the customer goalfrom the excel file if the corresponding database table is still empty"
+
+      - name: BootstrapCustomerLoan
+        actionType: ServerAction
+        description: "Populates the database with the customer loan from the excel file if the corresponding database table is still empty"
+
+      - name: BootstrapCustomerPictures
+        actionType: ServerAction
+
+      - name: BootstrapCustomerRegion
+        actionType: ServerAction
+        description: "Populates the database with the branches from the excel file if the corresponding database table is still empty"
+        parameters:
+          - name: RegionName
+            direction: Input
+            dataType: Text
+            isMandatory: true
+
+      - name: BootstrapCustomers
+        actionType: ServerAction
+        description: "Populates the database with the customers from the excel file if the corresponding database table is still empty"
+
+      - name: BootstrapData
+        actionType: ServerAction
+
+      - name: BootstrapGoalPictures
+        actionType: ServerAction
+
+      - name: BootstrapRegions
+        actionType: ServerAction
+        description: "Populates the database with the regions from the excel file if the corresponding database table is still empty"
+
+      - name: BootstrapRequests
+        actionType: ServerAction
+        description: "Populates the database with the requests from the excel file if the corresponding database table is still empty"
+
+      - name: BootstrapTransactions
+        actionType: ServerAction
+        description: "Populates the database with the transactions from the excel file if the corresponding database table is still empty"
+
+      - name: CustLoanCreateOrUpdateWithFiles
+        actionType: ServerAction
+        parameters:
+          - name: ListOfRequestFile
+            direction: Input
+            dataType: RequestFile List
+            isMandatory: true
+            isComplex: true  # Structure or referenced entity
+          - name: Source
+            direction: Input
+            dataType: CustomerLoan
+            isMandatory: true
+          - name: Comment
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Request
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+          - name: CustomerLoanId
+            direction: Output
+            dataType: CustomerLoan Identifier
+          - name: RequestId
+            direction: Output
+            dataType: LoanRequest Identifier
+
+      - name: CustomerGoalCreate
+        actionType: ServerAction
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerGoal
+            isMandatory: true
+            description: "CustomerGoal record to create"
+          - name: Id
+            direction: Output
+            dataType: CustomerGoal Identifier
+            description: "CustomerGoal identifier created"
+
+      - name: CustomerGoalCreateOrUpdate
+        actionType: ServerAction
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerGoal
+            isMandatory: true
+            description: "CustomerGoal record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: CustomerGoal Identifier
+            description: "CustomerGoal identifier created or modified"
+
+      - name: CustomerGoalDelete
+        actionType: ServerAction
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: CustomerGoal Identifier
+            isMandatory: true
+            description: "CustomerGoal identifier to delete"
+
+      - name: CustomerGoalUpdate
+        actionType: ServerAction
+        description: "Encapsulates the Update entity action, enabling logic to run consistently before and after a record is modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerGoal
+            isMandatory: true
+            description: "CustomerGoal record to modify"
+          - name: Id
+            direction: Output
+            dataType: CustomerGoal Identifier
+            description: "CustomerGoal identifier modified"
+
+      - name: CustomerLoanCreateOrUpdate
+        actionType: ServerAction
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerLoan
+            isMandatory: true
+          - name: Id
+            direction: Output
+            dataType: CustomerLoan Identifier
+
+      - name: CustomerLoanCreateOrUpdateWrapper
+        actionType: ServerAction
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerLoan
+            isMandatory: true
+          - name: Request
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+          - name: Comment
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: ListOfRequestFile
+            direction: Input
+            dataType: RequestFile List
+            isMandatory: true
+            isComplex: true  # Structure or referenced entity
+          - name: ProjectId
+            direction: Output
+            dataType: Text
+          - name: DatabaseURL
+            direction: Output
+            dataType: Text
+          - name: Target
+            direction: Output
+            dataType: Text
+          - name: Token
+            direction: Output
+            dataType: Text
+          - name: Id
+            direction: Output
+            dataType: CustomerLoan Identifier
+          - name: RequestId
+            direction: Output
+            dataType: LoanRequest Identifier
+          - name: BOUserId
+            direction: Output
+            dataType: User Identifier
+
+      - name: DeleteAllAndBootstrapData
+        actionType: ServerAction
+
+      - name: DeleteAllData
+        actionType: ServerAction
+        description: "Delete all application data."
+
+      - name: DeleteOldUploads
+        actionType: ServerAction
+
+      - name: DocumentCreateOrUodate
+        actionType: ServerAction
+        parameters:
+          - name: Binary
+            direction: Input
+            dataType: Binary Data
+            isMandatory: true
+          - name: Document
+            direction: Input
+            dataType: HBDocument
+            isMandatory: true
+
+      - name: DocumentDelete
+        actionType: ServerAction
+        parameters:
+          - name: DocumentId
+            direction: Input
+            dataType: HBDocument Identifier
+            isMandatory: true
+
+      - name: DocumentGet
+        actionType: ServerAction
+        parameters:
+          - name: DocumentId
+            direction: Input
+            dataType: HBDocument Identifier
+            isMandatory: true
+          - name: FileName
+            direction: Output
+            dataType: Text
+          - name: Binary
+            direction: Output
+            dataType: Binary Data
+
+      - name: EmailValidation
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: EnableResubmission
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: FormatCurrencyCustom
+        actionType: ServerAction
+        parameters:
+          - name: Amount
+            direction: Input
+            dataType: Currency
+            isMandatory: true
+          - name: FormatedAmount
+            direction: Output
+            dataType: Text
+
+      - name: GeneratePersonalLoanOfferLetter
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: GetBackofficeSampleUserId
+        actionType: ServerAction
+        parameters:
+          - name: BOUserId
+            direction: Output
+            dataType: User Identifier
+
+      - name: GetFirebaseConfigurations
+        actionType: ServerAction
+        parameters:
+          - name: ProjectId
+            direction: Output
+            dataType: Text
+          - name: DatabaseURL
+            direction: Output
+            dataType: Text
+          - name: Target
+            direction: Output
+            dataType: Text
+          - name: Token
+            direction: Output
+            dataType: Text
+
+      - name: GetSampleUser_Manager
+        actionType: ServerAction
+        parameters:
+          - name: Email
+            direction: Output
+            dataType: Email
+          - name: Password
+            direction: Output
+            dataType: Text
+
+      - name: GetSelectedRegion
+        actionType: ServerAction
+        parameters:
+          - name: RegionName
+            direction: Output
+            dataType: Text
+
+      - name: GetSettings
+        actionType: ServerAction
+        parameters:
+          - name: Currency
+            direction: Output
+            dataType: Text
+          - name: GroupSeparator
+            direction: Output
+            dataType: Text
+          - name: DecimalSeparator
+            direction: Output
+            dataType: Text
+
+      - name: GetUserPicture
+        actionType: ServerAction
+        parameters:
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+          - name: Image64
+            direction: Output
+            dataType: Text
+
+      - name: HBCustomerCreate
+        actionType: ServerAction
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBCustomer
+            isMandatory: true
+            description: "HBCustomer record to create"
+          - name: Id
+            direction: Output
+            dataType: HBCustomer Identifier
+            description: "HBCustomer identifier created"
+
+      - name: HBUploadCreate
+        actionType: ServerAction
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBUpload
+            isMandatory: true
+            description: "HBUpload record to create"
+          - name: Id
+            direction: Output
+            dataType: HBUpload Identifier
+            description: "HBUpload identifier created"
+
+      - name: HBUploadCreateOrUpdate
+        actionType: ServerAction
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBUpload
+            isMandatory: true
+            description: "HBUpload record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: HBUpload Identifier
+            description: "HBUpload identifier created or modified"
+
+      - name: HBUploadDelete
+        actionType: ServerAction
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: HBUpload Identifier
+            isMandatory: true
+            description: "HBUpload identifier to delete"
+
+      - name: HBUploadUpdate
+        actionType: ServerAction
+        description: "Encapsulates the Update entity action, enabling logic to run consistently before and after a record is modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBUpload
+            isMandatory: true
+            description: "HBUpload record to modify"
+          - name: Id
+            direction: Output
+            dataType: HBUpload Identifier
+            description: "HBUpload identifier modified"
+
+      - name: HistoryLogCreateOrUpdate
+        actionType: ServerAction
+        parameters:
+          - name: Log
+            direction: Input
+            dataType: HistoryLog
+            isMandatory: true
+          - name: LogId
+            direction: Output
+            dataType: HistoryLog Identifier
+
+      - name: LoanRequestCreate
+        actionType: ServerAction
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+            description: "LoanRequest record to create"
+          - name: Id
+            direction: Output
+            dataType: LoanRequest Identifier
+            description: "LoanRequest identifier created"
+
+      - name: LoanRequestCreateOrUpdate
+        actionType: ServerAction
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+            description: "LoanRequest record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: LoanRequest Identifier
+            description: "LoanRequest identifier created or modified"
+
+      - name: LoanRequestDelete
+        actionType: ServerAction
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+            description: "LoanRequest identifier to delete"
+
+      - name: LoanRequestUpdate
+        actionType: ServerAction
+        description: "Encapsulates the Update entity action, enabling logic to run consistently before and after a record is modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+            description: "LoanRequest record to modify"
+          - name: Id
+            direction: Output
+            dataType: LoanRequest Identifier
+            description: "LoanRequest identifier modified"
+
+      - name: RequestAssigned
+        actionType: ServerAction
+        parameters:
+          - name: EmployeeId
+            direction: Input
+            dataType: Employee Identifier
+            isMandatory: true
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: RequestChangeStatus
+        actionType: ServerAction
+        description: "Use this action everytime you want to change its current status in the process."
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: RequestStatusId
+            direction: Input
+            dataType: LoanRequestStatus Identifier
+            isMandatory: true
+          - name: RequestInfoOptionId
+            direction: Input
+            dataType: LoanRequestInfoOption Identifier
+          - name: StatusReason
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: EmployeeId
+            direction: Input
+            dataType: Employee Identifier
+            isMandatory: true
+
+      - name: RequestCreateOrUpdate
+        actionType: ServerAction
+        parameters:
+          - name: Request
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+          - name: Comment
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: RequestId
+            direction: Output
+            dataType: LoanRequest Identifier
+          - name: LogId
+            direction: Output
+            dataType: HistoryLog Identifier
+
+      - name: RequestNofificationOpened
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: SaveAppSettings
+        actionType: ServerAction
+        parameters:
+          - name: DataSettings
+            direction: Input
+            dataType: DataSettings
+            isMandatory: true
+
+      - name: SaveRequestBasicCreditInfo
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: KeyMetric
+            direction: Input
+            dataType: KeyMetric
+            isComplex: true  # Structure or referenced entity
+
+      - name: SendPushNotification
+        actionType: ServerAction
+        parameters:
+          - name: Title
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Message
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: DeviceId
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+
+      - name: Sidebar_ChangeStatus
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: RequestStatusId
+            direction: Input
+            dataType: LoanRequestStatus Identifier
+            isMandatory: true
+          - name: Reason
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+          - name: AgentTypeId
+            direction: Input
+            dataType: HBAgentType Identifier
+            isMandatory: true
+          - name: AgentDecisionStatusId
+            direction: Input
+            dataType: HBAgentDecisionStatus Identifier
+            isMandatory: true
+          - name: RequestInfoOptionId
+            direction: Input
+            dataType: LoanRequestInfoOption Identifier
+
+      - name: Sidebar_SendEmail
+        actionType: ServerAction
+        parameters:
+          - name: AgentResponse
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: TransactionCreateOrUpdate
+        actionType: ServerAction
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: Transaction
+            isMandatory: true
+          - name: Id
+            direction: Output
+            dataType: Transaction Identifier
+
+      - name: WakeUpWF
+        actionType: ServerAction
+
+  service_actions:  # 38 service actions (exposed to consumer apps)
+      - name: GetLoanAccountId
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: LoanRequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: AccountId
+            direction: Output
+            dataType: HBAccount Identifier
+
+      - name: GrantHBPortalRole
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+
+      - name: RequestSetStatus
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: RequestStatusId
+            direction: Input
+            dataType: LoanRequestStatus Identifier
+            isMandatory: true
+          - name: StatusReason
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: EmployeeId
+            direction: Input
+            dataType: Employee Identifier
+
+      - name: SendEmail_RequestRejected
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: ServiceAgentsResponseAdd
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: LoanRequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: Title
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Description
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Id
+            direction: Output
+            dataType: HAgentsResponse Identifier
+            description: "AgentsResponse identifier created or modified"
+
+      - name: ServiceAgentsResponseCreate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+            description: "AgentsResponse record to create"
+          - name: Id
+            direction: Output
+            dataType: HAgentsResponse Identifier
+            description: "AgentsResponse identifier created"
+
+      - name: ServiceAgentsResponseCreateOrUpdate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+            description: "AgentsResponse record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: HAgentsResponse Identifier
+            description: "AgentsResponse identifier created or modified"
+
+      - name: ServiceAgentsResponseDelete
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: HAgentsResponse Identifier
+            isMandatory: true
+            description: "AgentsResponse identifier to delete"
+
+      - name: ServiceAgentsResponseSave
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: AgentsResponse
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+          - name: DoAudit
+            direction: Input
+            dataType: Boolean
+
+      - name: ServiceCustomerGoalCreate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerGoal
+            isMandatory: true
+            description: "CustomerGoal record to create"
+          - name: Id
+            direction: Output
+            dataType: CustomerGoal Identifier
+            description: "CustomerGoal identifier created"
+
+      - name: ServiceCustomerGoalCreateOrUpdate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerGoal
+            isMandatory: true
+            description: "CustomerGoal record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: CustomerGoal Identifier
+            description: "CustomerGoal identifier created or modified"
+
+      - name: ServiceCustomerGoalDelete
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: CustomerGoal Identifier
+            isMandatory: true
+            description: "CustomerGoal identifier to delete"
+
+      - name: ServiceCustomerGoalUpdate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Update entity action, enabling logic to run consistently before and after a record is modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: CustomerGoal
+            isMandatory: true
+            description: "CustomerGoal record to modify"
+          - name: Id
+            direction: Output
+            dataType: CustomerGoal Identifier
+            description: "CustomerGoal identifier modified"
+
+      - name: ServiceDocumentDelete
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: DocumentId
+            direction: Input
+            dataType: HBDocument Identifier
+            isMandatory: true
+
+      - name: ServiceFormatCurrencyCustom
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: Amount
+            direction: Input
+            dataType: Currency
+            isMandatory: true
+          - name: FormatedAmount
+            direction: Output
+            dataType: Text
+
+      - name: ServiceGeneratePersonalLoanOfferLetter
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: ServiceGetFirebaseConfigurations
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: ProjectId
+            direction: Output
+            dataType: Text
+          - name: DatabaseURL
+            direction: Output
+            dataType: Text
+          - name: Target
+            direction: Output
+            dataType: Text
+          - name: Token
+            direction: Output
+            dataType: Text
+
+      - name: ServiceGetSettings
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: Currency
+            direction: Output
+            dataType: Text
+          - name: GroupSeparator
+            direction: Output
+            dataType: Text
+          - name: DecimalSeparator
+            direction: Output
+            dataType: Text
+          - name: GoogleMapsKey
+            direction: Output
+            dataType: Text
+
+      - name: ServiceHBCustomerCreate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBCustomer
+            isMandatory: true
+            description: "HBCustomer record to create"
+          - name: Id
+            direction: Output
+            dataType: HBCustomer Identifier
+            description: "HBCustomer identifier created"
+
+      - name: ServiceHBUploadCreate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBUpload
+            isMandatory: true
+            description: "HBUpload record to create"
+          - name: Id
+            direction: Output
+            dataType: HBUpload Identifier
+            description: "HBUpload identifier created"
+
+      - name: ServiceHBUploadCreateOrUpdate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBUpload
+            isMandatory: true
+            description: "HBUpload record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: HBUpload Identifier
+            description: "HBUpload identifier created or modified"
+
+      - name: ServiceHBUploadDelete
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: HBUpload Identifier
+            isMandatory: true
+            description: "HBUpload identifier to delete"
+
+      - name: ServiceHBUploadUpdate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Update entity action, enabling logic to run consistently before and after a record is modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: HBUpload
+            isMandatory: true
+            description: "HBUpload record to modify"
+          - name: Id
+            direction: Output
+            dataType: HBUpload Identifier
+            description: "HBUpload identifier modified"
+
+      - name: ServiceHistoryLogCreateOrUpdate
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: Log
+            direction: Input
+            dataType: HistoryLog
+            isMandatory: true
+          - name: LogId
+            direction: Output
+            dataType: HistoryLog Identifier
+
+      - name: ServiceLoanRequestCreate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Create entity action, enabling logic to run consistently before and after a record is created."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+            description: "LoanRequest record to create"
+          - name: Id
+            direction: Output
+            dataType: LoanRequest Identifier
+            description: "LoanRequest identifier created"
+
+      - name: ServiceLoanRequestCreateOrUpdate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the CreateOrUpdate entity action, enabling logic to run consistently before and after a record is created or modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+            description: "LoanRequest record to create or modify"
+          - name: Id
+            direction: Output
+            dataType: LoanRequest Identifier
+            description: "LoanRequest identifier created or modified"
+
+      - name: ServiceLoanRequestDelete
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Delete entity action, enabling logic to run consistently before and after a record is deleted."
+        parameters:
+          - name: Id
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+            description: "LoanRequest identifier to delete"
+
+      - name: ServiceLoanRequestUpdate
+        actionType: ServiceAction
+        isPublic: true
+        description: "Encapsulates the Update entity action, enabling logic to run consistently before and after a record is modified."
+        parameters:
+          - name: Source
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+            description: "LoanRequest record to modify"
+          - name: Id
+            direction: Output
+            dataType: LoanRequest Identifier
+            description: "LoanRequest identifier modified"
+
+      - name: ServiceOfferLetterVerification
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: HasOfferLetterGenerated
+            direction: Output
+            dataType: Boolean
+
+      - name: ServicePersonalLoanRequestCreatedOrUpdate
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: CustomerLoan
+            direction: Input
+            dataType: CustomerLoan
+            isMandatory: true
+          - name: Request
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+          - name: Comment
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Documents
+            direction: Input
+            dataType: DocumentStructure List
+            isMandatory: true
+            isComplex: true  # Structure or referenced entity
+          - name: RequestId
+            direction: Output
+            dataType: LoanRequest Identifier
+            description: "Id of the request generated"
+
+      - name: ServiceRequestAssigned
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: EmployeeId
+            direction: Input
+            dataType: Employee Identifier
+            isMandatory: true
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: ServiceRequestChangeStatus
+        actionType: ServiceAction
+        isPublic: true
+        description: "Use this action everytime you want to change its current status in the process."
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: RequestStatusId
+            direction: Input
+            dataType: LoanRequestStatus Identifier
+            isMandatory: true
+          - name: RequestInfoOptionId
+            direction: Input
+            dataType: LoanRequestInfoOption Identifier
+          - name: StatusReason
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: EmployeeId
+            direction: Input
+            dataType: Employee Identifier
+            isMandatory: true
+
+      - name: ServiceRequestCreateOrUpdate
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: Request
+            direction: Input
+            dataType: LoanRequest
+            isMandatory: true
+          - name: Comment
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: RequestId
+            direction: Output
+            dataType: LoanRequest Identifier
+          - name: LogId
+            direction: Output
+            dataType: HistoryLog Identifier
+
+      - name: ServiceRequestEnableResubmission
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+
+      - name: ServiceSaveAppSettings
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: DataSettings
+            direction: Input
+            dataType: DataSettings
+            isMandatory: true
+
+      - name: ServiceSendPushNotification
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: Title
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Message
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: DeviceId
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+
+      - name: ServiceSidebar_ChangeStatus
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: RequestStatusId
+            direction: Input
+            dataType: LoanRequestStatus Identifier
+            isMandatory: true
+          - name: Reason
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+          - name: AgentTypeId
+            direction: Input
+            dataType: HBAgentType Identifier
+            isMandatory: true
+          - name: AgentDecisionStatusId
+            direction: Input
+            dataType: HBAgentDecisionStatus Identifier
+            isMandatory: true
+          - name: RequestInfoOptionId
+            direction: Input
+            dataType: LoanRequestInfoOption Identifier
+
+      - name: ServiceSidebar_ChangeStatusGetFirebase
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: RequestStatusId
+            direction: Input
+            dataType: LoanRequestStatus Identifier
+            isMandatory: true
+          - name: Reason
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+          - name: AgentTypeId
+            direction: Input
+            dataType: HBAgentType Identifier
+            isMandatory: true
+          - name: AgentDecisionStatusId
+            direction: Input
+            dataType: HBAgentDecisionStatus Identifier
+            isMandatory: true
+          - name: RequestInfoOptionId
+            direction: Input
+            dataType: LoanRequestInfoOption Identifier
+          - name: ProjectId
+            direction: Output
+            dataType: Text
+          - name: DatabaseURL
+            direction: Output
+            dataType: Text
+          - name: Target
+            direction: Output
+            dataType: Text
+          - name: Token
+            direction: Output
+            dataType: Text
+
+
+# ════════════════════════════════════════════════════════════════════
+# PORTAL (26 actions)
+# Asset key: fa7ab595-f8cd-4140-8826-2acc484727b6
+# ════════════════════════════════════════════════════════════════════
+
+portal:
+  app_assetKey: fa7ab595-f8cd-4140-8826-2acc484727b6
+  action_count: 26
+
+  server_actions:  # 10
+      - name: CheckAndGrantRole
+        actionType: ServerAction
+        parameters:
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+
+      - name: GetDefaultLocale
+        actionType: ServerAction
+        parameters:
+          - name: LocaleId
+            direction: Output
+            dataType: Locale2 Identifier
+
+      - name: GetMonth
+        actionType: ServerAction
+        parameters:
+          - name: Short
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Month
+            direction: Output
+            dataType: Integer
+
+      - name: GetRequestByCustomerLoan
+        actionType: ServerAction
+        parameters:
+          - name: CustomerLoanId
+            direction: Input
+            dataType: CustomerLoan Identifier
+            isMandatory: true
+          - name: RequestId
+            direction: Output
+            dataType: LoanRequest Identifier
+
+      - name: Get_Settings
+        actionType: ServerAction
+        parameters:
+          - name: Currency
+            direction: Output
+            dataType: Text
+          - name: GroupSeparator
+            direction: Output
+            dataType: Text
+          - name: DecimalSeparator
+            direction: Output
+            dataType: Text
+          - name: SessionId
+            direction: Output
+            dataType: Text
+          - name: GoogleAnalyticsTrackingID
+            direction: Output
+            dataType: Text
+          - name: IsDemoAccessCookieEnabled
+            direction: Output
+            dataType: Boolean
+
+      - name: IsTwilioConfiguredAndGetPhoneNumber
+        actionType: ServerAction
+        parameters:
+          - name: IsConfigured
+            direction: Output
+            dataType: Boolean
+          - name: PhoneNumber
+            direction: Output
+            dataType: Phone Number
+
+      - name: KeepAwakeAll
+        actionType: ServerAction
+
+      - name: ParseAIResponse
+        actionType: ServerAction
+        parameters:
+          - name: Response
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: AIAnswer
+            direction: Output
+            dataType: AIAnswer
+            isComplex: true
+
+      - name: SetCookie
+        actionType: ServerAction
+        parameters:
+          - name: EmailHex
+            direction: Input
+            dataType: Email
+            isMandatory: true
+
+      - name: ValidateDocument
+        actionType: ServerAction
+        parameters:
+          - name: Binary
+            direction: Input
+            dataType: Binary Data
+            isMandatory: true
+          - name: Filename
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: HBDocumentTypeId
+            direction: Input
+            dataType: HBDocumentType Identifier
+            isMandatory: true
+          - name: LocaleId
+            direction: Input
+            dataType: Locale2 Identifier
+            isMandatory: true
+          - name: DocumentValidationResponse
+            direction: Output
+            dataType: DocumentValidationResponse
+            isComplex: true
+
+  client_actions:  # 16
+      - name: CheckCookie
+        actionType: ClientAction
+        parameters:
+          - name: HasCookie
+            direction: Output
+            dataType: Boolean
+          - name: Cookie
+            direction: Output
+            dataType: Text
+
+      - name: CheckRTL
+        actionType: ClientAction
+        parameters:
+          - name: IsRTL
+            direction: Output
+            dataType: Boolean
+
+      - name: DoLogin
+        actionType: ClientAction
+        description: "Performs a login using the system action for the given username and password."
+        parameters:
+          - name: Username
+            direction: Input
+            dataType: Text
+            isMandatory: true
+            description: "Name of the user logging in."
+          - name: Password
+            direction: Input
+            dataType: Text
+            isMandatory: true
+            description: "Password of the user logging in."
+          - name: Success
+            direction: Output
+            dataType: Boolean
+            description: "True if the user was successfully logged in."
+          - name: ErrorMessage
+            direction: Output
+            dataType: Text
+            description: "If unsuccessful, details the failure reason."
+
+      - name: FormatCurrencyCustom
+        actionType: ClientAction
+        parameters:
+          - name: Amount
+            direction: Input
+            dataType: Currency
+            isMandatory: true
+          - name: FormatedAmount
+            direction: Output
+            dataType: Text
+
+      - name: FormatDateCustom
+        actionType: ClientAction
+        parameters:
+          - name: Date
+            direction: Input
+            dataType: Date
+            isMandatory: true
+          - name: FormatedDate
+            direction: Output
+            dataType: Text
+
+      - name: GetCreditRank
+        actionType: ClientAction
+        parameters:
+          - name: Score
+            direction: Input
+            dataType: Integer
+            isMandatory: true
+          - name: Rank
+            direction: Output
+            dataType: Text
+
+      - name: GetLocale
+        actionType: ClientAction
+        parameters:
+          - name: LocaleId
+            direction: Output
+            dataType: Locale2 Identifier
+
+      - name: GetUserPicture
+        actionType: ClientAction
+
+      - name: InitClientVars
+        actionType: ClientAction
+
+      - name: Random
+        actionType: ClientAction
+        parameters:
+          - name: Min
+            direction: Input
+            dataType: Integer
+            isMandatory: true
+          - name: Max
+            direction: Input
+            dataType: Integer
+            isMandatory: true
+          - name: Output
+            direction: Output
+            dataType: Integer
+
+      - name: ScrollToTop
+        actionType: ClientAction
+        description: "Scroll to the top of the page."
+
+      - name: SendSMS
+        actionType: ClientAction
+        parameters:
+          - name: TwilioPhoneNumber
+            direction: Input
+            dataType: Phone Number
+            isMandatory: true
+          - name: Code
+            direction: Input
+            dataType: Text
+            isMandatory: true
+
+      - name: SetDefaultLocale
+        actionType: ClientAction
+
+      - name: SliderGoTo
+        actionType: ClientAction
+        parameters:
+          - name: WidgetId
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Index
+            direction: Input
+            dataType: Integer
+            isMandatory: true
+            description: "Index to move to"
+
+      - name: TextToHex
+        actionType: ClientAction
+        parameters:
+          - name: Text
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Hex
+            direction: Output
+            dataType: Text
+
+      - name: ToggleDarkMode
+        actionType: ClientAction
+        description: "It is set based on the client.IsDarkMode variable."
+
+
+# ════════════════════════════════════════════════════════════════════
+# BACKOFFICE (26 actions)
+# Asset key: 555cac1f-af92-4461-9750-b635d6570495
+# ════════════════════════════════════════════════════════════════════
+
+backoffice:
+  app_assetKey: 555cac1f-af92-4461-9750-b635d6570495
+  action_count: 26
+
+  server_actions:  # 11
+      - name: CheckAndGrantRole
+        actionType: ServerAction
+        parameters:
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+
+      - name: DocumentGet
+        actionType: ServerAction
+        parameters:
+          - name: DocumentId
+            direction: Input
+            dataType: HBDocument Identifier
+            isMandatory: true
+          - name: FileName
+            direction: Output
+            dataType: Text
+          - name: Binary
+            direction: Output
+            dataType: Binary Data
+
+      - name: GetDefaultLocale
+        actionType: ServerAction
+        parameters:
+          - name: LocaleId
+            direction: Output
+            dataType: Locale2 Identifier
+
+      - name: GetEmployeeTasks
+        actionType: ServerAction
+        parameters:
+          - name: EmployeeTasks
+            direction: Output
+            dataType: EmployeeTask List
+            isComplex: true
+
+      - name: GetMonth
+        actionType: ServerAction
+        parameters:
+          - name: Short
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: Month
+            direction: Output
+            dataType: Integer
+
+      - name: GetSettingsAndPicture
+        actionType: ServerAction
+        parameters:
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+          - name: Currency
+            direction: Output
+            dataType: Text
+          - name: GroupSeparator
+            direction: Output
+            dataType: Text
+          - name: DecimalSeparator
+            direction: Output
+            dataType: Text
+          - name: UserPicture
+            direction: Output
+            dataType: Text
+          - name: DefaultLocaleId
+            direction: Output
+            dataType: Locale2 Identifier
+          - name: GoogleAnalyticsTrackingID
+            direction: Output
+            dataType: Text
+
+      - name: GetUserPicture
+        actionType: ServerAction
+        parameters:
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+          - name: Image64
+            direction: Output
+            dataType: Text
+
+      - name: RequestAssignEmployeeBulk
+        actionType: ServerAction
+        parameters:
+          - name: RequestIds
+            direction: Input
+            dataType: LoanRequest Identifier List
+            isMandatory: true
+            isComplex: true
+          - name: EmployeeId
+            direction: Input
+            dataType: Employee Identifier
+            isMandatory: true
+
+      - name: Sidebar_ChangeStatus
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: RequestStatusId
+            direction: Input
+            dataType: LoanRequestStatus Identifier
+            isMandatory: true
+          - name: Reason
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: UserId
+            direction: Input
+            dataType: User Identifier
+            isMandatory: true
+          - name: AgentTypeId
+            direction: Input
+            dataType: HBAgentType Identifier
+            isMandatory: true
+          - name: AgentDecisionStatusId
+            direction: Input
+            dataType: HBAgentDecisionStatus Identifier
+            isMandatory: true
+          - name: RequestInfoOptionId
+            direction: Input
+            dataType: LoanRequestInfoOption Identifier
+          - name: NotifyUser
+            direction: Input
+            dataType: Boolean
+            isMandatory: true
+
+      - name: Sidebar_DownloadAttachment
+        actionType: ServerAction
+        parameters:
+          - name: RequestId
+            direction: Input
+            dataType: LoanRequest Identifier
+            isMandatory: true
+          - name: FileName
+            direction: Output
+            dataType: Text
+          - name: Binary
+            direction: Output
+            dataType: Binary Data
+
+      - name: Sidebar_UpdateEmail
+        actionType: ServerAction
+        parameters:
+          - name: AgentsResponse
+            direction: Input
+            dataType: HAgentsResponse
+            isMandatory: true
+
+  client_actions:  # 14
+      - name: AddMessage
+        actionType: ClientAction
+        parameters:
+          - name: SidebarId
+            direction: Input
+            dataType: Text
+            isMandatory: true
+          - name: ChatMsg
+            direction: Input
+            dataType: ChatMsg
+            isMandatory: true
+            isComplex: true
+
+      - name: CalcTimeDiff
+        actionType: ClientAction
+        parameters:
+          - name: DateTime
+            direction: Input
+            dataType: Date Time
+            isMandatory: true
+          - name: Output
+            direction: Output
+            dataType: Text
+
+      - name: CloseAISidebar
+        actionType: ClientAction
+
+      - name: CopyToClipboard
+        actionType: ClientAction
+        parameters:
+          - name: Text
+            direction: Input
+            dataType: Text
+            isMandatory: true
+
+      - name: DoLogin
+        actionType: ClientAction
+        description: "Performs a login using the system action for the given username and password."
+        parameters:
+          - name: Username
+            direction: Input
+            dataType: Text
+            isMandatory: true
+            description: "Name of the user logging in."
+          - name: Password
+            direction: Input
+            dataType: Text
+            isMandatory: true
+            description: "Password of the user logging in."
+          - name: Success
+            direction: Output
+            dataType: Boolean
+          - name: ErrorMessage
+            direction: Output
+            dataType: Text
+
+      - name: FormatCurrencyCustom
+        actionType: ClientAction
+        parameters:
+          - name: Amount
+            direction: Input
+            dataType: Currency
+            isMandatory: true
+          - name: DecimalDigits
+            direction: Input
+            dataType: Integer
+            isMandatory: true
+          - name: FormatedAmount
+            direction: Output
+            dataType: Text
+
+      - name: GenerateId
+        actionType: ClientAction
+        parameters:
+          - name: Id
+            direction: Output
+            dataType: Text
+
+      - name: GetLocale
+        actionType: ClientAction
+        parameters:
+          - name: LocaleId
+            direction: Output
+            dataType: Locale2 Identifier
+
+      - name: GetUserPicture
+        actionType: ClientAction
+
+      - name: InitClientVars
+        actionType: ClientAction
+        parameters:
+          - name: GoogleTrackingId
+            direction: Output
+            dataType: Text
+
+      - name: InitClientVarsAndTracking
+        actionType: ClientAction
+
+      - name: OpenAISidebar
+        actionType: ClientAction
+
+      - name: SetDefaultLocale
+        actionType: ClientAction
+
+      - name: ToggleAISidebar
+        actionType: ClientAction
+
+  service_actions:  # 1
+      - name: KeepAwake
+        actionType: ServiceAction
+        isPublic: true
+        parameters:
+          - name: SLADays
+            direction: Output
+            dataType: Integer
+

@@ -1,0 +1,32 @@
+# Home Banking — Roles Manifest
+#
+# Source: extracted via MCP context_roles from app key 695efc5b-... (Core).
+# Portal + Backoffice own zero roles; they consume Core's Public roles.
+
+app: home_banking_core
+app_assetKey: 695efc5b-8f39-4a53-8d71-35c59097d245
+role_count: 3
+
+roles:
+  - name: HomeBankingCore
+    isPublic: false
+    description: |
+      Internal role used by Core itself. Not exposed to consumer apps.
+      Auto-generated baseline role matching the app name.
+
+  - name: HomeBankingBackoffice
+    isPublic: true
+    description: |
+      End-user role for Backoffice users (underwriters, communicators, intake
+      agents). Exposed via Manage Dependencies to the Backoffice app, where
+      it gates the admin/underwriter screens.
+
+  - name: HomeBankingPortal
+    isPublic: true
+    description: |
+      End-user role for Portal customers (banking app end-users). Exposed to
+      Portal, Mobile, and Loan Request apps. Gates customer-facing screens.
+
+# Rebuild: drive each role through `data/MCP_RECIPES/03_role.md` (TBD).
+# After role creation in Core, run publish_start, then in Portal/Backoffice
+# use Studio "Manage Dependencies" to import the two Public roles.

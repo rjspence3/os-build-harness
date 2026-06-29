@@ -1,0 +1,66 @@
+=== Screen: Transfer ===
+Inputs: AccountId:HBAccount Identifier (EntityIdentifierType:oxCI2fSgEUaaBhQegy7cKg.#IdentifierType)
+Locals: NewTransfer:Amount, Date, OrginAccountId, SelectedTransferDateOptionId, ToAccountId, ToAccountNumber, ToContact, ToIBAN, ToPhoneNumber Record (AnonymousStructure:_OLa7Vh8gk2zIaq275gzSQ), StepNo:Integer (BasicTypes.Integer:j2Lc0phK0kuggij4gQYfAw), OTPVerificationCode:Integer (BasicTypes.Integer:j2Lc0phK0kuggij4gQYfAw), IsToPhoneNumber:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), IsConfirmPhoneNumberLoading:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), TwilioPhoneNumber:Phone Number (BasicTypes.PhoneNumber:uCRxZE_fNUyUSGrF0nnRIw), ShowPhoneNumberPopup:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg), IsPortrait:Boolean (BasicTypes.Boolean:oD0fxvc7hUOX_305zIXIlg)
+
+--- WIDGETS (flat, document order) ---
+[1] WebBlockInstance ''
+[2] PlaceholderArgument 'Header'
+[3] PlaceholderArgument 'MainContent'
+[4] PlaceholderArgument 'SideContent'
+[5] PlaceholderArgument 'Footer'
+[6] WebBlockInstance ''
+[7] Container '' Style=""left-side-content" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[8] If 'PhoneOrTabletPortrait' Condition="If(IsPhone() or (IsTablet() and IsPortrait),True,False) [Condition[ServiceStudio.Expressions.Abstrac..."
+[9] Container '' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="9 col"
+[10] Popup '' Style=""popup-dialog" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[11] CustomPlaceholderWidget 'content'
+[12] IfBranch ''
+[13] IfBranch ''
+[14] CustomPlaceholderWidget 'content'
+[15] CustomPlaceholderWidget 'content'
+[16] Container '' Style=""margin-bottom-l" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[17] Container '' Style=""account-card-cntr-transfer" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[18] Container '' Style=""margin-bottom-m" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[19] Container 'Step1' Visible="StepNo=1 [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[20] Container 'Step2' Visible="StepNo=2 [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[21] Container '' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[22] Container '' Style=""margin-top-base" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[23] Container '' Style=""margin-top-m" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" CustomStyle="text-align: center;" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[24] CustomPlaceholderWidget 'content'
+[25] CustomPlaceholderWidget 'content'
+[26] CustomPlaceholderWidget 'content'
+[27] CustomPlaceholderWidget 'content'
+[28] CustomPlaceholderWidget 'content'
+[29] CustomPlaceholderWidget 'content'
+[30] CustomPlaceholderWidget 'content'
+[31] CustomPlaceholderWidget 'content'
+[32] Text '' Value="New Transfer" Style=""font-size-h4 font-semi-bold" [Style[ServiceStudio.Expressions.AbstractExpression]]"
+[33] If 'StepNo1' Condition="StepNo=1 [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[34] Container '' Style=""margin-bottom-l" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[35] Container '' Style=""account-card-cntr-transfer-phone" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[36] Container '' Style=""margin-bottom-l" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[37] Form 'Form1' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[38] Container '' Style=""margin-bottom-l" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[39] Container '' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[40] Container '' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="11 col"
+[41] Container '' CustomStyle="text-align: right;" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="1 col"
+[42] Input 'Input_PhoneNumber' Style=""form-control" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[43] WebBlockInstance ''
+[44] IfBranch ''
+[45] IfBranch ''
+[46] CustomPlaceholderWidget 'content'
+[47] CustomPlaceholderWidget 'content'
+[48] CustomPlaceholderWidget 'content'
+[49] CustomPlaceholderWidget 'content'
+[50] CustomPlaceholderWidget 'content'
+[51] CustomPlaceholderWidget 'content'
+[52] CustomPlaceholderWidget 'content'
+[53] CustomPlaceholderWidget 'content'
+[54] PlaceholderArgument 'Button'
+[55] If 'IsDataFetched' Condition="GetAccounts.IsDataFetched [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[56] WebBlockInstance ''
+[57] Text '' Value="New Transfer" Style=""font-size-h4 font-semi-bold" [Style[ServiceStudio.Expressions.AbstractExpression]]"
+[58] If 'PhoneStepNo1' Condition="StepNo=1 [Condition[ServiceStudio.Expressions.AbstractExpression]]"
+[59] Text '' Value="Transfer Details" Style=""font-size-base font-semi-bold" [Style[ServiceStudio.Expressions.AbstractExpression]]"
+[60] Container '' Visible="True [Visible[ServiceStudio.Expressions.AbstractExpression]]" Width="(fill parent)"
+[61] Container '' Style=""margin-top-l transfer-to-btn-grp" [ValueExpression[ServiceStudio.Expressions.AbstractExpression]]" Visible=

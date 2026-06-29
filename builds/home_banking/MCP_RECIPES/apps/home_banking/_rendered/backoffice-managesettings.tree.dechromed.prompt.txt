@@ -1,0 +1,203 @@
+You are executing a Mentor MCP recipe from a debugged library. The library is
+a defined methodology — recipes compose in phase order (STRUCTURE → LOGIC →
+CHROME → VERIFY) and each recipe defines as much as possible explicitly. The
+API surface and patterns are pre-resolved — do NOT explore, probe, reflect,
+or call get_app_summary.
+
+CONSTRAINTS (non-negotiable):
+
+1. ONE applyModelApiCode call per recipe. No reflection, no exploratory reads.
+2. Use the EXACT code provided. Do not "improve" it.
+3. If the call throws compile or runtime error: STOP and report the error
+   verbatim. Do NOT iterate, do NOT regenerate, do NOT attempt a fix.
+4. Print only the diagnostic output the recipe specifies. No extra summarization.
+5. Do NOT publish from inside the recipe. The caller runs publish_start
+   separately.
+6. The recipe's PHASE annotation determines what the call may touch:
+   - STRUCTURE: entities, statics, roles, dechromed screens, default screen.
+     Uses ONLY standard OutSystemsUI widgets + the manifest's own custom
+     types. Custom blocks (Menu, Header, brand icons) are NOT yet authored —
+     do not reference them.
+   - LOGIC: server/service/client actions; expressions referencing the
+     STRUCTURE phase's entities. No widget/screen mutations.
+   - CHROME: custom blocks, theme CSS, chrome-wrap (replacing dechromed
+     widget shells with custom-block instances). Assumes STRUCTURE + LOGIC
+     phases published successfully.
+   - VERIFY: read-only context_* / applyModelApiCode probes that compare
+     published state vs manifest expectations.
+   A phase-violating call (e.g. a STRUCTURE recipe trying to wrap a screen
+   in HBIcon) is a recipe-library bug — STOP and report.
+
+API SURFACE PRE-RESOLVED (do not rediscover):
+
+- Server entity creation: eSpace.CreateServerEntity(name)
+- PK setup: entity.IdentifierAttribute = idAttr (assign AFTER attr created, BEFORE
+  any other attribute). idAttr.IsAutoNumber = OutSystems.Model.Enumerations.AutoNumber.Yes;
+  idAttr.IsMandatory = true; idAttr.DataType = eSpace.LongIntegerType.
+  (IsAutoNumber is an enum, NOT bool. Values: No | Yes | YesIfEmpty)
+- FK attributes: a.DataType = <staticEntity>.IdentifierType or
+  userIdentType (resolved via eSpace.References)
+- FK DeleteRule: ALWAYS set to OutSystems.Model.Enumerations.DeleteRule.Ignore
+  (Protect is deprecated and causes OS-BLD-40409 at publish time)
+- Static entity creation: eSpace.CreateStaticEntity(name)
+- Role creation: eSpace.CreateRole(name); role.Public = false
+- Server action: eSpace.CreateServerAction(name); action.Public = bool
+- SQL node: action.CreateNode<ISQLNode>("name"); sqlNode.Statement = "SQL";
+  sqlNode.CreateInputParameter(name); sqlNode.SetArgumentValue(param, "expr")
+- Screen creation: BLOCKED on some apps by a platform bug — recipe must declare
+  if it touches CreateScreen and the caller will route accordingly
+- DefaultScreen: eSpace.DefaultScreen = some IScreen reference
+- Publish: external to recipes; caller runs publish_start then publish_status
+
+CORPUS REFERENCES (relevant memories, already encoded into recipes):
+
+- odc_mcp_entity_auto_actions_incomplete — PK required before publish
+- odc_db_upgrade_pk_change_blocked — never alter PK post-publish; delete+recreate
+- odc_mcp_sql_node_api — ISQLNode surface
+- odc_mcp_publish_terminal_success_gate — never cancel a session you intend to publish
+- odc_mcp_screen_creation_broken_complianceops — known per-app CreateScreen bug
+- odc_mcp_record_literal_via_typed_local — Server Action record creation pattern
+- odc_long_integer_to_identifier_cast — LongIntegerToIdentifier for ID arguments
+- odc_mcp_assign_node_iteration_not_flow_order — identify Assign nodes by Variable name
+
+REQUIRED IMPORTS (always include these in the imports array):
+
+System.Linq
+OutSystems.Model
+OutSystems.Model.Data
+OutSystems.Model.Logic
+OutSystems.Model.Logic.Nodes
+OutSystems.Model.Enumerations
+OutSystems.Model.Types
+
+DIAGNOSTIC OUTPUT FORMAT:
+
+End the C# block with ONE Console.WriteLine that prints, on a single line:
+"Recipe <NN>: <Name> | Created: <comma list> | Status: OK"
+
+If any intermediate step asserts a non-null pre-condition that fails, print:
+"Recipe <NN>: <Name> | FAILED at <step name>: <what was unexpected>"
+and return from the lambda. The caller treats this as a fatal stop.
+
+Now execute the following recipe:
+
+```csharp
+eSpace => {
+    // ─── Screen: ManageSettings (dechromed) ─────────────
+    var flow = eSpace.MobileFlows.FirstOrDefault(f => f.Name == "MainFlow");
+    if (flow == null) { Console.WriteLine($"FAILED: MobileFlow MainFlow not found"); return; }
+    var screen = flow.CreateScreen("ManageSettings");
+    var role = eSpace.Roles.FirstOrDefault(r => r.Name == "HomeBankingBackofficeEmployee") ?? eSpace.References.SelectMany(r => r.Roles).FirstOrDefault(r => r.Name == "HomeBankingBackofficeEmployee");
+    if (role != null) screen.Roles.Add(role);
+    
+    // ─── Local variables ────────────────────────
+    { var lv = screen.CreateLocalVariable("IsBootstrapStarted"); lv.DataType = eSpace.BooleanType; lv.SetDefaultValue("False"); }
+    
+    // ─── Screen aggregates ──────────────────────
+    {
+        var agg = screen.CreateScreenAggregate(false, "GetDataSettings");
+        agg.Fetch = OutSystems.Model.Enumerations.DataSourceFetch.AtStart;
+        agg.SetMaxRecords("50");
+        var srcEntity = eSpace.Entities.OfType<OutSystems.Model.Data.IServerEntitySignature>()
+            .FirstOrDefault(e => e.Name == "DataSettings")
+            ?? (OutSystems.Model.Data.IEntitySignature)eSpace.Entities.OfType<OutSystems.Model.Data.IStaticEntitySignature>()
+                .FirstOrDefault(e => e.Name == "DataSettings")
+            ?? eSpace.References.SelectMany(r => r.Entities).FirstOrDefault(e => e.Name == "DataSettings");
+        if (srcEntity != null) agg.AsDatabaseAggregate.CreateSource(srcEntity);
+        else Console.WriteLine($"WARN: aggregate GetDataSettings source entity DataSettings not found");
+    }
+    {
+        var agg = screen.CreateScreenAggregate(false, "GetRegions");
+        agg.Fetch = OutSystems.Model.Enumerations.DataSourceFetch.AtStart;
+        agg.SetMaxRecords("50");
+        var srcEntity = eSpace.Entities.OfType<OutSystems.Model.Data.IServerEntitySignature>()
+            .FirstOrDefault(e => e.Name == "Region")
+            ?? (OutSystems.Model.Data.IEntitySignature)eSpace.Entities.OfType<OutSystems.Model.Data.IStaticEntitySignature>()
+                .FirstOrDefault(e => e.Name == "Region")
+            ?? eSpace.References.SelectMany(r => r.Entities).FirstOrDefault(e => e.Name == "Region");
+        if (srcEntity != null) agg.AsDatabaseAggregate.CreateSource(srcEntity);
+        else Console.WriteLine($"WARN: aggregate GetRegions source entity Region not found");
+    }
+    
+    // ─── Widget tree (dechromed — custom blocks stripped) ────────
+    { var sa = screen.CreateScreenAction("SaveSettingsOnClick");
+       var s = sa.CreateNode<OutSystems.Model.Logic.Nodes.IStartNode>();
+       var e = sa.CreateNode<OutSystems.Model.Logic.Nodes.IEndNode>();
+       e.ConnectedBelow(s); }  // stub action — body added later
+    // BlockInstance 'LayoutSideMenu' SourceBlock=LayoutSideMenu (OS UI standard — placeholder Container in dechromed phase)
+    var c1 = screen.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_LayoutSideMenu_1");
+    // CHROME-STRIPPED: BlockInstance 'Menu' SourceBlock=Menu → named Container placeholder for Recipe 23 chrome wrap
+    var c2 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Menu_1_1_1");
+    // CHROME-STRIPPED: BlockInstance 'Header' SourceBlock=Header → named Container placeholder for Recipe 23 chrome wrap
+    var c3 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Header_1_2_1");
+    var t4 = c1.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t4");
+    t4.Text = "Manage Settings";
+    var c5 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c5");
+    // Style="margin-bottom-xxl" (CSS class — applied in CHROME phase)
+    c5.SetVisible("True");
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'AlignCenter' SourceBlock=AlignCenter → named Container placeholder for Recipe 23 chrome wrap
+    var c6 = c5.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_AlignCenter_1_4_1_1");
+    var c7 = c6.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c7");
+    c7.SetVisible("True");
+    // Width="2 col" (OS UI column descriptor — layout class, set in CHROME phase)
+    var t8 = c7.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t8");
+    t8.Text = "Default Region";
+    // CustomStyle="font-weight: bold;" (inline CSS — applied in CHROME phase)
+    var c9 = c6.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c9");
+    c9.SetVisible("True");
+    // Width="10 col" (OS UI column descriptor — layout class, set in CHROME phase)
+    var c10 = c9.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("Dropdown1");
+    // DROPDOWN placeholder — bindings: {'List': 'GetRegions.List', 'Labels': 'Region.Region', 'Values': 'Region.Region', 'Variable': 'GetDataSettings.List.Current.DataSettings.CurrentRegionName'}
+    // Style="dropdown" (CSS class — applied in CHROME phase)
+    // Width="6 col" (OS UI column descriptor — layout class, set in CHROME phase)
+    var c11 = c9.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c11");
+    // Style="margin-top-s" (CSS class — applied in CHROME phase)
+    c11.SetVisible("True");
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var t12 = c11.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t12");
+    t12.Text = "(Region/Country that changes addresses for customers and bank headquarters)";
+    var c13 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c13");
+    c13.SetVisible("True");
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var btn14 = c13.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn14");
+    // btn14.OnClick → ScreenAction SaveSettingsOnClick (wired in CHROME/LOGIC phase)
+    // Style="btn btn-primary" (CSS class — applied in CHROME phase)
+    btn14.SetVisible("True");
+    var t15 = btn14.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t15");
+    t15.Text = "Save Settings & Bootstrap Data";
+    var c16 = c13.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c16");
+    // Style="text-yellow margin-top-m" (CSS class — applied in CHROME phase)
+    c16.SetVisible("IsBootstrapStarted");
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'HBIcon' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c17 = c16.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_4_2_2_1");
+    var t18 = c17.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t18");
+    t18.Text = "warning";
+    // Style="heading3" (CSS class — applied in CHROME phase)
+    // CustomStyle="font-weight: bold;" (inline CSS — applied in CHROME phase)
+    var c19 = c16.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c19");
+    c19.SetVisible("True");
+    // Width="11 col" (OS UI column descriptor — layout class, set in CHROME phase)
+    var t20 = c19.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t20");
+    t20.Text = "The data bootstrap has just started!\\nPlease follow the results in the ODC Portal, under the timer details in the ";
+    var t21 = c19.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t21");
+    t21.Text = "Home Banking Core";
+    // CustomStyle="font-weight: bold;" (inline CSS — applied in CHROME phase)
+    var t22 = c19.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t22");
+    t22.Text = " app, and don't forget to check the logs as well to see if any errors occurred.";
+    
+    Console.WriteLine($"Recipe 07-DECHROMED: ManageSettings | inputs={screen.InputParameters.Count()}, locals={screen.LocalVariables.Count()}, aggs=2, stripped_chrome=4 (Menu, Header, AlignCenter, HBIcon) | Status: OK");
+}
+```
+
+Required imports for the `imports` array on the applyModelApiCode call:
+  - System.Linq
+  - OutSystems.Model
+  - OutSystems.Model.Data
+  - OutSystems.Model.Logic
+  - OutSystems.Model.Logic.Nodes
+  - OutSystems.Model.UI.Mobile
+  - OutSystems.Model.UI.Mobile.Widgets
+  - OutSystems.Model.Enumerations
+  - ServiceStudio.Plugin.NRWidgets

@@ -1,0 +1,136 @@
+# Per-app configuration for the renderer pipeline.
+#
+# Migration target: replace the hardcoded dicts in scripts/build_banking.py
+# (APP_BLOCK_WHITELIST, APP_DEFAULT_SCREEN, SCREEN_PREFIX_CONTEXT) with values
+# loaded from this file.
+#
+# Status (2026-06-09): renderer still reads from build_banking.py constants;
+# this YAML is the migration target. P2 #8 of FRAMEWORK_REVIEW.md.
+#
+# Once the renderer loads from here, a new app cloning effort just needs:
+#   1. Create data/MCP_RECIPES/apps/<source_app>/_raw/ captures
+#   2. Create app_config.yaml mirroring this shape
+#   3. Run scripts/build_app.py --config <path>
+
+apps:
+  portal:
+    full_name: HomeBankingPortal
+    flow_name: MainFlow
+    role_name: HomeBankingPortal
+    default_screen: Dashboard         # set as eSpace.DefaultScreen at end of dispatch
+    captures_dir: _raw                # relative to this file
+    captures_prefix: portal-          # screen captures match this prefix
+    blocks:
+      # Local + chrome blocks captured 2026-06-09. Order matters for
+      # dispatch: layout blocks FIRST so screens wrapping in them resolve.
+      - HBIcon
+      - Menu
+      - MenuIcon
+      - ConfirmationPDF
+      - ApplicationTitle
+      - HeaderActions
+      - UserInfo
+      # Layout family (wrap every screen)
+      - LayoutBase
+      - LayoutBaseSection
+      - LayoutBlank
+      - LayoutTopMenu
+      - LayoutTopMenuLeftSide
+      - LayoutTopMenuRightSide
+      - LayoutTopMenuLeftSideWithBanner
+      - LayoutSideMenu
+      - PopupLayout
+      # Domain content
+      - AccountCard
+      - AccountAccordian
+      - LoanAccordian
+      - StackedCarousel
+      - ItemCard
+      - DocumentItem
+      - FormInfoField
+      - ValidationError
+      - DisplayHTML
+      - TaskBox
+      - NotificationsBalloon
+      # AI chat
+      - Chat
+      - ChatInput
+      - ChatMessage
+    anonymous_screens:                # screens where AnonymousAccess=true + roles cleared
+      - Login
+      - InvalidPermissions
+
+  core:
+    full_name: HomeBankingCore
+    # Core has no UI flows; only entities + actions + roles
+    blocks: []
+    anonymous_screens: []
+
+  backoffice:
+    full_name: HomeBankingBackoffice
+    flow_name: MainFlow
+    role_name: HomeBankingBackoffice
+    default_screen: Dashboard
+    captures_dir: _raw
+    captures_prefix: backoffice-
+    blocks:
+      - HBIcon
+      # Phase 2 — Backoffice block capture pending (task #81 in SCOPE.md)
+    anonymous_screens:
+      - Login
+      - InvalidPermissions
+
+# Theme assignments per app
+themes:
+  portal: theme-portal.css
+  backoffice: theme-backoffice.css
+  email: theme-email.css
+
+# Reference imports per app (NEW — formalizes Phase 0 dispatch)
+references:
+  portal:
+    - producer: HomeBankingCore
+      producer_key: 695efc5b-8f39-4a53-8d71-35c59097d245
+      elements: all_public                 # or explicit list of element names
+    - producer: OutSystemsUI
+      producer_key: 8be17f2a-431c-4958-b894-c77b988a7271
+      elements:                            # explicit list — use library_element_keys.yaml for UUIDs
+        - Tag
+        - Counter
+        - InputWithIcon
+        - ButtonLoading
+        - AlignCenter
+        - Card
+        - Section
+        - Columns2
+        - Columns3
+        - Columns4
+        - Notification
+        - CardItem
+        - CardBackground
+    - producer: OutSystemsCharts
+      producer_key: ""                     # TBD — Backoffice probe didn't capture this
+      elements: all_public
+    - producer: AgentsCommonResources
+      producer_key: ""
+      elements: [Chat, ChatInput, ChatMessage]
+    - producer: AppsCommonCore
+      producer_key: 4ba075ee-bb56-43a2-adc2-a81271fa5ee2
+      elements: all_public
+  core:
+    - producer: (System)
+      producer_key: 478870b9-2d60-4f73-9eb3-7cd8b994a737
+      elements: all_public
+  backoffice:
+    - producer: HomeBankingCore
+      producer_key: 695efc5b-8f39-4a53-8d71-35c59097d245
+      elements: all_public
+    - producer: OutSystemsUI
+      producer_key: 8be17f2a-431c-4958-b894-c77b988a7271
+      elements: all_public
+    - producer: UltimatePDF
+      producer_key: ""                     # TBD
+      elements: all_public
+    - producer: OutSystemsMaps
+      producer_key: ""                     # TBD
+      elements: all_public

@@ -1,0 +1,88 @@
+=== Screen: WakeUp ===
+Inputs: (none)
+Locals: WakeupST:WakeupST, IsLoading:Boolean
+Aggregates: (none)
+--- WIDGETS (hierarchical) ---
+[1] BlockInstance (unnamed) SourceBlock="LayoutTopMenu" EnableAccessibilityFeatures=null ExtendedClass=null HasFixedHeader=null
+  [1.1] BlockInstance (unnamed) PlaceholderName="Header" SourceBlock="Menu" ActiveItem=null ActiveSubItem=null
+  [1.2] Container (unnamed) PlaceholderName="Title" CustomStyle="text-align: center;"
+    [1.2.1] Text (unnamed) Text="Wake me up!"
+  [1.3] Container (unnamed) PlaceholderName="MainContent" CustomStyle="text-align: center;"
+    [1.3.1] Container (unnamed) Width="8 col"
+      [1.3.1.1] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.CoreHasRun,\"active\",\"\")"
+        [1.3.1.1.1] BlockInstance (unnamed) SourceBlock="AlignCenter" ExtendedClass=null IsHorizontal=null
+          [1.3.1.1.1.1] Image (unnamed) PlaceholderName="Content" Source="Logo" Style="\"serviceitem-img margin-right-base\"" CustomStyle="height: 40px;"
+          [1.3.1.1.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Core\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.1.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.CoreHasRun"
+            [1.3.1.1.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.1.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.CoreHasRun"
+              [1.3.1.1.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.2] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.BackofficeHasRun,\"active\",\"\")"
+        [1.3.1.2.1] BlockInstance (unnamed) SourceBlock="AlignCenter" ExtendedClass=null IsHorizontal=null
+          [1.3.1.2.1.1] Image (unnamed) PlaceholderName="Content" Source="Logo" Style="\"serviceitem-img margin-right-base\"" CustomStyle="height: 40px;"
+          [1.3.1.2.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Backoffice\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.2.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.BackofficeHasRun"
+            [1.3.1.2.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.2.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.BackofficeHasRun"
+              [1.3.1.2.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.3] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.DocumentVerificationAgentHasRan, \"active\",\"\")"
+        [1.3.1.3.1] BlockInstance (unnamed) SourceBlock="AlignCenter" ExtendedClass=null IsHorizontal=null
+          [1.3.1.3.1.1] Image (unnamed) PlaceholderName="Content" Source="Agent3" Style="\"serviceitem-img margin-right-base\""
+          [1.3.1.3.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Document Verification Agent\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.3.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.DocumentVerificationAgentHasRan"
+            [1.3.1.3.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.3.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.DocumentVerificationAgentHasRan"
+              [1.3.1.3.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.4] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.IntakeAgentHasRun,\"active\",\"\")"
+        [1.3.1.4.1] BlockInstance (unnamed) SourceBlock="AlignCenter" IsHorizontal=null ExtendedClass=null
+          [1.3.1.4.1.1] Image (unnamed) PlaceholderName="Content" Source="Agent3" Style="\"serviceitem-img margin-right-base\""
+          [1.3.1.4.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Intake Agent\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.4.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.IntakeAgentHasRun"
+            [1.3.1.4.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.4.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.IntakeAgentHasRun"
+              [1.3.1.4.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.5] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.EnrichmentAgentHasRun,\"active\",\"\")"
+        [1.3.1.5.1] BlockInstance (unnamed) SourceBlock="AlignCenter" IsHorizontal=null ExtendedClass=null
+          [1.3.1.5.1.1] Image (unnamed) PlaceholderName="Content" Source="Agent3" Style="\"serviceitem-img margin-right-base\""
+          [1.3.1.5.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Enrichment Agent\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.5.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.EnrichmentAgentHasRun"
+            [1.3.1.5.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.5.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.EnrichmentAgentHasRun"
+              [1.3.1.5.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.6] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.UnderwriterAgentHasRun,\"active\",\"\")"
+        [1.3.1.6.1] BlockInstance (unnamed) SourceBlock="AlignCenter" IsHorizontal=null ExtendedClass=null
+          [1.3.1.6.1.1] Image (unnamed) PlaceholderName="Content" Source="Agent3" Style="\"serviceitem-img margin-right-base\""
+          [1.3.1.6.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Underwriter Agent\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.6.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.UnderwriterAgentHasRun"
+            [1.3.1.6.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.6.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.UnderwriterAgentHasRun"
+              [1.3.1.6.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.7] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.CommunicationsAgentHasRun,\"active\",\"\")"
+        [1.3.1.7.1] BlockInstance (unnamed) SourceBlock="AlignCenter" ExtendedClass=null IsHorizontal=null
+          [1.3.1.7.1.1] Image (unnamed) PlaceholderName="Content" Source="Agent3" Style="\"serviceitem-img margin-right-base\""
+          [1.3.1.7.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Communications Agent\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.7.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.CommunicationsAgentHasRun"
+            [1.3.1.7.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.7.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.CommunicationsAgentHasRun"
+              [1.3.1.7.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.8] Container (unnamed) Style="\"serviceitem margin-bottom-base \" + If(WakeupST.ExtraInfoAgentHasRan,\"active\",\"\")"
+        [1.3.1.8.1] BlockInstance (unnamed) SourceBlock="AlignCenter" ExtendedClass=null IsHorizontal=null
+          [1.3.1.8.1.1] Image (unnamed) PlaceholderName="Content" Source="Agent3" Style="\"serviceitem-img margin-right-base\""
+          [1.3.1.8.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Data Generator Agent\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.8.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.ExtraInfoAgentHasRan"
+            [1.3.1.8.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.8.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.ExtraInfoAgentHasRan"
+              [1.3.1.8.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.9] Container (unnamed) Style="\"serviceitem  \" + If(WakeupST.WorkflowHasRun,\"active\",\"\")"
+        [1.3.1.9.1] BlockInstance (unnamed) SourceBlock="AlignCenter" IsHorizontal=null ExtendedClass=null
+          [1.3.1.9.1.1] Image (unnamed) PlaceholderName="Content" Source="Logo" Style="\"serviceitem-img margin-right-base\"" CustomStyle="height: 40px;"
+          [1.3.1.9.1.2] Expression (unnamed) PlaceholderName="Content" Value="\"Workflow\"" Style="\"bold\"" Width="(fill parent)"
+          [1.3.1.9.1.3] If (unnamed) PlaceholderName="Content" Condition="WakeupST.WorkflowHasRun"
+            [1.3.1.9.1.3.T.1] Image (unnamed) PlaceholderName="TrueBranch" Source="checkicontrans" Width="40px" CustomStyle="border-radius: 50px;"
+            [1.3.1.9.1.3.F.1] If (unnamed) PlaceholderName="FalseBranch" Condition="IsLoading and not WakeupST.WorkflowHasRun"
+              [1.3.1.9.1.3.F.1.T.1] Container (unnamed) PlaceholderName="TrueBranch" Style="\"list-updating wake-loader\""
+      [1.3.1.10] Container (unnamed) Style="\"margin-top-base\"" CustomStyle="text-align: center;"
+        [1.3.1.10.1] BlockInstance (unnamed) SourceBlock="ButtonLoading" ExtendedClass=null ShowLabelOnLoading=null IsLoading="IsLoading"
+          [1.3.1.10.1.1] Button (unnamed) PlaceholderName="Button" Style="\"btn btn-primary\"" Width="(fill parent)" OnClick→Destination="OnClick_WakeUpAll"
+            [1.3.1.10.1.1.1] Container (unnamed) Style="\"osui-btn-loading__spinner-animation\""
+            [1.3.1.10.1.1.2] Text (unnamed) Text="Wake up"

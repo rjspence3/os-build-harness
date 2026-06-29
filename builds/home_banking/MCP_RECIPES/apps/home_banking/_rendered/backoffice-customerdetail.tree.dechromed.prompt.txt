@@ -1,0 +1,425 @@
+You are executing a Mentor MCP recipe from a debugged library. The library is
+a defined methodology — recipes compose in phase order (STRUCTURE → LOGIC →
+CHROME → VERIFY) and each recipe defines as much as possible explicitly. The
+API surface and patterns are pre-resolved — do NOT explore, probe, reflect,
+or call get_app_summary.
+
+CONSTRAINTS (non-negotiable):
+
+1. ONE applyModelApiCode call per recipe. No reflection, no exploratory reads.
+2. Use the EXACT code provided. Do not "improve" it.
+3. If the call throws compile or runtime error: STOP and report the error
+   verbatim. Do NOT iterate, do NOT regenerate, do NOT attempt a fix.
+4. Print only the diagnostic output the recipe specifies. No extra summarization.
+5. Do NOT publish from inside the recipe. The caller runs publish_start
+   separately.
+6. The recipe's PHASE annotation determines what the call may touch:
+   - STRUCTURE: entities, statics, roles, dechromed screens, default screen.
+     Uses ONLY standard OutSystemsUI widgets + the manifest's own custom
+     types. Custom blocks (Menu, Header, brand icons) are NOT yet authored —
+     do not reference them.
+   - LOGIC: server/service/client actions; expressions referencing the
+     STRUCTURE phase's entities. No widget/screen mutations.
+   - CHROME: custom blocks, theme CSS, chrome-wrap (replacing dechromed
+     widget shells with custom-block instances). Assumes STRUCTURE + LOGIC
+     phases published successfully.
+   - VERIFY: read-only context_* / applyModelApiCode probes that compare
+     published state vs manifest expectations.
+   A phase-violating call (e.g. a STRUCTURE recipe trying to wrap a screen
+   in HBIcon) is a recipe-library bug — STOP and report.
+
+API SURFACE PRE-RESOLVED (do not rediscover):
+
+- Server entity creation: eSpace.CreateServerEntity(name)
+- PK setup: entity.IdentifierAttribute = idAttr (assign AFTER attr created, BEFORE
+  any other attribute). idAttr.IsAutoNumber = OutSystems.Model.Enumerations.AutoNumber.Yes;
+  idAttr.IsMandatory = true; idAttr.DataType = eSpace.LongIntegerType.
+  (IsAutoNumber is an enum, NOT bool. Values: No | Yes | YesIfEmpty)
+- FK attributes: a.DataType = <staticEntity>.IdentifierType or
+  userIdentType (resolved via eSpace.References)
+- FK DeleteRule: ALWAYS set to OutSystems.Model.Enumerations.DeleteRule.Ignore
+  (Protect is deprecated and causes OS-BLD-40409 at publish time)
+- Static entity creation: eSpace.CreateStaticEntity(name)
+- Role creation: eSpace.CreateRole(name); role.Public = false
+- Server action: eSpace.CreateServerAction(name); action.Public = bool
+- SQL node: action.CreateNode<ISQLNode>("name"); sqlNode.Statement = "SQL";
+  sqlNode.CreateInputParameter(name); sqlNode.SetArgumentValue(param, "expr")
+- Screen creation: BLOCKED on some apps by a platform bug — recipe must declare
+  if it touches CreateScreen and the caller will route accordingly
+- DefaultScreen: eSpace.DefaultScreen = some IScreen reference
+- Publish: external to recipes; caller runs publish_start then publish_status
+
+CORPUS REFERENCES (relevant memories, already encoded into recipes):
+
+- odc_mcp_entity_auto_actions_incomplete — PK required before publish
+- odc_db_upgrade_pk_change_blocked — never alter PK post-publish; delete+recreate
+- odc_mcp_sql_node_api — ISQLNode surface
+- odc_mcp_publish_terminal_success_gate — never cancel a session you intend to publish
+- odc_mcp_screen_creation_broken_complianceops — known per-app CreateScreen bug
+- odc_mcp_record_literal_via_typed_local — Server Action record creation pattern
+- odc_long_integer_to_identifier_cast — LongIntegerToIdentifier for ID arguments
+- odc_mcp_assign_node_iteration_not_flow_order — identify Assign nodes by Variable name
+
+REQUIRED IMPORTS (always include these in the imports array):
+
+System.Linq
+OutSystems.Model
+OutSystems.Model.Data
+OutSystems.Model.Logic
+OutSystems.Model.Logic.Nodes
+OutSystems.Model.Enumerations
+OutSystems.Model.Types
+
+DIAGNOSTIC OUTPUT FORMAT:
+
+End the C# block with ONE Console.WriteLine that prints, on a single line:
+"Recipe <NN>: <Name> | Created: <comma list> | Status: OK"
+
+If any intermediate step asserts a non-null pre-condition that fails, print:
+"Recipe <NN>: <Name> | FAILED at <step name>: <what was unexpected>"
+and return from the lambda. The caller treats this as a fatal stop.
+
+Now execute the following recipe:
+
+```csharp
+eSpace => {
+    // ─── Screen: CustomerDetail (dechromed) ─────────────
+    var flow = eSpace.MobileFlows.FirstOrDefault(f => f.Name == "MainFlow");
+    if (flow == null) { Console.WriteLine($"FAILED: MobileFlow MainFlow not found"); return; }
+    var screen = flow.CreateScreen("CustomerDetail");
+    var role = eSpace.Roles.FirstOrDefault(r => r.Name == "HomeBankingBackofficeEmployee") ?? eSpace.References.SelectMany(r => r.Roles).FirstOrDefault(r => r.Name == "HomeBankingBackofficeEmployee");
+    if (role != null) screen.Roles.Add(role);
+    
+    // ─── Inputs ─────────────────────────────────
+    { var ip = screen.CreateInputParameter("CustomerId"); ip.DataType = ((eSpace.Entities.OfType<OutSystems.Model.Data.IServerEntitySignature>().FirstOrDefault(e => e.Name == "HBCustomer") ?? (OutSystems.Model.Data.IEntitySignature)eSpace.Entities.OfType<OutSystems.Model.Data.IStaticEntitySignature>().FirstOrDefault(e => e.Name == "HBCustomer") ?? eSpace.References.SelectMany(r => r.Entities).FirstOrDefault(e => e.Name == "HBCustomer"))?.IdentifierType ?? eSpace.TextType); ip.IsMandatory = true; }
+    
+    // ─── Local variables ────────────────────────
+    { var lv = screen.CreateLocalVariable("ShowSSN"); lv.DataType = eSpace.BooleanType; lv.SetDefaultValue("False"); }
+    
+    // ─── Screen aggregates ──────────────────────
+    // TODO aggregate GetAccountsByCustomerId — source not parsed from ""
+    // TODO aggregate GetCustomerById — source not parsed from ""
+    // TODO aggregate GetCustomerPictureByCustomerId — source not parsed from ""
+    // TODO aggregate GetRequestStatuses — source not parsed from ""
+    // TODO aggregate GetPortfolioItems — source not parsed from "DataAction"
+    
+    // ─── Widget tree (dechromed — custom blocks stripped) ────────
+    { var sa = screen.CreateScreenAction("Customers");
+       var s = sa.CreateNode<OutSystems.Model.Logic.Nodes.IStartNode>();
+       var e = sa.CreateNode<OutSystems.Model.Logic.Nodes.IEndNode>();
+       e.ConnectedBelow(s); }  // stub action — body added later
+    { var sa = screen.CreateScreenAction("NotImplemented");
+       var s = sa.CreateNode<OutSystems.Model.Logic.Nodes.IStartNode>();
+       var e = sa.CreateNode<OutSystems.Model.Logic.Nodes.IEndNode>();
+       e.ConnectedBelow(s); }  // stub action — body added later
+    { var sa = screen.CreateScreenAction("RedirectToURL");
+       var s = sa.CreateNode<OutSystems.Model.Logic.Nodes.IStartNode>();
+       var e = sa.CreateNode<OutSystems.Model.Logic.Nodes.IEndNode>();
+       e.ConnectedBelow(s); }  // stub action — body added later
+    { var sa = screen.CreateScreenAction("ToggleHideSSNOnClick");
+       var s = sa.CreateNode<OutSystems.Model.Logic.Nodes.IStartNode>();
+       var e = sa.CreateNode<OutSystems.Model.Logic.Nodes.IEndNode>();
+       e.ConnectedBelow(s); }  // stub action — body added later
+    // CHROME-STRIPPED: BlockInstance 'LayoutSideMenuBannerActionsInstance' SourceBlock=LayoutSideMenuBannerActions → named Container placeholder for Recipe 23 chrome wrap
+    var c1 = screen.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_LayoutSideMenuBannerActions_1");
+    // CHROME-STRIPPED: BlockInstance 'MenuInstance' SourceBlock=Menu → named Container placeholder for Recipe 23 chrome wrap
+    var c2 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Menu_1_1_1");
+    // CHROME-STRIPPED: BlockInstance 'HeaderInstance' SourceBlock=Header → named Container placeholder for Recipe 23 chrome wrap
+    var c3 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Header_1_2_1");
+    // CHROME-STRIPPED: BlockInstance 'BreadcrumbsInstance' SourceBlock=Breadcrumbs → named Container placeholder for Recipe 23 chrome wrap
+    var c4 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Breadcrumbs_1_3_1");
+    // CHROME-STRIPPED: BlockInstance 'BreadcrumbsItemInstance' SourceBlock=BreadcrumbsItem → named Container placeholder for Recipe 23 chrome wrap
+    var c5 = c4.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_BreadcrumbsItem_1_3_1_1_1");
+    // TODO widget type 'Link' at path 1.3.1.1.1.1.1 — handler not implemented; emitting Container shell
+    var c6 = c5.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c6");
+    var t7 = c6.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t7");
+    // TODO widget type 'Icon' at path 1.3.1.1.1.2.1 — handler not implemented; emitting Container shell
+    var c8 = c5.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c8");
+    // Style=""icon"" (CSS class — applied in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'BreadcrumbsItemInstance2' SourceBlock=BreadcrumbsItem → named Container placeholder for Recipe 23 chrome wrap
+    var c9 = c4.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_BreadcrumbsItem_1_3_1_1_2");
+    var t10 = c9.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t10");
+    // CHROME-STRIPPED: BlockInstance 'AlignCenterInstance' SourceBlock=AlignCenter → named Container placeholder for Recipe 23 chrome wrap
+    var c11 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_AlignCenter_1_4_1");
+    var c12 = c11.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c12");
+    // Style=""margin-right-base"" (CSS class — applied in CHROME phase)
+    var c13 = c12.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c13");
+    // IF Condition="GetCustomerPictureByCustomerId.IsDataFetched" — dechromed as Container; conditional restored in LOGIC phase
+    var img14 = c13.CreateWidget<ServiceStudio.Plugin.NRWidgets.IImage>("img14");
+    // Style=""img-circle"" (CSS class — applied in CHROME phase)
+    // Width="44px" (OS UI column descriptor — layout class, set in CHROME phase)
+    var c15 = c13.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c15");
+    // CustomStyle="text-align: center;" (inline CSS — applied in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'AnimateInstance' SourceBlock=Animate → named Container placeholder for Recipe 23 chrome wrap
+    var c16 = c15.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Animate_1_4_1_1_1_1_F_1_1");
+    // TODO widget type 'Icon' at path 1.4.1.1.1.1.F.1.1.1.1 — handler not implemented; emitting Container shell
+    var c17 = c16.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c17");
+    // Style=""icon"" (CSS class — applied in CHROME phase)
+    var c18 = c11.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c18");
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'AlignCenterInstance2' SourceBlock=AlignCenter → named Container placeholder for Recipe 23 chrome wrap
+    var c19 = c18.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_AlignCenter_1_4_1_1_2_1");
+    var expr20 = c19.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr20");
+    expr20.SetValue("GetCustomerById.List.Current.HBCustomer.Name");
+    // Style=""heading6 margin-right-m"" (CSS class — applied in CHROME phase)
+    var c21 = c19.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("Loading");
+    // IF Condition="not GetCustomerById.IsDataFetched" — dechromed as Container; conditional restored in LOGIC phase
+    var c22 = c21.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c22");
+    // IF Condition="GetCustomerById.List.Current.HBCustomer.IsPremium" — dechromed as Container; conditional restored in LOGIC phase
+    // CHROME-STRIPPED: BlockInstance 'TagInstance' SourceBlock=Tag → named Container placeholder for Recipe 23 chrome wrap
+    var c23 = c22.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Tag_1_4_1_1_2_1_1_2_F_1_T_1");
+    // CHROME-STRIPPED: BlockInstance 'HBIconInstance' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c24 = c23.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_4_1_1_2_1_1_2_F_1_T_1_1_1");
+    var t25 = c24.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t25");
+    var t26 = c23.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t26");
+    // CHROME-STRIPPED: BlockInstance 'TagInstance2' SourceBlock=Tag → named Container placeholder for Recipe 23 chrome wrap
+    var c27 = c22.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Tag_1_4_1_1_2_1_1_2_F_1_F_1");
+    // CHROME-STRIPPED: BlockInstance 'HBIconInstance2' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c28 = c27.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_4_1_1_2_1_1_2_F_1_F_1_1_1");
+    var t29 = c28.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t29");
+    var t30 = c27.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t30");
+    // CHROME-STRIPPED: BlockInstance 'CreditRatingInstance' SourceBlock=CreditRating → named Container placeholder for Recipe 23 chrome wrap
+    var c31 = c18.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_CreditRating_1_4_1_1_2_2");
+    var c32 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c32");
+    // Style=""margin-right-l"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.5.1.1 — handler not implemented; emitting Container shell
+    var c33 = c32.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c33");
+    var expr34 = c32.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr34");
+    expr34.SetValue("GetCustomerById.List.Current.HBCustomer.CardID");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    var c35 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c35");
+    // Style=""margin-right-l"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.5.2.1 — handler not implemented; emitting Container shell
+    var c36 = c35.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c36");
+    // CHROME-STRIPPED: BlockInstance 'AlignCenterInstance3' SourceBlock=AlignCenter → named Container placeholder for Recipe 23 chrome wrap
+    var c37 = c35.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_AlignCenter_1_5_2_2");
+    var expr38 = c37.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr38");
+    expr38.SetValue("If(ShowSSN, HBCustomer.SSN, \"***-**-\"+Substr(SSN,Length(SSN)-4,4))");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // CustomStyle="min-width: 95px;" (inline CSS — applied in CHROME phase)
+    // TODO widget type 'Link' at path 1.5.2.2.1.2 — handler not implemented; emitting Container shell
+    var c39 = c37.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c39");
+    // Style=""margin-left-xs"" (CSS class — applied in CHROME phase)
+    var c40 = c39.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c40");
+    // IF Condition="ShowSSN" — dechromed as Container; conditional restored in LOGIC phase
+    // CHROME-STRIPPED: BlockInstance 'HBIconInstance3' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c41 = c40.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_5_2_2_1_2_1_T_1");
+    var t42 = c41.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t42");
+    // CHROME-STRIPPED: BlockInstance 'HBIconInstance4' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c43 = c40.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_5_2_2_1_2_1_F_1");
+    var t44 = c43.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t44");
+    var c45 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c45");
+    // Style=""margin-right-l"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.5.3.1 — handler not implemented; emitting Container shell
+    var c46 = c45.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c46");
+    var expr47 = c45.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr47");
+    expr47.SetValue("FormatDateLocale(HBCustomer.BirthDate, Client.LocaleId)");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    var c48 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c48");
+    // Style=""margin-right-l"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.5.4.1 — handler not implemented; emitting Container shell
+    var c49 = c48.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c49");
+    var expr50 = c48.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr50");
+    expr50.SetValue("GetCustomerById.List.Current.HBCustomer.Mobile");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    var c51 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c51");
+    // Style=""margin-right-l"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.5.5.1 — handler not implemented; emitting Container shell
+    var c52 = c51.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c52");
+    // TODO widget type 'Link' at path 1.5.5.2 — handler not implemented; emitting Container shell
+    var c53 = c51.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c53");
+    var expr54 = c53.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr54");
+    expr54.SetValue("GetCustomerById.List.Current.HBCustomer.Email");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.5.6.1 — handler not implemented; emitting Container shell
+    var c55 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c55");
+    var expr56 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr56");
+    expr56.SetValue("GetCustomerById.List.Current.HBCustomer.Address");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    var c57 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c57");
+    // Style=""customer-actions"" (CSS class — applied in CHROME phase)
+    var btn58 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn58");
+    var t59 = btn58.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t59");
+    t59.Text = "Edit";
+    // btn58.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn"" (CSS class — applied in CHROME phase)
+    var btn60 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn60");
+    var t61 = btn60.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t61");
+    t61.Text = "Complaint Ticket";
+    // btn60.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn"" (CSS class — applied in CHROME phase)
+    var btn62 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn62");
+    var t63 = btn62.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t63");
+    t63.Text = "New Simulation";
+    // btn62.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn"" (CSS class — applied in CHROME phase)
+    var btn64 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn64");
+    var t65 = btn64.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t65");
+    t65.Text = "New Account";
+    // btn64.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn"" (CSS class — applied in CHROME phase)
+    var btn66 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn66");
+    var t67 = btn66.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t67");
+    t67.Text = "Product Request";
+    // btn66.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn"" (CSS class — applied in CHROME phase)
+    var btn68 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn68");
+    var t69 = btn68.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t69");
+    t69.Text = "Deposit";
+    // btn68.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn btn-primary"" (CSS class — applied in CHROME phase)
+    var btn70 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn70");
+    var t71 = btn70.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t71");
+    t71.Text = "Transfer";
+    // btn70.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn btn-primary"" (CSS class — applied in CHROME phase)
+    var btn72 = c57.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn72");
+    var t73 = btn72.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t73");
+    t73.Text = "Withdrawal";
+    // btn72.OnClick → ScreenAction NotImplemented (wired in CHROME/LOGIC phase)
+    // Style=""btn btn-primary"" (CSS class — applied in CHROME phase)
+    // BlockInstance 'TabsInstance' SourceBlock=Tabs (OS UI standard — placeholder Container in dechromed phase)
+    var c74 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Tabs_1_7_1");
+    // CHROME-STRIPPED: BlockInstance 'TabsHeaderItemInstance' SourceBlock=TabsHeaderItem → named Container placeholder for Recipe 23 chrome wrap
+    var c75 = c74.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_TabsHeaderItem_1_7_1_1_1");
+    var t76 = c75.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t76");
+    // CHROME-STRIPPED: BlockInstance 'TabsHeaderItemInstance2' SourceBlock=TabsHeaderItem → named Container placeholder for Recipe 23 chrome wrap
+    var c77 = c74.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_TabsHeaderItem_1_7_1_1_2");
+    var t78 = c77.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t78");
+    // CHROME-STRIPPED: BlockInstance 'TabsHeaderItemInstance3' SourceBlock=TabsHeaderItem → named Container placeholder for Recipe 23 chrome wrap
+    var c79 = c74.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_TabsHeaderItem_1_7_1_1_3");
+    var t80 = c79.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t80");
+    // CHROME-STRIPPED: BlockInstance 'TabsContentItemInstance' SourceBlock=TabsContentItem → named Container placeholder for Recipe 23 chrome wrap
+    var c81 = c74.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_TabsContentItem_1_7_1_2_1");
+    var c82 = c81.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c82");
+    // Style=""margin-top-xl"" (CSS class — applied in CHROME phase)
+    var c83 = c82.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("IsDataFetchedFinancial");
+    // IF Condition="GetCustomerById.IsDataFetched" — dechromed as Container; conditional restored in LOGIC phase
+    var c84 = c83.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("NoCustomerInfo");
+    // IF Condition="GetCustomerById.List.Empty" — dechromed as Container; conditional restored in LOGIC phase
+    // BlockInstance 'BlankSlateInstance' SourceBlock=BlankSlate (OS UI standard — placeholder Container in dechromed phase)
+    var c85 = c84.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_BlankSlate_1_7_1_2_1_1_1_1_T_1_T_1");
+    // CHROME-STRIPPED: BlockInstance 'HBIconInstance5' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c86 = c85.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_7_1_2_1_1_1_1_T_1_T_1_1_1");
+    var t87 = c86.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t87");
+    var t88 = c85.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t88");
+    var c89 = c84.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c89");
+    // Style=""card"" (CSS class — applied in CHROME phase)
+    var c90 = c89.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c90");
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'Columns5Instance' SourceBlock=Columns5 → named Container placeholder for Recipe 23 chrome wrap
+    var c91 = c90.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Columns5_1_7_1_2_1_1_1_1_T_1_F_1_1_1");
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.1.1.1.1.1 — handler not implemented; emitting Container shell
+    var c92 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c92");
+    var expr93 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr93");
+    expr93.SetValue("FormatDateLocale(HBCustomer.ClientSince, Client.LocaleId)");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.1.1.2.1.1 — handler not implemented; emitting Container shell
+    var c94 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c94");
+    var expr95 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr95");
+    expr95.SetValue("GetCustomerById.List.Current.HBBranch.Name");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.1.1.3.1.1 — handler not implemented; emitting Container shell
+    var c96 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c96");
+    var expr97 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr97");
+    expr97.SetValue("GetCustomerById.List.Current.HBCustomer.EmploymentStatus");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.1.1.4.1.1 — handler not implemented; emitting Container shell
+    var c98 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c98");
+    var expr99 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr99");
+    expr99.SetValue("GetCustomerById.List.Current.HBCustomer.EmployerName");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.1.1.5.1.1 — handler not implemented; emitting Container shell
+    var c100 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c100");
+    var expr101 = c91.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr101");
+    expr101.SetValue("GetCustomerById.List.Current.HBCustomer.Position");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    var c102 = c89.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c102");
+    // Style="If(IsPhone(), "margin-top-base", "margin-top-l")" (CSS class — applied in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'Columns5Instance2' SourceBlock=Columns5 → named Container placeholder for Recipe 23 chrome wrap
+    var c103 = c102.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Columns5_1_7_1_2_1_1_1_1_T_1_F_1_2_1");
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.2.1.1.1.1 — handler not implemented; emitting Container shell
+    var c104 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c104");
+    var expr105 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr105");
+    expr105.SetValue("FormatDateLocale(HBCustomer.EmploymentStartDate, Client.LocaleId)");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.2.1.2.1.1 — handler not implemented; emitting Container shell
+    var c106 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c106");
+    var expr107 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr107");
+    expr107.SetValue("FormatCurrencyCustom(HBCustomer.AnnualIncome,2)");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.2.1.3.1.1 — handler not implemented; emitting Container shell
+    var c108 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c108");
+    var expr109 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr109");
+    expr109.SetValue("GetCustomerById.List.Current.HBCustomer.OtherSourceofIncome");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.2.1.4.1.1 — handler not implemented; emitting Container shell
+    var c110 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c110");
+    var expr111 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr111");
+    expr111.SetValue("GetCustomerById.List.Current.HBCustomer.HomeOwnership");
+    // Style=""font-semi-bold"" (CSS class — applied in CHROME phase)
+    // TODO widget type 'Label' at path 1.7.1.2.1.1.1.1.T.1.F.1.2.1.5.1.1 — handler not implemented; emitting Container shell
+    var c112 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c112");
+    // CHROME-STRIPPED: BlockInstance 'CreditCategoriesInstance' SourceBlock=CreditCategories → named Container placeholder for Recipe 23 chrome wrap
+    var c113 = c103.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_CreditCategories_1_7_1_2_1_1_1_1_T_1_F_1_2_1_5_1_2");
+    var c114 = c83.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c114");
+    // Style=""list-updating"" (CSS class — applied in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'TabsContentItemInstance2' SourceBlock=TabsContentItem → named Container placeholder for Recipe 23 chrome wrap
+    var c115 = c74.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_TabsContentItem_1_7_1_2_2");
+    var c116 = c115.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c116");
+    // Style=""margin-top-xl"" (CSS class — applied in CHROME phase)
+    var c117 = c116.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("IsDataFetchedAccounts");
+    // IF Condition="GetAccountsByCustomerId.IsDataFetched" — dechromed as Container; conditional restored in LOGIC phase
+    var c118 = c117.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("NoAccounts");
+    // IF Condition="GetAccountsByCustomerId.List.Empty" — dechromed as Container; conditional restored in LOGIC phase
+    // BlockInstance 'BlankSlateInstance2' SourceBlock=BlankSlate (OS UI standard — placeholder Container in dechromed phase)
+    var c119 = c118.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_BlankSlate_1_7_1_2_2_1_1_1_T_1_T_1");
+    // CHROME-STRIPPED: BlockInstance 'HBIconInstance6' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c120 = c119.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_7_1_2_2_1_1_1_T_1_T_1_1_1");
+    var t121 = c120.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t121");
+    var t122 = c119.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t122");
+    // BlockInstance 'CarouselInstance' SourceBlock=Carousel (OS UI standard — placeholder Container in dechromed phase)
+    var c123 = c118.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Carousel_1_7_1_2_2_1_1_1_T_1_F_1");
+    // TODO widget type 'List' at path 1.7.1.2.2.1.1.1.T.1.F.1.1.1 — handler not implemented; emitting Container shell
+    var c124 = c123.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c124");
+    // Style=""list list-group"" (CSS class — applied in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'AccountCardInstance' SourceBlock=AccountCard → named Container placeholder for Recipe 23 chrome wrap
+    var c125 = c124.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_AccountCard_1_7_1_2_2_1_1_1_T_1_F_1_1_1_1_1");
+    var c126 = c117.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c126");
+    // Style=""list-updating"" (CSS class — applied in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'TabsContentItemInstance3' SourceBlock=TabsContentItem → named Container placeholder for Recipe 23 chrome wrap
+    var c127 = c74.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_TabsContentItem_1_7_1_2_3");
+    var c128 = c127.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c128");
+    // Style=""margin-top-xl"" (CSS class — applied in CHROME phase)
+    var c129 = c128.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("IsDataFetchedPortFolio");
+    // IF Condition="GetPortfolioItems.IsDataFetched" — dechromed as Container; conditional restored in LOGIC phase
+    var c130 = c129.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("NoRecords");
+    // IF Condition="GetPortfolioItems.PortfolioItemList.Empty" — dechromed as Container; conditional restored in LOGIC phase
+    // BlockInstance 'BlankSlateInstance3' SourceBlock=BlankSlate (OS UI standard — placeholder Container in dechromed phase)
+    var c131 = c130.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_BlankSlate_1_7_1_2_3_1_1_1_T_1_T_1");
+    // CHROME-STRIPPED: BlockInstance 'HBIconInstance7' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c132 = c131.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_7_1_2_3_1_1_1_T_1_T_1_1_1");
+    var t133 = c132.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t133");
+    var t134 = c131.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t134");
+    // BlockInstance 'GalleryInstance' SourceBlock=Gallery (OS UI standard — placeholder Container in dechromed phase)
+    var c135 = c130.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Gallery_1_7_1_2_3_1_1_1_T_1_F_1");
+    // TODO widget type 'List' at path 1.7.1.2.3.1.1.1.T.1.F.1.1.1 — handler not implemented; emitting Container shell
+    var c136 = c135.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c136");
+    // Style=""list list-group"" (CSS class — applied in CHROME phase)
+    // CHROME-STRIPPED: BlockInstance 'PortfolioItemCardInstance' SourceBlock=PortfolioItemCard → named Container placeholder for Recipe 23 chrome wrap
+    var c137 = c136.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_PortfolioItemCard_1_7_1_2_3_1_1_1_T_1_F_1_1_1_1");
+    
+    Console.WriteLine($"Recipe 07-DECHROMED: CustomerDetail | inputs={screen.InputParameters.Count()}, locals={screen.LocalVariables.Count()}, aggs=5, stripped_chrome=31 (LayoutSideMenuBannerActions, Menu, Header, Breadcrumbs, BreadcrumbsItem, AlignCenter, Animate, Tag, HBIcon, CreditRating, TabsHeaderItem, TabsContentItem, Columns5, CreditCategories, AccountCard, PortfolioItemCard) | Status: OK");
+}
+```
+
+Required imports for the `imports` array on the applyModelApiCode call:
+  - System.Linq
+  - OutSystems.Model
+  - OutSystems.Model.Data
+  - OutSystems.Model.Logic
+  - OutSystems.Model.Logic.Nodes
+  - OutSystems.Model.UI.Mobile
+  - OutSystems.Model.UI.Mobile.Widgets
+  - OutSystems.Model.Enumerations
+  - ServiceStudio.Plugin.NRWidgets

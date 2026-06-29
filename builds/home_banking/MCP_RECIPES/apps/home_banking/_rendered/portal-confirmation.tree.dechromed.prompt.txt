@@ -1,0 +1,203 @@
+You are executing a Mentor MCP recipe from a debugged library. The library is
+a defined methodology — recipes compose in phase order (STRUCTURE → LOGIC →
+CHROME → VERIFY) and each recipe defines as much as possible explicitly. The
+API surface and patterns are pre-resolved — do NOT explore, probe, reflect,
+or call get_app_summary.
+
+CONSTRAINTS (non-negotiable):
+
+1. ONE applyModelApiCode call per recipe. No reflection, no exploratory reads.
+2. Use the EXACT code provided. Do not "improve" it.
+3. If the call throws compile or runtime error: STOP and report the error
+   verbatim. Do NOT iterate, do NOT regenerate, do NOT attempt a fix.
+4. Print only the diagnostic output the recipe specifies. No extra summarization.
+5. Do NOT publish from inside the recipe. The caller runs publish_start
+   separately.
+6. The recipe's PHASE annotation determines what the call may touch:
+   - STRUCTURE: entities, statics, roles, dechromed screens, default screen.
+     Uses ONLY standard OutSystemsUI widgets + the manifest's own custom
+     types. Custom blocks (Menu, Header, brand icons) are NOT yet authored —
+     do not reference them.
+   - LOGIC: server/service/client actions; expressions referencing the
+     STRUCTURE phase's entities. No widget/screen mutations.
+   - CHROME: custom blocks, theme CSS, chrome-wrap (replacing dechromed
+     widget shells with custom-block instances). Assumes STRUCTURE + LOGIC
+     phases published successfully.
+   - VERIFY: read-only context_* / applyModelApiCode probes that compare
+     published state vs manifest expectations.
+   A phase-violating call (e.g. a STRUCTURE recipe trying to wrap a screen
+   in HBIcon) is a recipe-library bug — STOP and report.
+
+API SURFACE PRE-RESOLVED (do not rediscover):
+
+- Server entity creation: eSpace.CreateServerEntity(name)
+- PK setup: entity.IdentifierAttribute = idAttr (assign AFTER attr created, BEFORE
+  any other attribute). idAttr.IsAutoNumber = OutSystems.Model.Enumerations.AutoNumber.Yes;
+  idAttr.IsMandatory = true; idAttr.DataType = eSpace.LongIntegerType.
+  (IsAutoNumber is an enum, NOT bool. Values: No | Yes | YesIfEmpty)
+- FK attributes: a.DataType = <staticEntity>.IdentifierType or
+  userIdentType (resolved via eSpace.References)
+- FK DeleteRule: ALWAYS set to OutSystems.Model.Enumerations.DeleteRule.Ignore
+  (Protect is deprecated and causes OS-BLD-40409 at publish time)
+- Static entity creation: eSpace.CreateStaticEntity(name)
+- Role creation: eSpace.CreateRole(name); role.Public = false
+- Server action: eSpace.CreateServerAction(name); action.Public = bool
+- SQL node: action.CreateNode<ISQLNode>("name"); sqlNode.Statement = "SQL";
+  sqlNode.CreateInputParameter(name); sqlNode.SetArgumentValue(param, "expr")
+- Screen creation: BLOCKED on some apps by a platform bug — recipe must declare
+  if it touches CreateScreen and the caller will route accordingly
+- DefaultScreen: eSpace.DefaultScreen = some IScreen reference
+- Publish: external to recipes; caller runs publish_start then publish_status
+
+CORPUS REFERENCES (relevant memories, already encoded into recipes):
+
+- odc_mcp_entity_auto_actions_incomplete — PK required before publish
+- odc_db_upgrade_pk_change_blocked — never alter PK post-publish; delete+recreate
+- odc_mcp_sql_node_api — ISQLNode surface
+- odc_mcp_publish_terminal_success_gate — never cancel a session you intend to publish
+- odc_mcp_screen_creation_broken_complianceops — known per-app CreateScreen bug
+- odc_mcp_record_literal_via_typed_local — Server Action record creation pattern
+- odc_long_integer_to_identifier_cast — LongIntegerToIdentifier for ID arguments
+- odc_mcp_assign_node_iteration_not_flow_order — identify Assign nodes by Variable name
+
+REQUIRED IMPORTS (always include these in the imports array):
+
+System.Linq
+OutSystems.Model
+OutSystems.Model.Data
+OutSystems.Model.Logic
+OutSystems.Model.Logic.Nodes
+OutSystems.Model.Enumerations
+OutSystems.Model.Types
+
+DIAGNOSTIC OUTPUT FORMAT:
+
+End the C# block with ONE Console.WriteLine that prints, on a single line:
+"Recipe <NN>: <Name> | Created: <comma list> | Status: OK"
+
+If any intermediate step asserts a non-null pre-condition that fails, print:
+"Recipe <NN>: <Name> | FAILED at <step name>: <what was unexpected>"
+and return from the lambda. The caller treats this as a fatal stop.
+
+Now execute the following recipe:
+
+```csharp
+eSpace => {
+    // ─── Screen: Confirmation (dechromed) ─────────────
+    var flow = eSpace.MobileFlows.FirstOrDefault(f => f.Name == "MainFlow");
+    if (flow == null) { Console.WriteLine($"FAILED: MobileFlow MainFlow not found"); return; }
+    var screen = flow.CreateScreen("Confirmation");
+    var role = eSpace.Roles.FirstOrDefault(r => r.Name == "HomeBankingPortalCustomer") ?? eSpace.References.SelectMany(r => r.Roles).FirstOrDefault(r => r.Name == "HomeBankingPortalCustomer");
+    if (role != null) screen.Roles.Add(role);
+    
+    // ─── Inputs ─────────────────────────────────
+    { var ip = screen.CreateInputParameter("TransactionId"); ip.DataType = ((eSpace.Entities.OfType<OutSystems.Model.Data.IServerEntitySignature>().FirstOrDefault(e => e.Name == "Transaction") ?? (OutSystems.Model.Data.IEntitySignature)eSpace.Entities.OfType<OutSystems.Model.Data.IStaticEntitySignature>().FirstOrDefault(e => e.Name == "Transaction") ?? eSpace.References.SelectMany(r => r.Entities).FirstOrDefault(e => e.Name == "Transaction"))?.IdentifierType ?? eSpace.TextType); ip.IsMandatory = true; }
+    { var ip = screen.CreateInputParameter("RequestId"); ip.DataType = ((eSpace.Entities.OfType<OutSystems.Model.Data.IServerEntitySignature>().FirstOrDefault(e => e.Name == "LoanRequest") ?? (OutSystems.Model.Data.IEntitySignature)eSpace.Entities.OfType<OutSystems.Model.Data.IStaticEntitySignature>().FirstOrDefault(e => e.Name == "LoanRequest") ?? eSpace.References.SelectMany(r => r.Entities).FirstOrDefault(e => e.Name == "LoanRequest"))?.IdentifierType ?? eSpace.TextType); ip.IsMandatory = false; }
+    
+    // ─── Local variables ────────────────────────
+    { var lv = screen.CreateLocalVariable("CountDownValue"); lv.DataType = eSpace.IntegerType; lv.SetDefaultValue("10"); }
+    { var lv = screen.CreateLocalVariable("Message"); lv.DataType = eSpace.TextType; }
+    { var lv = screen.CreateLocalVariable("IsPDFRendered"); lv.DataType = eSpace.BooleanType; lv.SetDefaultValue("False"); }
+    { var lv = screen.CreateLocalVariable("myTimerHandler"); lv.DataType = eSpace.TextType /* unmapped:  */; }
+    
+    // ─── Widget tree (dechromed — custom blocks stripped) ────────
+    // BlockInstance 'LayoutTopMenu' SourceBlock=LayoutTopMenu (OS UI standard — placeholder Container in dechromed phase)
+    var c1 = screen.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_LayoutTopMenu_1");
+    // CHROME-STRIPPED: BlockInstance 'Menu' SourceBlock=Menu → named Container placeholder for Recipe 23 chrome wrap
+    var c2 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Menu_1_1_1");
+    var c3 = c1.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c3");
+    // CustomStyle="padding: 130px 50px 50px 50px; text-align: center;" (inline CSS — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var c4 = c3.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c4");
+    // IF Condition="TransactionId = NullIdentifier()" — dechromed as Container; conditional restored in LOGIC phase
+    // BlockInstance 'Wizard' SourceBlock=Wizard (OS UI standard — placeholder Container in dechromed phase)
+    var c5 = c4.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_Wizard_1_2_1_1_T_1");
+    // BlockInstance 'WizardItem' SourceBlock=WizardItem (OS UI standard — placeholder Container in dechromed phase)
+    var c6 = c5.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_WizardItem_1_2_1_1_T_1_1");
+    // BlockInstance 'CheckMark' SourceBlock=CheckMark (OS UI standard — placeholder Container in dechromed phase)
+    var c7 = c6.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_CheckMark_1_2_1_1_T_1_1_I_1");
+    var t8 = c6.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t8");
+    t8.Text = "Application Submission";
+    // BlockInstance 'WizardItem2' SourceBlock=WizardItem (OS UI standard — placeholder Container in dechromed phase)
+    var c9 = c5.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_WizardItem_1_2_1_1_T_1_2");
+    // CHROME-STRIPPED: BlockInstance 'HBIcon' SourceBlock=HBIcon → named Container placeholder for Recipe 23 chrome wrap
+    var c10 = c9.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_HBIcon_1_2_1_1_T_1_2_I_1");
+    var t11 = c10.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t11");
+    t11.Text = "checklist";
+    // Style=""heading5"" (CSS class — applied in CHROME phase)
+    var t12 = c9.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t12");
+    t12.Text = "Process Validation";
+    // BlockInstance 'WizardItem3' SourceBlock=WizardItem (OS UI standard — placeholder Container in dechromed phase)
+    var c13 = c5.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_WizardItem_1_2_1_1_T_1_3");
+    var img14 = c13.CreateWidget<ServiceStudio.Plugin.NRWidgets.IImage>("img14");
+    // Style=""svg-icon"" (CSS class — applied in CHROME phase)
+    var t15 = c13.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t15");
+    t15.Text = "Final Decision";
+    var c16 = c4.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c16");
+    // Style=""margin-l"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var c17 = c16.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c17");
+    // Style=""heading4"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var t18 = c17.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t18");
+    t18.Text = "Your loan application was successfully submitted!";
+    var c19 = c16.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c19");
+    // Style=""margin-top-base"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var t20 = c19.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t20");
+    t20.Text = "We'll review it and get back to you soon. ";
+    // Style=""font-size-base"" (CSS class — applied in CHROME phase)
+    var c21 = c16.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c21");
+    // Style=""padding-top-xxl " + If(IsPhone(), "display-grid gap-base", "")" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var c22 = c21.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c22");
+    // IF Condition="RequestId <> NullIdentifier()" — dechromed as Container; conditional restored in LOGIC phase
+    // CHROME-STRIPPED: BlockInstance 'ConfirmationPDF' SourceBlock=ConfirmationPDF → named Container placeholder for Recipe 23 chrome wrap
+    var c23 = c22.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_ConfirmationPDF_1_2_1_1_T_2_3_1_T_1");
+    var btn24 = c21.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn24");
+    // Style=""btn btn-primary"" (CSS class — applied in CHROME phase)
+    var c25 = c4.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("ConfirmationIcon");
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    // BlockInstance 'CheckMark2' SourceBlock=CheckMark (OS UI standard — placeholder Container in dechromed phase)
+    var c26 = c25.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("_chrome_CheckMark_1_2_1_1_F_1_1");
+    var c27 = c4.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c27");
+    // Style=""margin-l"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var c28 = c27.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c28");
+    // Style=""heading4"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var t29 = c28.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t29");
+    t29.Text = "Success!";
+    var c30 = c27.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c30");
+    // Style=""margin-top-base"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var t31 = c30.CreateWidget<OutSystems.Model.UI.Mobile.Widgets.ITextWidget>("t31");
+    t31.Text = "Your transfer is complete.";
+    // Style=""font-size-base"" (CSS class — applied in CHROME phase)
+    var c32 = c27.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("c32");
+    // Style=""margin-top-xxl"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var btn33 = c32.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn33");
+    // Style=""btn btn-primary"" (CSS class — applied in CHROME phase)
+    var btn34 = c32.CreateWidget<ServiceStudio.Plugin.NRWidgets.IButton>("btn34");
+    // Style=""btn"" (CSS class — applied in CHROME phase)
+    var c35 = c3.CreateWidget<ServiceStudio.Plugin.NRWidgets.IContainer>("CountDownMessage");
+    // Style=""confirmation-counter-message"" (CSS class — applied in CHROME phase)
+    // Width="(fill parent)" (OS UI column descriptor — layout class, set in CHROME phase)
+    var expr36 = c35.CreateWidget<ServiceStudio.Plugin.NRWidgets.IExpression>("expr36");
+    expr36.SetValue("Message");
+    
+    Console.WriteLine($"Recipe 07-DECHROMED: Confirmation | inputs={screen.InputParameters.Count()}, locals={screen.LocalVariables.Count()}, aggs=0, stripped_chrome=3 (Menu, HBIcon, ConfirmationPDF) | Status: OK");
+}
+```
+
+Required imports for the `imports` array on the applyModelApiCode call:
+  - System.Linq
+  - OutSystems.Model
+  - OutSystems.Model.Data
+  - OutSystems.Model.Logic
+  - OutSystems.Model.Logic.Nodes
+  - OutSystems.Model.UI.Mobile
+  - OutSystems.Model.UI.Mobile.Widgets
+  - OutSystems.Model.Enumerations
+  - ServiceStudio.Plugin.NRWidgets

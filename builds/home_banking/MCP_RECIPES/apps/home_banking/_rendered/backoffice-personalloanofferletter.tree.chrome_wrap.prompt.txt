@@ -1,0 +1,227 @@
+You are executing a Mentor MCP recipe from a debugged library. The library is
+a defined methodology — recipes compose in phase order (STRUCTURE → LOGIC →
+CHROME → VERIFY) and each recipe defines as much as possible explicitly. The
+API surface and patterns are pre-resolved — do NOT explore, probe, reflect,
+or call get_app_summary.
+
+CONSTRAINTS (non-negotiable):
+
+1. ONE applyModelApiCode call per recipe. No reflection, no exploratory reads.
+2. Use the EXACT code provided. Do not "improve" it.
+3. If the call throws compile or runtime error: STOP and report the error
+   verbatim. Do NOT iterate, do NOT regenerate, do NOT attempt a fix.
+4. Print only the diagnostic output the recipe specifies. No extra summarization.
+5. Do NOT publish from inside the recipe. The caller runs publish_start
+   separately.
+6. The recipe's PHASE annotation determines what the call may touch:
+   - STRUCTURE: entities, statics, roles, dechromed screens, default screen.
+     Uses ONLY standard OutSystemsUI widgets + the manifest's own custom
+     types. Custom blocks (Menu, Header, brand icons) are NOT yet authored —
+     do not reference them.
+   - LOGIC: server/service/client actions; expressions referencing the
+     STRUCTURE phase's entities. No widget/screen mutations.
+   - CHROME: custom blocks, theme CSS, chrome-wrap (replacing dechromed
+     widget shells with custom-block instances). Assumes STRUCTURE + LOGIC
+     phases published successfully.
+   - VERIFY: read-only context_* / applyModelApiCode probes that compare
+     published state vs manifest expectations.
+   A phase-violating call (e.g. a STRUCTURE recipe trying to wrap a screen
+   in HBIcon) is a recipe-library bug — STOP and report.
+
+API SURFACE PRE-RESOLVED (do not rediscover):
+
+- Server entity creation: eSpace.CreateServerEntity(name)
+- PK setup: entity.IdentifierAttribute = idAttr (assign AFTER attr created, BEFORE
+  any other attribute). idAttr.IsAutoNumber = OutSystems.Model.Enumerations.AutoNumber.Yes;
+  idAttr.IsMandatory = true; idAttr.DataType = eSpace.LongIntegerType.
+  (IsAutoNumber is an enum, NOT bool. Values: No | Yes | YesIfEmpty)
+- FK attributes: a.DataType = <staticEntity>.IdentifierType or
+  userIdentType (resolved via eSpace.References)
+- FK DeleteRule: ALWAYS set to OutSystems.Model.Enumerations.DeleteRule.Ignore
+  (Protect is deprecated and causes OS-BLD-40409 at publish time)
+- Static entity creation: eSpace.CreateStaticEntity(name)
+- Role creation: eSpace.CreateRole(name); role.Public = false
+- Server action: eSpace.CreateServerAction(name); action.Public = bool
+- SQL node: action.CreateNode<ISQLNode>("name"); sqlNode.Statement = "SQL";
+  sqlNode.CreateInputParameter(name); sqlNode.SetArgumentValue(param, "expr")
+- Screen creation: BLOCKED on some apps by a platform bug — recipe must declare
+  if it touches CreateScreen and the caller will route accordingly
+- DefaultScreen: eSpace.DefaultScreen = some IScreen reference
+- Publish: external to recipes; caller runs publish_start then publish_status
+
+CORPUS REFERENCES (relevant memories, already encoded into recipes):
+
+- odc_mcp_entity_auto_actions_incomplete — PK required before publish
+- odc_db_upgrade_pk_change_blocked — never alter PK post-publish; delete+recreate
+- odc_mcp_sql_node_api — ISQLNode surface
+- odc_mcp_publish_terminal_success_gate — never cancel a session you intend to publish
+- odc_mcp_screen_creation_broken_complianceops — known per-app CreateScreen bug
+- odc_mcp_record_literal_via_typed_local — Server Action record creation pattern
+- odc_long_integer_to_identifier_cast — LongIntegerToIdentifier for ID arguments
+- odc_mcp_assign_node_iteration_not_flow_order — identify Assign nodes by Variable name
+
+REQUIRED IMPORTS (always include these in the imports array):
+
+System.Linq
+OutSystems.Model
+OutSystems.Model.Data
+OutSystems.Model.Logic
+OutSystems.Model.Logic.Nodes
+OutSystems.Model.Enumerations
+OutSystems.Model.Types
+
+DIAGNOSTIC OUTPUT FORMAT:
+
+End the C# block with ONE Console.WriteLine that prints, on a single line:
+"Recipe <NN>: <Name> | Created: <comma list> | Status: OK"
+
+If any intermediate step asserts a non-null pre-condition that fails, print:
+"Recipe <NN>: <Name> | FAILED at <step name>: <what was unexpected>"
+and return from the lambda. The caller treats this as a fatal stop.
+
+Now execute the following recipe:
+
+```csharp
+eSpace => {
+    // ─── Chrome Wrap: PersonalLoanOfferLetter (Recipe 23) ─────────────
+    var flow = eSpace.MobileFlows.FirstOrDefault(f => f.Name == "MainFlow");
+    if (flow == null) { Console.WriteLine($"FAILED: MobileFlow MainFlow not found"); return; }
+    var screen = flow.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileScreen>().FirstOrDefault(s => s.Name == "PersonalLoanOfferLetter");
+    if (screen == null) { Console.WriteLine($"FAILED: Screen PersonalLoanOfferLetter not found"); return; }
+    int wrapped = 0, missing = 0;
+    
+    // Wrap site: 1 → BlockInstance SourceBlock=PrintLayout
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_PrintLayout_1");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_PrintLayout_1 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "PrintLayout")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "PrintLayout");
+            if (blockSig == null) { Console.WriteLine($"WARN: block PrintLayout not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 1.2.1.1.1 → BlockInstance SourceBlock=ColumnsSmallRight
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_ColumnsSmallRight_1_2_1_1_1");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_ColumnsSmallRight_1_2_1_1_1 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "ColumnsSmallRight")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "ColumnsSmallRight");
+            if (blockSig == null) { Console.WriteLine($"WARN: block ColumnsSmallRight not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "ExtendedClass"); if (p != null) p.SetValue("\"margin-bottom-m\""); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 1.2.1.1.8.2.1.1.1 → BlockInstance SourceBlock=ColumnsSmallRight
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_ColumnsSmallRight_1_2_1_1_8_2_1_1_1");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_ColumnsSmallRight_1_2_1_1_8_2_1_1_1 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "ColumnsSmallRight")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "ColumnsSmallRight");
+            if (blockSig == null) { Console.WriteLine($"WARN: block ColumnsSmallRight not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 1.2.1.1.8.2.1.1.1.2 → BlockInstance SourceBlock=Separator
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Separator_1_2_1_1_8_2_1_1_1_2");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Separator_1_2_1_1_8_2_1_1_1_2 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Separator")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Separator");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Separator not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "PlaceholderName"); if (p != null) p.SetValue("Column1"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Space"); if (p != null) p.SetValue("Entities.Space.None"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Color"); if (p != null) p.SetValue("Entities.Color.Neutral9"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 1.2.1.1.8.2.1.2.1 → BlockInstance SourceBlock=ColumnsSmallRight
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_ColumnsSmallRight_1_2_1_1_8_2_1_2_1");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_ColumnsSmallRight_1_2_1_1_8_2_1_2_1 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "ColumnsSmallRight")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "ColumnsSmallRight");
+            if (blockSig == null) { Console.WriteLine($"WARN: block ColumnsSmallRight not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    // Wrap site: 1.2.1.1.8.2.1.2.1.2 → BlockInstance SourceBlock=Separator
+    {
+        var marker = screen.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileContainer>()
+            .FirstOrDefault(c => c.Name == "_chrome_Separator_1_2_1_1_8_2_1_2_1_2");
+        if (marker == null) { Console.WriteLine($"WARN: chrome marker _chrome_Separator_1_2_1_1_8_2_1_2_1_2 not found — skipping"); missing++; }
+        else {
+            var blockSig = eSpace.MobileFlows.SelectMany(f => f.GetAllDescendantsOfType<OutSystems.Model.UI.Mobile.IMobileBlock>())
+                .FirstOrDefault(b => b.Name == "Separator")
+                ?? eSpace.References.SelectMany(r => r.Blocks).FirstOrDefault(b => b.Name == "Separator");
+            if (blockSig == null) { Console.WriteLine($"WARN: block Separator not found — skipping"); missing++; }
+            else {
+                var parent = marker.Parent;
+                var bi = parent.CreateBlockInstance(blockSig);
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "PlaceholderName"); if (p != null) p.SetValue("Column1"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Space"); if (p != null) p.SetValue("Entities.Space.None"); }
+                { var p = bi.Parameters.FirstOrDefault(pp => pp.Name == "Color"); if (p != null) p.SetValue("Entities.Color.Neutral9"); }
+                parent.RemoveWidget(marker);
+                wrapped++;
+            }
+        }
+    }
+    
+    Console.WriteLine($"Recipe 23: PersonalLoanOfferLetter | wrapped={wrapped}/6, missing={missing} | Status: {(wrapped == 6 && missing == 0 ? \"OK\" : \"PARTIAL\")}");
+}
+```
+
+Required imports for the `imports` array on the applyModelApiCode call:
+  - System.Linq
+  - OutSystems.Model
+  - OutSystems.Model.Data
+  - OutSystems.Model.Logic
+  - OutSystems.Model.Logic.Nodes
+  - OutSystems.Model.UI.Mobile
+  - OutSystems.Model.UI.Mobile.Widgets
+  - OutSystems.Model.Enumerations
+  - ServiceStudio.Plugin.NRWidgets

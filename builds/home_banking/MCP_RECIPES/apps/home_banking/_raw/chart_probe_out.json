@@ -1,0 +1,395 @@
+{
+  "charts": {
+    "hc": true,
+    "count": 2,
+    "charts": [
+      {
+        "type": "pie",
+        "title": null,
+        "xCategories": null,
+        "xTitle": {
+          "align": "middle",
+          "useHTML": false,
+          "x": 0,
+          "y": 0,
+          "style": {
+            "color": "#666666",
+            "fontSize": "0.8em"
+          },
+          "position3d": null,
+          "skew3d": null
+        },
+        "yTitle": {
+          "rotation": 270,
+          "text": "Values",
+          "align": "middle",
+          "useHTML": false,
+          "x": 0,
+          "y": 0,
+          "style": {
+            "color": "#666666",
+            "fontSize": "0.8em"
+          }
+        },
+        "seriesCount": 1,
+        "series": [
+          {
+            "name": null,
+            "type": "",
+            "color": "",
+            "dataLen": 3,
+            "dataSample": [
+              {
+                "color": "#C678D9",
+                "custom": {
+                  "tooltipText": "Checking: $5,095.00"
+                },
+                "y": 5095,
+                "name": "Checking"
+              },
+              {
+                "color": "#56A6B2",
+                "custom": {
+                  "tooltipText": "Saving: $925.00"
+                },
+                "y": 925,
+                "name": "Saving"
+              },
+              {
+                "color": "#F99551",
+                "custom": {
+                  "tooltipText": "Investment: $2,152.00"
+                },
+                "y": 2152,
+                "name": "Investment"
+              }
+            ]
+          }
+        ],
+        "colors": [
+          "#0D8091",
+          "#74B816",
+          "#4263EB",
+          "#F59F00",
+          "#C92A2A",
+          "#37B24D",
+          "#D6336C",
+          "#087F5B",
+          "#7048E8",
+          "#F76707",
+          "#AE3EC9",
+          "#1A79CB"
+        ],
+        "plotOptions": [
+          "line",
+          "area",
+          "spline",
+          "areaspline",
+          "column",
+          "bar",
+          "scatter",
+          "pie",
+          "arearange",
+          "areasplinerange",
+          "boxplot",
+          "bubble",
+          "columnrange",
+          "columnpyramid",
+          "errorbar",
+          "gauge",
+          "packedbubble",
+          "polygon",
+          "waterfall",
+          "scatter3d",
+          "series"
+        ],
+        "renderToId": "b47-ChartContainer",
+        "legend": {
+          "enabled": false
+        }
+      },
+      {
+        "type": "column",
+        "title": null,
+        "xCategories": [
+          "Wk14",
+          "Wk15",
+          "Wk16",
+          "Wk17",
+          "Wk18",
+          "Wk19",
+          "Wk20",
+          "Wk21",
+          "Wk22",
+          "Wk23"
+        ],
+        "xTitle": {
+          "align": "middle",
+          "useHTML": false,
+          "x": 0,
+          "y": 0,
+          "style": {
+            "color": "#666666",
+            "fontSize": "0.8em"
+          },
+          "position3d": null,
+          "skew3d": null,
+          "text": null
+        },
+        "yTitle": {
+          "rotation": 270,
+          "text": null,
+          "align": "middle",
+          "useHTML": false,
+          "x": 0,
+          "y": 0,
+          "style": {
+            "color": "#666666",
+            "fontSize": "0.8em"
+          }
+        },
+        "seriesCount": 2,
+        "series": [
+          {
+            "name": "Income",
+            "type": "",
+            "color": "",
+            "dataLen": 10,
+            "dataSample": [
+              {
+                "color": "#234F4F",
+                "custom": {
+                  "tooltipText": "Income: $400.00"
+                },
+                "y": 400,
+                "name": "Wk14"
+              },
+              {
+                "color": "#234F4F",
+                "custom": {
+                  "tooltipText": "Income: $420.00"
+                },
+                "y": 420,
+                "name": "Wk15"
+              },
+              {
+                "color": "#234F4F",
+                "custom": {
+                  "tooltipText": "Income: $440.00"
+                },
+                "y": 440,
+                "name": "Wk16"
+              },
+              {
+                "color": "#234F4F",
+                "custom": {
+                  "tooltipText": "Income: $540.00"
+                },
+                "y": 540,
+                "name": "Wk17"
+              },
+              {
+                "color": "#234F4F",
+                "custom": {
+                  "tooltipText": "Income: $560.00"
+                },
+                "y": 560,
+                "name": "Wk18"
+              },
+              {
+                "color": "#234F4F",
+                "custom": {
+                  "tooltipText": "Income: $700.00"
+                },
+                "y": 700,
+                "name": "Wk19"
+              }
+            ]
+          },
+          {
+            "name": "Expenses",
+            "type": "",
+            "color": "",
+            "dataLen": 10,
+            "dataSample": [
+              {
+                "color": "#B34852",
+                "custom": {
+                  "tooltipText": "Expenses: $500.00"
+                },
+                "y": 500,
+                "name": "Wk14"
+              },
+              {
+                "color": "#B34852",
+                "custom": {
+                  "tooltipText": "Expenses: $520.00"
+                },
+                "y": 520,
+                "name": "Wk15"
+              },
+              {
+                "color": "#B34852",
+                "custom": {
+                  "tooltipText": "Expenses: $540.00"
+                },
+                "y": 540,
+                "name": "Wk16"
+              },
+              {
+                "color": "#B34852",
+                "custom": {
+                  "tooltipText": "Expenses: $600.00"
+                },
+                "y": 600,
+                "name": "Wk17"
+              },
+              {
+                "color": "#B34852",
+                "custom": {
+                  "tooltipText": "Expenses: $620.00"
+                },
+                "y": 620,
+                "name": "Wk18"
+              },
+              {
+                "color": "#B34852",
+                "custom": {
+                  "tooltipText": "Expenses: $500.00"
+                },
+                "y": 500,
+                "name": "Wk19"
+              }
+            ]
+          }
+        ],
+        "colors": [
+          "#4263EB",
+          "#F59F00"
+        ],
+        "plotOptions": [
+          "line",
+          "area",
+          "spline",
+          "areaspline",
+          "column",
+          "bar",
+          "scatter",
+          "pie",
+          "arearange",
+          "areasplinerange",
+          "boxplot",
+          "bubble",
+          "columnrange",
+          "columnpyramid",
+          "errorbar",
+          "gauge",
+          "packedbubble",
+          "polygon",
+          "waterfall",
+          "scatter3d",
+          "series"
+        ],
+        "renderToId": "b21-ChartContainer",
+        "legend": {
+          "enabled": false
+        }
+      }
+    ]
+  },
+  "dropdowns": [
+    {
+      "id": "PeroidFilterDdl",
+      "cls": "dropdown-display dropdown ",
+      "options": [
+        {
+          "v": "0",
+          "t": "Weekly"
+        },
+        {
+          "v": "1",
+          "t": "Monthly"
+        },
+        {
+          "v": "2",
+          "t": "Quarterly"
+        }
+      ]
+    },
+    {
+      "customDropdown": true,
+      "cls": "dropdown-container locale-dropdown",
+      "text": "EN"
+    },
+    {
+      "customDropdown": true,
+      "cls": "dropdown-display",
+      "text": "EN"
+    },
+    {
+      "customDropdown": true,
+      "cls": "dropdown-display-content",
+      "text": "EN"
+    },
+    {
+      "customDropdown": true,
+      "cls": "dropdown-container",
+      "text": "WeeklyMonthlyQuarterly"
+    },
+    {
+      "customDropdown": true,
+      "cls": "dropdown-display dropdown ",
+      "text": "WeeklyMonthlyQuarterly"
+    }
+  ],
+  "accordions": [
+    {
+      "cls": "osui-accordion",
+      "headerText": "Checking$5,095.00"
+    },
+    {
+      "cls": "osui-accordion-item background-neutral-2 osui-accordion-item--is-closed",
+      "headerText": "Checking$5,095.00"
+    },
+    {
+      "cls": "osui-accordion-item__title osui-accordion-item__title--is-right osui-accordion-item__click_zone",
+      "headerText": "Checking$5,095.00"
+    },
+    {
+      "cls": "osui-accordion-item__title__placeholder",
+      "headerText": "Checking$5,095.00"
+    },
+    {
+      "cls": "osui-accordion-item__icon osui-accordion-item__icon--caret",
+      "headerText": ""
+    },
+    {
+      "cls": "osui-accordion-item__icon placeholder-empty osui-accordion-item__icon--hidden",
+      "headerText": ""
+    },
+    {
+      "cls": "osui-accordion-item__content osui-accordion-item__content--is-collapsed",
+      "headerText": "****  ****  ****  4478$5,095.00"
+    },
+    {
+      "cls": "osui-accordion-item background-neutral-2 osui-accordion-item--is-closed",
+      "headerText": "Saving$925.00"
+    },
+    {
+      "cls": "osui-accordion-item__title osui-accordion-item__title--is-right osui-accordion-item__click_zone",
+      "headerText": "Saving$925.00"
+    },
+    {
+      "cls": "osui-accordion-item__title__placeholder",
+      "headerText": "Saving$925.00"
+    },
+    {
+      "cls": "osui-accordion-item__icon osui-accordion-item__icon--caret",
+      "headerText": ""
+    },
+    {
+      "cls": "osui-accordion-item__icon placeholder-empty osui-accordion-item__icon--hidden",
+      "headerText": ""
+    }
+  ]
+}
