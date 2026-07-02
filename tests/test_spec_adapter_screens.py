@@ -187,7 +187,11 @@ def test_sidebar_nav_items_resolve_to_screen_names():
         ],
     }
     nl = render_spec_screens_nl(synthetic)
-    assert "navigates to screens `Home`, `Detail`" in nl
+    # Sidebar is a first-class app-shell type: labeled nav items, each resolved to a screen NAME.
+    assert "a Sidebar app-shell named `sidebar`" in nl
+    assert "with navigation items: `Home` -> screen `Home`; `Detail` -> screen `Detail`" in nl
+    from harness.banking_runner.spec_adapter import collect_spec_screen_gaps
+    assert collect_spec_screen_gaps(synthetic) == []          # no gap — native phrasing exists
 
 
 def test_non_onclick_event_is_mentioned():
@@ -229,3 +233,26 @@ def test_missing_screens_raises():
 
     with pytest.raises(SpecAdaptError):
         render_spec_screens_nl({"app": {"name": "t", "roles": ["R"]}, "dataModel": {"entities": []}})
+
+
+def test_card_and_chart_are_first_class_no_gap():
+    """Dashboard KPI Cards and Charts get purpose-named NL phrasing (was best-effort gap)."""
+    from harness.banking_runner.spec_adapter import collect_spec_screen_gaps
+    synthetic = {
+        "app": {"name": "t", "roles": ["R"]},
+        "dataModel": {"entities": [
+            {"name": "E", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
+        "screens": [{
+            "id": "dash", "name": "Dash",
+            "components": [
+                {"id": "kpi0", "type": "Card", "label": "Open Items"},
+                {"id": "trend", "type": "Chart", "label": "Items by Status"},
+            ],
+            "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "kpi0"}]},
+        }],
+    }
+    nl = render_spec_screens_nl(synthetic)
+    assert 'a KPI Card named `kpi0` (label "Open Items")' in nl
+    assert 'a Chart named `trend` (label "Items by Status")' in nl
+    assert collect_spec_screen_gaps(synthetic) == []

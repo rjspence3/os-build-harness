@@ -228,11 +228,17 @@ _SHOWING_COMPONENT_TYPES = {"Table", "List"}          # "showing `X` records"
 _BOUND_COMPONENT_TYPES = {"Form", "Input", "Dropdown"}  # "bound to `X`"
 _NAV_COMPONENT_TYPES = {"Button", "Link"}             # navigation source
 _PLAIN_COMPONENT_TYPES = {"Text", "Image", "Container"}
+_SHELL_COMPONENT_TYPES = {"Sidebar"}                  # app-shell with labeled nav items
+_KPI_COMPONENT_TYPES = {"Card"}                       # dashboard KPI card
+_CHART_COMPONENT_TYPES = {"Chart"}                    # dashboard chart
 _RECOGNIZED_COMPONENT_TYPES = (
     _SHOWING_COMPONENT_TYPES
     | _BOUND_COMPONENT_TYPES
     | _NAV_COMPONENT_TYPES
     | _PLAIN_COMPONENT_TYPES
+    | _SHELL_COMPONENT_TYPES
+    | _KPI_COMPONENT_TYPES
+    | _CHART_COMPONENT_TYPES
 )
 
 
@@ -324,14 +330,42 @@ def _nl_component(
             f"as a named {ctype or 'widget'}."
         )
 
-    line = f"{article} {ctype or 'widget'} named `{cid}`"
+    line = _component_lead_phrase(ctype, cid, article)
     line += _component_binding_phrase(comp, ctype)
     line += _component_extra_phrase(comp)
     label = comp.get("label")
     if label:
         line += f' (label "{label}")'
-    line += _component_nav_phrase(comp, screen, screen_name_by_id)
+    # A Sidebar carries its own labeled nav items (comp.nav[]); render those with labels
+    # rather than the generic "navigates to screens X, Y" collapse.
+    if ctype in _SHELL_COMPONENT_TYPES:
+        line += _sidebar_nav_phrase(comp, screen_name_by_id)
+    else:
+        line += _component_nav_phrase(comp, screen, screen_name_by_id)
     return line, gap
+
+
+def _component_lead_phrase(ctype: str, cid: str, article: str) -> str:
+    """Lead clause per component type — the three dashboard-shell types get a purpose-named
+    phrasing so Mentor authors the intended widget, not a bare unnamed one."""
+    if ctype in _SHELL_COMPONENT_TYPES:
+        return f"a Sidebar app-shell named `{cid}`"
+    if ctype in _KPI_COMPONENT_TYPES:
+        return f"a KPI Card named `{cid}`"
+    if ctype in _CHART_COMPONENT_TYPES:
+        return f"a Chart named `{cid}`"
+    return f"{article} {ctype or 'widget'} named `{cid}`"
+
+
+def _sidebar_nav_phrase(comp: dict, screen_name_by_id: dict) -> str:
+    items: list[str] = []
+    for item in comp.get("nav", []) or []:
+        if not isinstance(item, dict) or not item.get("toScreen"):
+            continue
+        target = screen_name_by_id.get(item["toScreen"], item["toScreen"])
+        label = item.get("label")
+        items.append(f"`{label}` -> screen `{target}`" if label else f"screen `{target}`")
+    return " with navigation items: " + "; ".join(items) if items else ""
 
 
 def _component_binding_phrase(comp: dict, ctype: str) -> str:
