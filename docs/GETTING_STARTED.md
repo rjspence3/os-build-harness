@@ -143,12 +143,18 @@ Best starting point for a brand-new app. The flow:
    ```
 3. **Drive the loop.** Inside that session, Claude Code follows the doctrine in
    `builds/my_app/CLAUDE.md` (which `@import`s `harness/CLAUDE.md`): take the next
-   unit of work from the spec → build it via the MCP → verify with
-   `harness-verify <spec> --phase live` → continue or log a wall.
-   *(Note: the `--phase live` executors and `harness-capture` are honest stubs today —
-   they report `not-implemented` rather than silently passing. Until they land, verify
-   built state at runtime yourself: query the MCP / inspect the published app / eyeball
-   the screen. Offline `--phase spec` validation is fully implemented.)*
+   unit of work from the spec → build it via the MCP → **verify it landed** → continue
+   or log a wall. Live verification is **snapshot-fed** — the session fetches live
+   state via the MCP and hands it to the judge:
+   ```bash
+   #   entities.json ← the `context_entities` MCP response, saved to a file
+   #   screens.json  ← a read-only applyModelApiCode screen-walk (contract: examples/task_tracker/live_screens.json)
+   harness-verify <spec> --phase live --entities entities.json --screens screens.json
+   ```
+   With the snapshot the executors return real pass/fail; with none the phase is
+   inconclusive (never a silent pass). `examples/README.md` has a runnable worked
+   example. *(Only `harness-capture`'s CDP visual diff and the auto-fetch channel are
+   unbuilt — you fetch the snapshot yourself, as above.)*
 
 > The spec-driven runner is still being generalized (see [`ROADMAP.md`](../ROADMAP.md));
 > the doctrine and verifier are the mature parts. Expect to drive more of the loop by

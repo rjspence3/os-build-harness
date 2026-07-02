@@ -482,3 +482,20 @@ def test_screen_walk_matches_by_name_when_no_id() -> None:
         "navigation": [{"fromComponent": "newBtn", "event": "onClick", "toScreen": "issues"}]}]}
     results = run_live_phase(_walk_spec(), None, None, load_screens_snapshot(walk))
     assert all(r.status == "pass" for r in results)
+
+
+# ── worked live example (examples/task_tracker) ─────────────────────────────
+def test_example_live_snapshots_all_pass() -> None:
+    """The shipped live snapshots match the example spec → every live assertion passes."""
+    from pathlib import Path
+    from harness.verify import (
+        run_live_phase, _live_exit_code, load_entities_snapshot, load_screens_snapshot,
+    )
+    ex = Path(__file__).resolve().parents[1] / "examples" / "task_tracker"
+    spec = json.loads((ex / "app_spec.json").read_text(encoding="utf-8"))
+    ents = load_entities_snapshot(ex / "live_entities.json")
+    scrn = load_screens_snapshot(ex / "live_screens.json")
+    results = run_live_phase(spec, mcp_config=None, entities_snapshot=ents, screens_snapshot=scrn)
+    assert all(r.status == "pass" for r in results), [r.render() for r in results if r.status != "pass"]
+    assert _live_exit_code(results) == 0
+    assert len(results) == 9

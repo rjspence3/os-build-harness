@@ -1,0 +1,22 @@
+{
+  "_comment": "A structured screen-walk snapshot for a BUILT task_tracker app — the shape a read-only applyModelApiCode walk emits (per the contract in harness/verify.py: {id, components:[{id,type,boundTo}], navigation:[{fromComponent,event,toScreen}]}). The orchestrator fetches this via the MCP and feeds it to `harness-verify --phase live --screens`. Matches examples/task_tracker/app_spec.json, so live verify PASSES.",
+  "screens": [
+    {
+      "id": "lists",
+      "components": [
+        {"id": "listsTable", "type": "Table", "boundTo": "TaskList"},
+        {"id": "openTasksBtn", "type": "Button"}
+      ],
+      "navigation": [
+        {"fromComponent": "openTasksBtn", "event": "onClick", "toScreen": "tasks"}
+      ]
+    },
+    {
+      "id": "tasks",
+      "components": [
+        {"id": "tasksTable", "type": "Table", "boundTo": "Task"}
+      ],
+      "navigation": []
+    }
+  ]
+}

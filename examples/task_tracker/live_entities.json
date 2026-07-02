@@ -1,0 +1,28 @@
+{
+  "_comment": "A saved `context_entities` response for a BUILT task_tracker app — the shape the orchestrator (Claude Code) fetches via the OutSystems MCP and feeds to `harness-verify --phase live --entities`. `load_entities_snapshot` is tolerant of this {data:[...]} envelope. This one matches examples/task_tracker/app_spec.json, so live verify PASSES.",
+  "data": [
+    {
+      "name": "TaskList",
+      "isStatic": false,
+      "additionalData": {
+        "attributes": [
+          {"name": "Id", "dataType": "Long Integer", "isMandatory": true, "isPrimaryKey": true},
+          {"name": "Title", "dataType": "Text", "isMandatory": true},
+          {"name": "CreatedAt", "dataType": "Date Time", "isMandatory": false}
+        ]
+      }
+    },
+    {
+      "name": "Task",
+      "isStatic": false,
+      "additionalData": {
+        "attributes": [
+          {"name": "Id", "dataType": "Long Integer", "isMandatory": true, "isPrimaryKey": true},
+          {"name": "TaskListId", "dataType": "TaskList Identifier", "isMandatory": true},
+          {"name": "Title", "dataType": "Text", "isMandatory": true},
+          {"name": "IsDone", "dataType": "Boolean", "isMandatory": true}
+        ]
+      }
+    }
+  ]
+}

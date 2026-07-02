@@ -12,17 +12,21 @@ Two phases, matching app_spec.v0.json's contract:
        flow reference (screen/entity/role/action/step) must resolve — else spec-gap.
        A structure-only spec (no capabilities) stays valid with one advisory nudge.
 
-  live phase (SCAFFOLDED) — check the built ODC app against each screen's
-    acceptance assertions. One handler per assertion kind routes to a channel
-    (mcp | capture | unverifiable). The channel per kind is GROUNDED in the MCP
-    doctrine notes' ODC findings, not assumption (see LIVE_CHANNELS citations). Actual MCP/CDP reads
-    are gated behind a real .mcp.json and are not implemented yet, so the phase
-    currently returns unconfigured/not-implemented/unverifiable per assertion and
-    never a silent pass.
+  live phase — check the built ODC app against each screen's acceptance
+    assertions. SNAPSHOT-FED (per HD D7): the orchestrator fetches live state via the
+    MCP and passes it in — `--entities` (a context_entities response) drives
+    entityExists/attribute; `--screens` (a structured applyModelApiCode screen-walk;
+    contract by example in examples/task_tracker/live_screens.json) drives
+    componentPresent/binding/navigates. Given the snapshot the per-kind executors
+    return REAL pass/fail; with no snapshot each assertion is inconclusive and the
+    phase NEVER returns a silent pass. integrationExists is unverifiable (no ODC read
+    path). The judge does not open its own MCP client — the auto-fetch channel is
+    intentionally unbuilt (you fetch the snapshot yourself).
 
-Exit codes: 0 = clean (spec valid / no gating findings); 1 = spec-gap findings;
-3 = phase requested but not implemented (live). The build agent turns findings
-into WALLS.md entries (category spec-gap) per the harness doctrine.
+Exit codes: 0 = clean (spec valid / all supplied live assertions pass); 1 = failure
+(spec-gap findings, or a live assertion that failed against the snapshot); 3 =
+inconclusive (live requested but no snapshot supplied, or unverifiable). The build
+agent turns findings into WALLS.md entries (category spec-gap) per the harness doctrine.
 """
 from __future__ import annotations
 
