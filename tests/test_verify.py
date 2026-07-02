@@ -499,3 +499,20 @@ def test_example_live_snapshots_all_pass() -> None:
     assert all(r.status == "pass" for r in results), [r.render() for r in results if r.status != "pass"]
     assert _live_exit_code(results) == 0
     assert len(results) == 9
+
+
+def test_navigates_matches_when_walk_emits_screen_name() -> None:
+    """A screen-walk may emit the screen NAME while the spec asserts by id;
+    run_live_phase normalizes nav toScreen to the id so `navigates` still matches."""
+    from harness.verify import run_live_phase, load_screens_snapshot
+    spec = {"screens": [
+        {"id": "home", "name": "Home", "acceptance": {"assertions": [
+            {"kind": "navigates", "fromComponent": "goBtn", "event": "onClick", "toScreen": "detail"}]}},
+        {"id": "detail", "name": "Detail", "acceptance": {"assertions": []}},
+    ]}
+    walk = {"screens": [{"id": "Home", "components": [{"id": "goBtn"}],
+            "navigation": [{"fromComponent": "goBtn", "event": "onClick", "toScreen": "Detail"}]}]}
+    scrn = load_screens_snapshot(walk)
+    results = run_live_phase(spec, mcp_config=None, screens_snapshot=scrn)
+    nav = next(r for r in results if r.kind == "navigates")
+    assert nav.status == "pass", nav.detail    # "Detail" (name) resolved to id "detail"

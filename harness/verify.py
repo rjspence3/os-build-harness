@@ -618,6 +618,21 @@ def run_live_phase(spec: dict, mcp_config: Path | None, entities_snapshot: dict 
     (parsed context_entities) drives entityExists/attribute; screens_snapshot (parsed
     applyModelApiCode walk) drives componentPresent/binding/navigates. A channel with no
     snapshot falls back to the grounded-channel router (never a fake pass)."""
+    # Normalize nav-edge `toScreen` to the spec's screen id: a screen-walk may emit the
+    # screen NAME (e.g. "Tasks") while the spec asserts by id ("tasks"). Both are valid
+    # references, so map each edge's toScreen through {id|name -> id} before matching.
+    if screens_snapshot:
+        id_by_key: dict[str, str] = {}
+        for s in spec.get("screens", []):
+            for key in (s.get("id"), s.get("name")):
+                if key:
+                    id_by_key[key] = s["id"]
+        for entry in screens_snapshot.values():
+            for edge in entry.get("nav", []):
+                ts = edge.get("toScreen")
+                if ts in id_by_key:
+                    edge["toScreen"] = id_by_key[ts]
+
     results: list[LiveResult] = []
     for screen in spec["screens"]:
         for a in screen["acceptance"]["assertions"]:

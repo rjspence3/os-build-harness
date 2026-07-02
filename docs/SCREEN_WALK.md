@@ -124,9 +124,18 @@ exercises offline.
   widgets unnamed → they're skipped by default (or get synthetic `type_<index>` ids under
   `FALLBACK_IDS=true`, which only match spec assertions using that same scheme). **Name the
   widgets your spec asserts on** (`componentPresent`/`binding`).
-- **`boundTo`** is proven for `List` widgets (`IList.Source.DisplayName`, e.g. `GetItems.List`).
-  For Table/Form data widgets, extend the `is`-cascade with their source property when you hit one.
-- **Navigation** captures `OnClick.Destination` that resolves to a screen. Navigation via a
+- **`boundTo` — extend the cascade for ODC Table widgets (live finding 2026-07-02).** ODC
+  Table widgets are `ITableRecords`, which the base cascade above MISSES — add an
+  `ITableRecords` branch (type `"Table"`, read `.Name`; `boundTo` from the record source's
+  `DisplayName`). `IList` binding is proven via `IList.Source.DisplayName`.
+- **`boundTo` is the AGGREGATE, not the bare entity.** A data widget's live source is an
+  aggregate (`GetTaskLists.List`), not the entity (`TaskList`). So a spec `binding` assertion
+  that names the ENTITY will NOT match unless the walk resolves the aggregate to its source
+  entity (recommended: report the source entity as `boundTo`) — or the spec asserts the
+  aggregate form. (Live-proven: task_tracker `binding` failed `GetTaskLists.List` vs `TaskList`
+  — the build was correct; the walk needs the resolution.)
+- **Navigation** captures `OnClick.Destination` that resolves to a screen (emit the target as
+  the screen name or id — `harness-verify` normalizes both to the spec id). Navigation via a
   screen *action* (Destination null) is intentionally not captured.
 - **One screen per call.** A full-screen walk can overflow MCP transport (~35–40K chars); the
   named + typed filter keeps output compact. Never batch screens into one call.
