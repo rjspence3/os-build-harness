@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
-"""Render an app_spec.json's entity layer to Mentor authoring batches (DRY-RUN).
+"""Emit the complete, repeatable BUILD PLAN for an app_spec.json (DRY-RUN, authors nothing).
 
-This is the generalized counterpart to `scripts/build_banking.py`: instead of a
-home_banking YAML manifest, it takes a schema-validated `app_spec.json` (see
-`harness/schemas/app_spec.v0.json`), maps it onto the same renderer dataclasses
-via `harness.banking_runner.spec_adapter`, and prints the entity-authoring
-batches. It authors NOTHING — no MCP, no network. This is the first increment of
-generalizing the runner off home_banking.
+The generalized counterpart to `scripts/build_banking.py`: it takes a
+schema-validated `app_spec.json` (see `harness/schemas/app_spec.v0.json`), maps it
+onto the renderer dataclasses via `harness.banking_runner.spec_adapter`, and prints
+the ordered plan a captured Mentor build session executes:
+
+    PHASE 1 · Author entities   — natural-language intent (Mentor authors NATIVELY;
+                                  verbatim applyModelApiCode C# does not persist on
+                                  fresh apps — proven). ONE committing turn so FKs see
+                                  their targets.
+    PHASE 2 · Author screens    — natural-language intent per screen.
+    PHASE 3 · Verify            — read-only capture (context_entities + a read-only
+                                  applyModelApiCode screen-walk per docs/SCREEN_WALK.md)
+                                  fed to `harness-verify --phase live`. Expect exit 0.
+
+It authors NOTHING — no MCP, no network. Authoring happens in a captured build
+session that executes this plan; verification is deterministic and snapshot-fed.
 
 Usage:
-    python scripts/build_from_spec.py --from-spec examples/task_tracker/app_spec.json --dry-run
+    python scripts/build_from_spec.py --from-spec examples/task_tracker/app_spec.json
+    python scripts/build_from_spec.py --from-spec <spec> --emit-csharp   # legacy C# entity batch too
 """
 from __future__ import annotations
 
@@ -24,11 +35,16 @@ if str(REPO_ROOT) not in sys.path:
 
 from harness.banking_runner.spec_adapter import (  # noqa: E402
     collect_spec_gaps,
+    collect_spec_screen_gaps,
     render_spec_entities,
+    render_spec_entities_nl,
+    render_spec_screens_nl,
     spec_to_entities,
 )
 
 SCHEMA_PATH = REPO_ROOT / "harness" / "schemas" / "app_spec.v0.json"
+_RULE = "=" * 78
+_SUB = "─" * 78
 
 
 def _validate_against_schema(spec: dict) -> list[str]:
@@ -46,16 +62,34 @@ def _validate_against_schema(spec: dict) -> list[str]:
     ]
 
 
+def _verify_plan_text(spec_path: Path) -> str:
+    """The read-only verification recipe — deterministic, snapshot-fed, never a false pass."""
+    return "\n".join([
+        "After the build session publishes (revision must increment — the only trustworthy",
+        "'landed' signal), capture live state READ-ONLY and verify:",
+        "",
+        "  1. Entities:  context_entities  ->  entities.json",
+        "  2. Screens:   read-only applyModelApiCode screen-walk (one screen per call, per",
+        "                docs/SCREEN_WALK.md; emits {id,type,boundTo,sourceEntity} + nav)  ->  screens.json",
+        "  3. Verify:",
+        f"       harness-verify --phase live --entities entities.json --screens screens.json {spec_path.name}",
+        "",
+        "     Expect every assertion [pass] and exit 0. A binding matches whether the walk",
+        "     reports the aggregate (GetTaskLists.List) or the resolved sourceEntity (TaskList).",
+        "     Empty snapshots -> exit 3 (inconclusive), never a false pass.",
+    ])
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--from-spec", required=True, type=Path, help="Path to app_spec.json")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        default=True,
-        help="Print batches; author nothing (the only supported mode in this increment).",
-    )
+    parser.add_argument("--dry-run", action="store_true", default=True,
+                        help="Print the plan; author nothing (the only supported mode).")
     parser.add_argument("--skip-validation", action="store_true", help="Skip JSON-Schema validation.")
+    parser.add_argument("--emit-csharp", action="store_true",
+                        help="Also print the legacy applyModelApiCode C# entity batch "
+                             "(superseded for authoring by the NL intent; kept for reference).")
     args = parser.parse_args(argv)
 
     spec_path: Path = args.from_spec
@@ -75,24 +109,53 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     manifest = spec_to_entities(spec)
-    gaps = collect_spec_gaps(spec)
+    entity_gaps = collect_spec_gaps(spec)
+    screen_gaps = collect_spec_screen_gaps(spec)
 
-    print("=" * 78)
-    print(f"App:            {manifest.app or '(unnamed)'}")
+    # ── header ────────────────────────────────────────────────────────────────
+    print(_RULE)
+    print(f"BUILD PLAN · {manifest.app or '(unnamed app)'}   [DRY-RUN — authors nothing]")
+    print(_RULE)
     print(f"Static entities: {len(manifest.static_entities)}  "
           f"[{', '.join(e.name for e in manifest.static_entities) or '-'}]")
     print(f"Server entities: {len(manifest.server_entities)}  "
           f"[{', '.join(e.name for e in manifest.server_entities) or '-'}]")
-    if gaps:
-        print(f"\nMapping gaps ({len(gaps)}):")
-        for g in gaps:
-            print(f"  - {g}")
-    else:
+    print(f"Screens:         {len(spec.get('screens', []))}  "
+          f"[{', '.join(s.get('id') or s.get('name') or '?' for s in spec.get('screens', [])) or '-'}]")
+    for label, gaps in (("entity", entity_gaps), ("screen", screen_gaps)):
+        if gaps:
+            print(f"\n{label.capitalize()} mapping gaps ({len(gaps)}):")
+            for g in gaps:
+                print(f"  - {g}")
+    if not entity_gaps and not screen_gaps:
         print("\nMapping gaps: none")
-    print("=" * 78)
 
-    batch_text = render_spec_entities(spec)
-    print(batch_text)
+    # ── PHASE 1 · entities (NL intent — the proven authoring path) ─────────────
+    print(f"\n{_SUB}")
+    print("PHASE 1 · Author entities — natural-language intent (ONE committing Mentor turn)")
+    print(_SUB)
+    print(render_spec_entities_nl(spec))
+
+    # ── PHASE 2 · screens (NL intent) ──────────────────────────────────────────
+    print(f"\n{_SUB}")
+    print("PHASE 2 · Author screens — natural-language intent")
+    print(_SUB)
+    print(render_spec_screens_nl(spec))
+
+    # ── PHASE 3 · verify (read-only, deterministic) ────────────────────────────
+    print(f"\n{_SUB}")
+    print("PHASE 3 · Verify — read-only capture -> harness-verify --phase live")
+    print(_SUB)
+    print(_verify_plan_text(spec_path))
+
+    # ── optional legacy C# batch ───────────────────────────────────────────────
+    if args.emit_csharp:
+        print(f"\n{_SUB}")
+        print("APPENDIX · Legacy applyModelApiCode C# entity batch (superseded — reference only)")
+        print(_SUB)
+        print(render_spec_entities(spec))
+
+    print(f"\n{_RULE}")
     return 0
 
 
