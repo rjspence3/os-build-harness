@@ -1,4 +1,14 @@
-"""app_spec.json  →  recipe-renderable Entity dataclasses (the entity layer).
+"""app_spec.json  →  authoring bridges: Entity dataclasses (entity layer) + NL screen intent.
+
+Two authoring bridges live here, both pure/deterministic/offline (no MCP, no network):
+  * ENTITY layer — `spec_to_entities` maps the spec onto renderer dataclasses; the
+    proven authoring bridge is `render_spec_entities_nl` (NL intent for Mentor to
+    author natively — verbatim applyModelApiCode C# did not persist on a fresh app).
+  * SCREEN layer — `render_spec_screens_nl` mirrors the entity NL bridge: it emits
+    natural-language screen-authoring instructions (widgets named by their exact spec
+    `id`, bindings, navigation) for Mentor to author natively, AFTER the entities exist.
+    `collect_spec_screen_gaps` reports component types with no native NL phrasing.
+
 
 The banking runner's renderers in `recipe.py` (`render_server_entity`,
 `render_static_entity`, `render_attribute_line`, `collect_fk_targets`,
@@ -178,6 +188,221 @@ def _nl_attribute(a: Attribute) -> str:
     if dt == "Decimal" and a.length:
         return f"Decimal `{a.name}` ({a.length},{a.decimals or 0}){mand}"
     return f"{dt} `{a.name}`{mand}"
+
+
+# ─── screen layer (NL authoring bridge) ──────────────────────────────────────────
+#
+# Screen/component -> NL mapping (author from the explicit components/navigation,
+# NEVER from acceptance.assertions — those are verify targets):
+#
+#   spec fragment                         emitted NL
+#   ------------------------------------  ----------------------------------------
+#   component.id                          the widget NAME ("Table named `listsTable`")
+#   type Table / List  + boundTo=X        "showing `X` records"
+#   type Form/Input/Dropdown + boundTo=X  "bound to `X`"
+#   type Button / Link                    (navigation-capable; see below)
+#   type Text / Image / Container         plain named widget
+#   any other type                        best-effort "<Type> named `id`" + a GAP
+#   component.label                       ' (label "…")'
+#   component.groupBy / .columns          ' (grouped by `…`; columns `…`)'
+#   navigation[] fromComponent==id        "that navigates to screen `<toScreen name>`"
+#   component.nav[] (Sidebar/Nav items)   same, one target per nav item
+#   navEdge.event != onClick              "that on <event> navigates to screen `…`"
+#   screen.inputParameters[]              "receives input parameter `Name` referencing `E`"
+#   screen.actions[] (non-Navigate does)  "action `Name` on `component` <event>: CreateEntity, …"
+#
+# toScreen ids are resolved to screen NAMES via the screens table; unknown ids pass
+# through raw. Navigation edges already cover Navigate actions, so pure-Navigate
+# actions are dropped from the actions section (no double-rendering).
+
+_SCREEN_PREAMBLE = (
+    "Author these screens natively AFTER the data model (entities) already exist, so "
+    "that every data binding resolves against a real entity. Author each widget with "
+    "the EXACT name shown in backticks — the screen-walk verifier keys on widget "
+    "names, so an unnamed widget fails its assertion. Publish when done."
+)
+
+# Component types with a native 1:1 NL phrasing. Anything outside this set is emitted
+# best-effort and flagged by `collect_spec_screen_gaps` (never faked coverage).
+_SHOWING_COMPONENT_TYPES = {"Table", "List"}          # "showing `X` records"
+_BOUND_COMPONENT_TYPES = {"Form", "Input", "Dropdown"}  # "bound to `X`"
+_NAV_COMPONENT_TYPES = {"Button", "Link"}             # navigation source
+_PLAIN_COMPONENT_TYPES = {"Text", "Image", "Container"}
+_RECOGNIZED_COMPONENT_TYPES = (
+    _SHOWING_COMPONENT_TYPES
+    | _BOUND_COMPONENT_TYPES
+    | _NAV_COMPONENT_TYPES
+    | _PLAIN_COMPONENT_TYPES
+)
+
+
+def render_spec_screens_nl(app_spec: dict) -> str:
+    """Render the screen layer as precise NATURAL-LANGUAGE authoring instructions for
+    Mentor to author NATIVELY — mirrors `render_spec_entities_nl` for the data model.
+
+    Each component is named by its exact spec `id` (the screen-walk verifier keys on
+    widget names). Data bindings, navigation edges, screen inputs, and non-navigation
+    actions are rendered from the EXPLICIT spec fields (never from acceptance
+    assertions). Deterministic, offline, no MCP. Author screens AFTER the entities so
+    bindings resolve."""
+    text, _gaps = _screens_nl(app_spec)
+    return text
+
+
+def collect_spec_screen_gaps(app_spec: dict) -> list[str]:
+    """Return human-readable warnings for screen features with no clean native NL
+    phrasing (e.g. composite component types like Board/Sidebar). Empty list means a
+    fully-mapped screen layer."""
+    _text, gaps = _screens_nl(app_spec)
+    return gaps
+
+
+def _screens_nl(app_spec: dict) -> tuple[str, list[str]]:
+    screens = app_spec.get("screens")
+    if not isinstance(screens, list) or not screens:
+        raise SpecAdaptError("app_spec missing screens")
+
+    screen_name_by_id = {
+        s.get("id"): s.get("name") or s.get("id") or ""
+        for s in screens
+        if isinstance(s, dict)
+    }
+
+    gaps: list[str] = []
+    out: list[str] = [_SCREEN_PREAMBLE, ""]
+    for screen in screens:
+        out.append(_screen_header(screen))
+        for ip in screen.get("inputParameters", []) or []:
+            out.append("   - " + _nl_input_parameter(ip))
+        components = screen.get("components", []) or []
+        if not components:
+            out.append("   - (no components specified)")
+        for comp in components:
+            line, gap = _nl_component(comp, screen, screen_name_by_id)
+            out.append("   - " + line)
+            if gap:
+                gaps.append(gap)
+        out.extend(_nl_actions(screen))
+        out.append("")
+    return "\n".join(out).rstrip() + "\n", gaps
+
+
+def _screen_header(screen: dict) -> str:
+    name = screen.get("name") or screen.get("id") or ""
+    meta: list[str] = []
+    if screen.get("route"):
+        meta.append(f"route {screen['route']}")
+    if screen.get("uiFlow"):
+        meta.append(f"flow {screen['uiFlow']}")
+    roles = screen.get("roles") or []
+    if roles:
+        meta.append("role " + ", ".join(roles))
+    suffix = f" ({', '.join(meta)})" if meta else ""
+    return f"Screen `{name}`{suffix}:"
+
+
+def _nl_input_parameter(ip: dict) -> str:
+    name = ip.get("name", "?")
+    ref = ip.get("references")
+    if ref:
+        return f"receives input parameter `{name}` referencing `{ref}`"
+    return f"receives input parameter `{name}` ({ip.get('dataType', 'Text')})"
+
+
+def _nl_component(
+    comp: dict, screen: dict, screen_name_by_id: dict
+) -> tuple[str, str | None]:
+    ctype = comp.get("type") or ""
+    cid = comp.get("id", "?")
+    article = "an" if ctype[:1].upper() in {"A", "E", "I", "O", "U"} else "a"
+
+    gap = None
+    if ctype not in _RECOGNIZED_COMPONENT_TYPES:
+        gap = (
+            f'Screen "{screen.get("id", "?")}": component "{cid}" type '
+            f'"{ctype or "(missing)"}" has no native NL phrasing; emitted best-effort '
+            f"as a named {ctype or 'widget'}."
+        )
+
+    line = f"{article} {ctype or 'widget'} named `{cid}`"
+    line += _component_binding_phrase(comp, ctype)
+    line += _component_extra_phrase(comp)
+    label = comp.get("label")
+    if label:
+        line += f' (label "{label}")'
+    line += _component_nav_phrase(comp, screen, screen_name_by_id)
+    return line, gap
+
+
+def _component_binding_phrase(comp: dict, ctype: str) -> str:
+    bound = comp.get("boundTo")
+    if not bound:
+        return ""
+    if ctype in _SHOWING_COMPONENT_TYPES:
+        return f" showing `{bound}` records"
+    # Form/Input/Dropdown (and any best-effort type carrying a binding).
+    return f" bound to `{bound}`"
+
+
+def _component_extra_phrase(comp: dict) -> str:
+    parts: list[str] = []
+    if comp.get("groupBy"):
+        parts.append(f"grouped by `{comp['groupBy']}`")
+    fields = [
+        c.get("field")
+        for c in (comp.get("columns") or [])
+        if isinstance(c, dict) and c.get("field")
+    ]
+    if fields:
+        parts.append("columns " + ", ".join(f"`{f}`" for f in fields))
+    return f" ({'; '.join(parts)})" if parts else ""
+
+
+def _component_nav_phrase(
+    comp: dict, screen: dict, screen_name_by_id: dict
+) -> str:
+    cid = comp.get("id")
+    simple: list[str] = []          # onClick / default-event targets
+    evented: list[tuple[str, str]] = []  # (event, target) for non-onClick edges
+
+    for edge in screen.get("navigation", []) or []:
+        if edge.get("fromComponent") == cid and edge.get("toScreen"):
+            target = screen_name_by_id.get(edge["toScreen"], edge["toScreen"])
+            event = edge.get("event")
+            if event and event != "onClick":
+                evented.append((event, target))
+            else:
+                simple.append(target)
+    for item in comp.get("nav", []) or []:
+        if isinstance(item, dict) and item.get("toScreen"):
+            simple.append(screen_name_by_id.get(item["toScreen"], item["toScreen"]))
+
+    out = ""
+    if len(simple) == 1:
+        out += f" that navigates to screen `{simple[0]}`"
+    elif simple:
+        out += " that navigates to screens " + ", ".join(f"`{n}`" for n in simple)
+    for event, target in evented:
+        out += f" that on {event} navigates to screen `{target}`"
+    return out
+
+
+def _nl_actions(screen: dict) -> list[str]:
+    lines: list[str] = []
+    for act in screen.get("actions", []) or []:
+        # Navigation is rendered from navigation edges; drop pure-Navigate actions
+        # so they are not double-rendered.
+        meaningful = [d for d in (act.get("does") or []) if d != "Navigate"]
+        if not meaningful:
+            continue
+        trigger = act.get("trigger") or {}
+        on = trigger.get("onComponent", "?")
+        event = trigger.get("event", "onClick")
+        lines.append(
+            f"   - action `{act.get('name', '?')}` on `{on}` {event}: "
+            + ", ".join(meaningful)
+        )
+    return lines
 
 
 # ─── internals ──────────────────────────────────────────────────────────────────
