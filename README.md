@@ -57,10 +57,10 @@ builds/
 docs/                # GETTING_STARTED.md · SCREEN_WALK.md (live-verify producer) · REALTIME.md
 examples/            # task_tracker/app_spec.json — a complete, validated example spec
 assets/              # shared OutSystems UI / FontAwesome / ECharts bundle (vendored, see LICENSEs)
-scripts/             # build_banking.py (entrypoint) + render/diff/capture tooling
-tests/               # banking_runner unit tests
+scripts/             # build_banking.py (clone entrypoint) · build_from_spec.py (spec-driven build plan) + render/diff/capture tooling
+tests/               # unit tests (renderers · spec adapter · verifier)
 HARNESS_DECISIONS.md # the architectural decision log
-ROADMAP.md           # where this is headed (generalizing the runner into a spec-driven harness)
+ROADMAP.md           # where this is headed
 ```
 
 ## Two build modes
@@ -71,8 +71,11 @@ The harness supports two ways of defining "the source of truth" — a build root
 - **recipe / clone** — the source of truth is a hardened recipe library **plus the original
   app**. Recipes drive Mentor; fidelity is verified by **`pixel_diff`** against the original's
   runtime captures. `home_banking` is this mode.
-- **spec-driven** — the source of truth is an `app_spec` (see `harness/schemas/app_spec.v0.json`);
-  structure is verified with `harness-verify`. (This is the direction the roadmap generalizes toward.)
+- **spec-driven** — the source of truth is an `app_spec` (see `harness/schemas/app_spec.v0.json`).
+  `scripts/build_from_spec.py` renders the full natural-language build plan (entities → screens →
+  verify); `harness-verify` checks structure against live system state. Live-proven end-to-end on
+  `task_tracker` (`--phase live` → **9/9**); the 47-spec kyleCohorts corpus renders **zero-gap** on
+  both the entity and screen layers.
 
 ## Requirements
 
@@ -93,11 +96,12 @@ pip install -r requirements.txt
 pip install -e .          # installs the harness-verify / harness-capture / harness-prompt-step CLIs
 
 # No tenant needed for these — they exercise the harness offline:
-pytest tests/ -q                                                  # → 173 passed
+pytest tests/ -q                                                  # → 213 passed
 python scripts/build_banking.py --list-apps                       # the home_banking manifest
 python scripts/build_banking.py --app core --dry-run --out /tmp/hb_run
 #   → rendered Mentor batches land under /tmp/hb_run/core/batches/
 harness-verify examples/task_tracker/app_spec.json --phase spec   # validate a spec, offline
+python scripts/build_from_spec.py --from-spec examples/task_tracker/app_spec.json  # full NL build plan
 ```
 
 To go **live** you need an OutSystems ODC tenant with the **Mentor MCP** enabled
@@ -130,11 +134,13 @@ meaningless on empty screens. The full doctrine is in `harness/CLAUDE.md`.
 
 ## Caveats
 
-- The full unit suite passes (`pytest tests/ -q` → 173 passed). The renderers are pure
-  (AST → C# string), so the tests run offline with no tenant or live Mentor dispatch.
-- `banking_runner` was built around the `home_banking` clone and is **not yet generalized** — paths
-  resolve to `builds/home_banking/`. Mirror that layout under `builds/<name>/` and parameterize when
-  adding a build (see `ROADMAP.md`).
+- The full unit suite passes (`pytest tests/ -q` → 213 passed). The renderers are pure
+  (spec → authoring text), so the tests run offline with no tenant or live Mentor dispatch.
+- `scripts/build_banking.py` (the `home_banking` **clone** entrypoint) still resolves paths to
+  `builds/home_banking/`. The **spec-driven** path is generalized: `scripts/build_from_spec.py`
+  maps any `app_spec` onto the renderers (entities + screens) and emits the full natural-language
+  build plan. Authoring is via NL intent to Mentor (verbatim C# does not persist on fresh apps);
+  the legacy C# entity batch stays behind `--emit-csharp` for reference.
 - The `home_banking` build is a worked example to **study**, not a push-button reproducible build:
   its live verification compares against the original Home Banking app and tenant-specific app keys
   that exist only in the author's tenant. The recipes, doctrine, and offline `--dry-run` are fully

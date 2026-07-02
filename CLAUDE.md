@@ -39,7 +39,7 @@ python scripts/build_banking.py --list-apps
 python scripts/build_banking.py --app core --dry-run
 ```
 
-Note: the unit suite is green (`pytest tests/ -q` → 173 passed). The renderers are pure
+Note: the unit suite is green (`pytest tests/ -q` → 213 passed). The renderers are pure
 (AST → C# string), so the tests run offline with no tenant or live Mentor dispatch.
 
 ## Vendored helper — `cdp_helpers`

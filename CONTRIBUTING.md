@@ -10,7 +10,7 @@ issue — that's a contribution too.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
-pytest tests/ -q          # → 173 passed
+pytest tests/ -q          # → 213 passed
 ```
 
 No tenant is needed for development: the renderers are **pure** (AST → C# string), so the

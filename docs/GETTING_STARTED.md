@@ -62,7 +62,7 @@ Get a feel for the harness before wiring up a tenant. All of this runs anywhere:
 
 ```bash
 # Run the unit suite (pure AST → C# renderers; no live calls)
-pytest tests/ -q                                   # → 173 passed
+pytest tests/ -q                                   # → 213 passed
 
 # Inspect the home_banking reference build's manifest
 python scripts/build_banking.py --list-apps
