@@ -1,0 +1,9 @@
+{
+  "name": "os-build-harness-ws-relay",
+  "version": "1.0.0",
+  "description": "Channel-based WebSocket relay for the harness's real-time layer (external server-push for ODC apps; OS stays the system of record).",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "ws": "^8.18.0" },
+  "engines": { "node": ">=18" }
+}

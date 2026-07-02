@@ -48,12 +48,13 @@ harness/
   capture.py verify.py prompt_step.py   # harness-capture / harness-verify / harness-prompt-step
   CLAUDE.md          # SHARED DOCTRINE — the build loop, walls protocol, authoring patterns
   launch_build.sh    # scaffolds builds/<app>/ from _template and starts a build session
+  realtime/ws-relay/ # external WebSocket relay for live features (see docs/REALTIME.md)
 builds/
   home_banking/      # build #0 — the reference clone (OutSystems demo app)
     MCP_RECIPES/     # the recipe library + DISPATCH_PLAYBOOK + RUNBOOK + per-app captures
     theme/
   _template/         # starting point for a new build root (see its README)
-docs/                # GETTING_STARTED.md — the onboarding walkthrough
+docs/                # GETTING_STARTED.md · SCREEN_WALK.md (live-verify producer) · REALTIME.md
 examples/            # task_tracker/app_spec.json — a complete, validated example spec
 assets/              # shared OutSystems UI / FontAwesome / ECharts bundle (vendored, see LICENSEs)
 scripts/             # build_banking.py (entrypoint) + render/diff/capture tooling

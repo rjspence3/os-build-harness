@@ -181,15 +181,15 @@ else
 fi
 
 # 6b. Host-path fragments (~/Development/, -Users-rob-) + private sibling-repo
-#     names in *.py AND *.md — so this whole class of leak cannot regress.
-LEAK_HITS="$(grep -rInE --include='*.py' --include='*.md' "${LEAK_PATTERN}" "${CLONE_DIR}" \
-            --exclude-dir='.venv' 2>/dev/null)"
+#     names in *.py, *.md AND *.js — so this whole class of leak cannot regress.
+LEAK_HITS="$(grep -rInE --include='*.py' --include='*.md' --include='*.js' "${LEAK_PATTERN}" "${CLONE_DIR}" \
+            --exclude-dir='.venv' --exclude-dir='node_modules' 2>/dev/null)"
 
 if [[ -z "${LEAK_HITS}" ]]; then
-    ok "no host-path fragments or private repo names found in *.py/*.md"
+    ok "no host-path fragments or private repo names found in *.py/*.md/*.js"
 else
     LEAK_COUNT="$(printf '%s\n' "${LEAK_HITS}" | grep -c .)"
-    fail "found ${LEAK_COUNT} host-path / private-repo-name leak(s) in *.py/*.md"
+    fail "found ${LEAK_COUNT} host-path / private-repo-name leak(s) in *.py/*.md/*.js"
     printf '%s\n' "${LEAK_HITS}" | sed 's/^/    > /'
 fi
 
