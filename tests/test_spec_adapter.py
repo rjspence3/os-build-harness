@@ -121,6 +121,20 @@ def test_rendered_task_entity_contains_mapped_attributes(spec):
     assert 'Named("TaskList")' in prompt
 
 
+def test_render_nl_entities_task_tracker(spec):
+    # The corrected authoring bridge: natural-language intent for Mentor to author
+    # NATIVELY (verbatim applyModelApiCode C# did not persist on a fresh app).
+    from harness.banking_runner.spec_adapter import render_spec_entities_nl
+    nl = render_spec_entities_nl(spec)
+    assert "Server entity `TaskList`" in nl
+    assert "Server entity `Task`" in nl
+    assert "Text `Title`, max 100 chars (mandatory)" in nl
+    assert "Boolean `IsDone` (mandatory)" in nl                       # mandatory preserved
+    assert "reference `ListId` -> `TaskList` (mandatory)" in nl
+    assert nl.index("`TaskList`") < nl.index("`Task`")               # FK topo order
+    assert "applyModelApiCode" not in nl and "eSpace" not in nl      # NL, not C#
+
+
 def test_rendered_tasklist_entity_title_length(spec):
     manifest = spec_to_entities(spec)
     local_server = {e.name for e in manifest.server_entities}

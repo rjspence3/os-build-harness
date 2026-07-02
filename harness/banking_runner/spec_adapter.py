@@ -126,6 +126,54 @@ def render_spec_entities(app_spec: dict, recipes_dir=DEFAULT_RECIPES_DIR) -> str
     return "\n\n".join(parts)
 
 
+def render_spec_entities_nl(app_spec: dict) -> str:
+    """Render the entity layer as precise NATURAL-LANGUAGE authoring instructions for
+    Mentor to author NATIVELY — not applyModelApiCode C#.
+
+    Live finding (2026-07-02): on a from-scratch app, verbatim `applyModelApiCode`
+    edits reported success in-turn but did NOT persist to the publishable model, while
+    Mentor's own native (NL-driven) entity authoring committed reliably. So the
+    generalized runner's authoring BRIDGE is natural-language intent, not rendered C#.
+    The deterministic parse (`spec_to_entities` + FK topological order) is reused
+    verbatim; only the output format changes. Deterministic, offline, no MCP.
+    """
+    manifest = spec_to_entities(app_spec)
+    static_names = {e.name for e in manifest.static_entities}
+    ordered = list(manifest.static_entities) + topologically_order_server_entities(
+        manifest.server_entities
+    )
+    out = [
+        "Author this OutSystems data model natively (create each entity, then add its "
+        "attributes). Author the entities in the order below so references resolve. "
+        "Each entity gets an auto-number Long Integer `Id` primary key. Add ONLY the "
+        "attributes listed — nothing extra. Publish when done.",
+        "",
+    ]
+    for i, ent in enumerate(ordered, 1):
+        kind = "Static" if ent.name in static_names else "Server"
+        out.append(f"{i}. {kind} entity `{ent.name}`:")
+        for a in ent.attributes:
+            out.append(f"   - {_nl_attribute(a)}")
+        if ent.name in static_names and getattr(ent, "records", None):
+            out.append(f"   - Seed records (by identifier): {', '.join(ent.records)}")
+        out.append("")
+    return "\n".join(out).rstrip() + "\n"
+
+
+def _nl_attribute(a: Attribute) -> str:
+    """One human-readable authoring line for an attribute."""
+    dt = a.data_type
+    mand = " (mandatory)" if a.is_mandatory else ""
+    if dt.endswith(" Identifier"):
+        target = dt[: -len(" Identifier")]
+        return f"reference `{a.name}` -> `{target}`{mand}"
+    if dt == "Text" and a.length:
+        return f"Text `{a.name}`, max {a.length} chars{mand}"
+    if dt == "Decimal" and a.length:
+        return f"Decimal `{a.name}` ({a.length},{a.decimals or 0}){mand}"
+    return f"{dt} `{a.name}`{mand}"
+
+
 # ─── internals ──────────────────────────────────────────────────────────────────
 
 def _adapt(app_spec: dict) -> tuple[EntitiesManifest, list[str]]:
