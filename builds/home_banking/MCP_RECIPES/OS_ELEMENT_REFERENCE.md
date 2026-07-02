@@ -1,4 +1,3 @@
-~/Development/kyleAccounts/scripts/os_element_reflect/Program.cs(66,61): warning CS8619: Nullability of reference types in value of type 'Type?[]' doesn't match target type 'Type[]'. [~/Development/kyleAccounts/scripts/os_element_reflect/os_element_reflect.csproj]
 # OS Element Authoring Reference
 
 Reflection-derived from the installed ODC Studio .NET assemblies via

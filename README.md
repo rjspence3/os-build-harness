@@ -62,25 +62,6 @@ HARNESS_DECISIONS.md # the architectural decision log
 ROADMAP.md           # where this is headed (generalizing the runner into a spec-driven harness)
 ```
 
-```
-harness/
-  banking_runner/    # the recipe runner — renders recipes → Mentor MCP batches, tracks state
-  schemas/           # app_spec.v0.json — the spec schema for spec-driven builds
-  cdp_helpers.py     # CDP (Chrome DevTools) connection helpers for runtime capture
-  capture.py verify.py prompt_step.py   # harness-capture / harness-verify / harness-prompt-step
-  CLAUDE.md          # SHARED DOCTRINE — the build loop, walls protocol, authoring patterns
-builds/
-  home_banking/      # build #0 — the reference clone (OutSystems demo app)
-    MCP_RECIPES/     # the recipe library + DISPATCH_PLAYBOOK + RUNBOOK + per-app captures
-    theme/
-  _template/         # starting point for a new build root
-assets/              # shared OutSystems UI / FontAwesome / ECharts bundle (vendored, see LICENSEs)
-scripts/             # build_banking.py (entrypoint) + render/diff/capture tooling
-tests/               # banking_runner unit tests
-HARNESS_DECISIONS.md # the architectural decision log
-ROADMAP.md           # where this is headed (generalizing the runner into a spec-driven harness)
-```
-
 ## Two build modes
 
 The harness supports two ways of defining "the source of truth" — a build root's own
@@ -118,19 +99,24 @@ python scripts/build_banking.py --app core --dry-run --out /tmp/hb_run
 harness-verify examples/task_tracker/app_spec.json --phase spec   # validate a spec, offline
 ```
 
-To go **live**, configure your tenant, then drive a build from a Claude Code session:
+To go **live** you need an OutSystems ODC tenant with the **Mentor MCP** enabled
+(it may be in preview — confirm on your tenant). Register the MCP once, then run one
+build session per app:
 
 ```bash
-cp .env.example .env
-# edit .env → set OUTSYSTEMS_MCP_TENANT=<your-tenant>.outsystems.dev
+# 1. register the OutSystems Mentor MCP (user scope); endpoint = your tenant's host:
+claude mcp add --transport http outsystems https://<your-tenant>.outsystems.dev/mcp -s user
 
-# scaffold builds/my_app/ from the example spec and start a build session:
+# 2. scaffold builds/my_app/ from the example spec and start a build session IN it:
 harness/launch_build.sh my_app examples/task_tracker
 ```
 
-Authenticate the `outsystems` MCP server in that session and drive the loop per
+Inside that session run `/mcp` to complete the OAuth login, then drive the loop per
 **`harness/CLAUDE.md`** + **`builds/home_banking/MCP_RECIPES/DISPATCH_PLAYBOOK.md`**.
-**See [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) for the full walkthrough.**
+**Run model:** one Claude Code session per build, cwd = `builds/<app>/` — that's where
+the doctrine, the wall-cap, your MCP auth, and the captured run all apply; no central
+orchestrator needed. **See [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) for
+the full walkthrough** (incl. the Mentor-MCP access caveat).
 
 ## The method, in one breath
 

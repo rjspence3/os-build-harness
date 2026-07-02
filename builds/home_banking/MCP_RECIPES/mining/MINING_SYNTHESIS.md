@@ -27,7 +27,7 @@ Three distinct failure classes — each previously conflated:
 
 ### P0 — bake now (each <30 min, all offline)
 
-1. **chrome_wrap v12: constructible globalKeys.** osMCP proved globalKey = `<producerModulePrefix>*<elementKey>`. Add `module_prefix` per producer to library_element_keys.yaml; emit literal `eSpace.AddDependency(Services.ModelServices.ParseGlobalKey("<prefix>*<elementKey>"))` lines in IMPORT PREREQUISITES. Removes getWebBlock round-trips AND the last Mentor-judgment surface in reference wiring.
+1. **chrome_wrap v12: constructible globalKeys.** The MCP retest proved globalKey = `<producerModulePrefix>*<elementKey>`. Add `module_prefix` per producer to library_element_keys.yaml; emit literal `eSpace.AddDependency(Services.ModelServices.ParseGlobalKey("<prefix>*<elementKey>"))` lines in IMPORT PREREQUISITES. Removes getWebBlock round-trips AND the last Mentor-judgment surface in reference wiring.
 
 2. **PROMPT_PREAMBLE: CS1061 anti-hallucination table.** Top hallucinated members with corrections (`.Name` on ITypeSignature → use reflection `.DisplayName`; `IMobileWidget` → `IMobileWidgetSignature`; `.AutoNumber` → `IsAutoNumber`; `eSpace.Actions` → `.ServerActions`/`.ServiceActions`; `Reference.MobileBlocks` → `GetAllDescendantsOfType<IMobileBlockSignature>()`; `.Append()` → `ListAppend`; `TryParseKey` is `out` not `ref`). 251 compile errors say this table pays for itself in one batch.
 

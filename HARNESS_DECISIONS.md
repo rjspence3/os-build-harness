@@ -71,7 +71,7 @@ P1 is relaxed accordingly.)
 ## D3 — `integrations` taxonomy is minimal v1, grounded in home_banking — 2026-06-16
 
 **Decision.** The `app_spec` v1 `integrations` block models **only the connector kinds
-home_banking actually uses** (likely REST), derived from mentorMCP `context_connections` findings.
+home_banking actually uses** (likely REST), derived from the MCP doctrine notes' `context_connections` findings.
 Widen in later schema versions.
 
 **Why.** Avoid speculative schema surface. Ground the first cut in the one real reference app rather

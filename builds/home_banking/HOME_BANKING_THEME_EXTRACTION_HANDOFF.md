@@ -356,7 +356,7 @@ This is the next prompt (see § Next prompt to run).
 1. **Image partition**: which of Portal's 25 images are theme-shape vs banking-shape? Defer until execution phase — running Mentor on this is cheap. Sketch a brand-vs-generic classification turn before step 9.
 2. **CSS partition strategy**: confirm whole-copy is right, or selective-extract if banking-branded rules cause visual bleeding. Decide after the first test render with the new library against a non-banking consumer.
 3. **Library naming**: `Theme_Foundation` is a placeholder. Confirm with user — possible alternatives: `Reactive_Foundation`, `OutSystems_Foundation`, `Branded_Foundation`. Same for `Theme_Chatbot`.
-4. **Consumer for testing**: which app gets re-themed first to validate the extraction? Likely a kyleAccounts cohort prototype. Confirm with user.
+4. **Consumer for testing**: which app gets re-themed first to validate the extraction? Likely a cohort prototype app. Confirm with user.
 5. **`HBIcon` deprecation path**: long-term, banking apps should also migrate to the new `Icon` block. Out of scope for this extraction, but worth flagging in `Agents Common Resources`.
 
 ---

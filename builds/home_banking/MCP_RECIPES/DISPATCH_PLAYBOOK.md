@@ -205,7 +205,7 @@ into a 30s plan that already accounts for the live state.
 7. Wait 35s, publish_status — expect Finished
 ```
 
-**The two-step reference contract (osMCP B2-rerun, 2026-06-10)**: `addReferenceToElements` returning `null` only STAGES the import. The reference materializes after `applyModelApiCode` runs `eSpace.AddDependency(Services.ModelServices.ParseGlobalKey("<globalKey>"))` per element (globalKey from `getWebBlock`'s stub). Both steps are required.
+**The two-step reference contract (MCP retest B2-rerun, 2026-06-10)**: `addReferenceToElements` returning `null` only STAGES the import. The reference materializes after `applyModelApiCode` runs `eSpace.AddDependency(Services.ModelServices.ParseGlobalKey("<globalKey>"))` per element (globalKey from `getWebBlock`'s stub). Both steps are required.
 
 **VERIFICATION (MANDATORY before Phase 1)**:
 ```
@@ -213,11 +213,11 @@ app_refs({key: <APP>}) — must contain every producer required for downstream p
 ```
 If any required producer is missing → HALT, document specific missing producer.
 
-**Publish-shape gate (osMCP Q23/O01 — #1 scale blocker)**: entities with a custom (non-platform) `IdentifierAttribute` shape author fine in-session but CRASH publish at DB-script generation (`OS-BEW-CODE-50008` / `OS-RDBS-GEN-40002`). Renderer's `Id` LongInteger AutoNumber shape conforms. Before any entity phase on a new manifest: publish ONE entity in isolation first to confirm the shape deploys, then batch the rest.
+**Publish-shape gate (MCP retest Q23/O01 — #1 scale blocker)**: entities with a custom (non-platform) `IdentifierAttribute` shape author fine in-session but CRASH publish at DB-script generation (`OS-BEW-CODE-50008` / `OS-RDBS-GEN-40002`). Renderer's `Id` LongInteger AutoNumber shape conforms. Before any entity phase on a new manifest: publish ONE entity in isolation first to confirm the shape deploys, then batch the rest.
 
 **Freshness gate**: `context_*` staleness is >4 min post-publish (NOT ~30s). Gate phase verification on `app_info.revision`/`modelDigest` first; treat context_search presence as eventual confirmation only.
 
-**Concurrency lock**: concurrent Mentor sessions on one app silently fork — last publish wins with no warning (osMCP Q20). ONE in-flight Mentor session per app, always.
+**Concurrency lock**: concurrent Mentor sessions on one app silently fork — last publish wins with no warning (MCP retest Q20). ONE in-flight Mentor session per app, always.
 
 ---
 

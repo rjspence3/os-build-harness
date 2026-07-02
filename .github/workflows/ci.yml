@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run unit tests
+        run: pytest -q
+
+      - name: Validate example spec (offline, --phase spec)
+        run: harness-verify examples/task_tracker/app_spec.json --phase spec
+
+      # cloneproof clones the checked-out repo into a fresh, differently-named
+      # temp dir, rebuilds a venv, reruns the suite + banking CLI, and greps for
+      # host-path / private-repo-name leaks. It runs fully headless (no
+      # interactive or git-remote steps): SOURCE_REPO defaults to the repo root.
+      - name: Clone-cleanliness gate (cloneproof)
+        run: bash scripts/cloneproof.sh

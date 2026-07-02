@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "buildharness"
+name = "os-build-harness"
 version = "0.1.0"
 description = "Spec-driven OutSystems build harness (orchestrator tool belt + banking_runner)."
 requires-python = ">=3.11"

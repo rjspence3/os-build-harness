@@ -1,11 +1,11 @@
-# buildHarness
+# os-build-harness
 
 Build harness for cloning/regenerating OutSystems apps via the Mentor MCP. Consumes app specs
-(today: hand-authored recipe libraries; future: specs produced by the `kyleCohorts` spec factory)
+(today: hand-authored recipe libraries; future: specs produced by a spec factory)
 and drives a recipe runner against fresh ODC apps, diffing the result against a known-good original.
 
-Split out of the former `kyleAccounts` monorepo on 2026-06-16. Sibling repos:
-`kyleCohorts` (spec factory) and `mentorMCP` (MCP doctrine / findings).
+This is a curated public export of a private OutSystems build lab. Some notes reference a companion
+spec factory and a set of MCP-doctrine findings that live outside this repo.
 
 ## Layout
 
@@ -39,9 +39,8 @@ python scripts/build_banking.py --list-apps
 python scripts/build_banking.py --app core --dry-run
 ```
 
-Note: 7 tests fail and are PRE-EXISTING (inherited from the monorepo — test-vs-code API drift, e.g.
-`render_fk_resolution_block` returns a 3-tuple while a test unpacks 2). They are NOT migration
-artifacts; fixing them is follow-on work, not part of the split.
+Note: the unit suite is green (`pytest tests/ -q` → 173 passed). The renderers are pure
+(AST → C# string), so the tests run offline with no tenant or live Mentor dispatch.
 
 ## Vendored helper — `cdp_helpers`
 

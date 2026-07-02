@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # ---------------------------------------------------------------------------
 # VENDORED — canonical source: kernel/scripts/cdp_helpers.py
-# Vendored 2026-06-16 during the buildHarness repo split to remove the off-repo
-# dependency and make the repo clone-clean. Sync manually if the kernel copy changes.
-# buildHarness uses only connect_with_retry + is_chrome_available; the rest
+# Vendored 2026-06-16 to remove the off-repo dependency and make the repo
+# clone-clean. Sync manually if the kernel copy changes.
+# This repo uses only connect_with_retry + is_chrome_available; the rest
 # (Gmail/Slack/Substack/Calendar helpers) rides along unused.
 # ---------------------------------------------------------------------------
 """

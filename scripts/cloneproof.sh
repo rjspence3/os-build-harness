@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 #
-# cloneproof.sh — Prove the buildHarness repo is clone-clean.
+# cloneproof.sh — Prove the os-build-harness repo is clone-clean.
 #
 # Clones the repo into a fresh temp dir under a DIFFERENT name (a different
 # path surfaces hardcoded absolute paths), builds a fresh venv, installs deps,
-# runs the test suite + the banking CLI, and greps for hardcoded /Users/rob
-# paths in the cloned *.py. Prints a PASS/FAIL summary and exits nonzero on
-# any defect.
+# runs the test suite + the banking CLI, and greps the cloned *.py/*.md for
+# hardcoded host paths and private sibling-repo names. Prints a PASS/FAIL
+# summary and exits nonzero on any defect.
 #
-# The 7 pre-existing banking-test failures are EXPECTED. A pytest result of
-# "N passed, 7 failed" is treated as SUCCESS; any NEW failure count, an error
-# count, or a collection error is a DEFECT.
+# The full suite is expected GREEN. A pytest result of "N passed" (0 failed)
+# is SUCCESS; any failure, error, or collection error is a DEFECT.
+#
+# SOURCE_REPO can be overridden (e.g. to point at a scratch clone) via env:
+#   SOURCE_REPO=/path/to/repo scripts/cloneproof.sh
+# It defaults to the repo this script lives in.
 #
 # Usage: scripts/cloneproof.sh
 #
@@ -18,15 +21,20 @@ set -uo pipefail
 
 # --- Configuration -----------------------------------------------------------
 
-readonly SOURCE_REPO="~/Development/buildHarness"
-readonly CLONE_DIRNAME="buildHarness_cloneproof"
-readonly EXPECTED_FAILS=7
+# Default the source to the repo this script lives in (portable — no hardcoded
+# host path). Override with the SOURCE_REPO env var when needed.
+readonly SOURCE_REPO="${SOURCE_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+readonly CLONE_DIRNAME="os-build-harness_cloneproof"
+readonly EXPECTED_FAILS=0
 readonly FORBIDDEN_PATH="/Users/rob"
+# Host-path fragments + private sibling-repo names that must never ship in the
+# public repo's *.py/*.md. Extending this guard stops the leak class regressing.
+readonly LEAK_PATTERN='~/Development/|-Users-rob-|kyleCohorts|kyleAccounts|mentorMCP|osMCP|buildHarness'
 
 # --- State -------------------------------------------------------------------
 
 TMP_ROOT=""        # mktemp -d parent; cleaned up on exit
-CLONE_DIR=""       # the actual clone path (TMP_ROOT/buildHarness_cloneproof)
+CLONE_DIR=""       # the actual clone path (TMP_ROOT/os-build-harness_cloneproof)
 declare -a DEFECTS=()   # accumulated defect messages
 
 # --- Helpers -----------------------------------------------------------------
@@ -106,6 +114,7 @@ fi
 # --- Stage 4: pytest ---------------------------------------------------------
 
 step "4. Run pytest tests/ -q (expect: N passed, ${EXPECTED_FAILS} failed)"
+# EXPECTED_FAILS is 0 — the suite is green. Any failure/error is a DEFECT.
 
 PYTEST_OUT="$( cd "${CLONE_DIR}" && "${VENV_PY}" -m pytest tests/ -q 2>&1 )"
 PYTEST_RC=$?
@@ -155,11 +164,11 @@ else
     fail "build_banking.py --list-apps exited ${LISTAPPS_RC} (expected 0)"
 fi
 
-# --- Stage 6: grep for hardcoded absolute paths ------------------------------
+# --- Stage 6: grep for leaked host paths + private repo names ----------------
 
-step "6. Grep clone *.py for hardcoded ${FORBIDDEN_PATH} (expect zero)"
+step "6. Grep clone *.py/*.md for host paths + private repo names (expect zero)"
 
-# Search only tracked-style source; exclude the clone's own venv site-packages.
+# 6a. Hardcoded absolute home path in *.py (original guard).
 HITS="$(grep -rIn --include='*.py' "${FORBIDDEN_PATH}" "${CLONE_DIR}" \
             --exclude-dir='.venv' 2>/dev/null)"
 
@@ -169,6 +178,19 @@ else
     HIT_COUNT="$(printf '%s\n' "${HITS}" | grep -c .)"
     fail "found ${HIT_COUNT} hardcoded ${FORBIDDEN_PATH} reference(s) in *.py"
     printf '%s\n' "${HITS}" | sed 's/^/    > /'
+fi
+
+# 6b. Host-path fragments (~/Development/, -Users-rob-) + private sibling-repo
+#     names in *.py AND *.md — so this whole class of leak cannot regress.
+LEAK_HITS="$(grep -rInE --include='*.py' --include='*.md' "${LEAK_PATTERN}" "${CLONE_DIR}" \
+            --exclude-dir='.venv' 2>/dev/null)"
+
+if [[ -z "${LEAK_HITS}" ]]; then
+    ok "no host-path fragments or private repo names found in *.py/*.md"
+else
+    LEAK_COUNT="$(printf '%s\n' "${LEAK_HITS}" | grep -c .)"
+    fail "found ${LEAK_COUNT} host-path / private-repo-name leak(s) in *.py/*.md"
+    printf '%s\n' "${LEAK_HITS}" | sed 's/^/    > /'
 fi
 
 # --- Stage 7: cleanup is handled by the EXIT trap ----------------------------

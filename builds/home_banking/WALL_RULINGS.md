@@ -6,7 +6,7 @@ bottom with a non-`## WALL-` heading so the hook stops counting them), then proc
 
 ## WALL-001 (Employee FK on HBAccount + LoanRequest) → CORRECTED: FIXABLE via MCP reference-import (NOT a scope cut)
 **Earlier ruling was WRONG** — it cited `odc_mcp_reference_add_studio_only`, which is **SUPERSEDED**: the
-osMCP 2026-06-09 retest RETIRED the reference-add wall. This is the **producer-reference-import pattern**,
+the 2026-06-09 MCP retest RETIRED the reference-add wall. This is the **producer-reference-import pattern**,
 and the MCP can do it (the same flow the chrome_wrap recipes + DISPATCH_PLAYBOOK Phase 0 use):
 `addReferenceToElements` STAGES the import (returns null), then `applyModelApiCode` materializes it with
 `eSpace.AddDependency(Services.ModelServices.ParseGlobalKey("<globalKey>"))` per element; the `globalKey`

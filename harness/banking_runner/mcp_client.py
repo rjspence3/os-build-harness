@@ -153,7 +153,8 @@ class MentorMCP:
 
     # ─── Publish ──────────────────────────────────────────────────────────────
 
-    DEV_ENV_KEY = "3ba8afaa-fc56-4c7a-8704-939086449c7c"  # TODO: read from env_list at startup
+    DEV_ENV_KEY = ""  # your ODC Dev environment key (from env_list); blank by default so no tenant
+    #                   value ships — set it in your fork or pass env_key explicitly. TODO: read from env_list.
 
     async def publish_start(
         self,

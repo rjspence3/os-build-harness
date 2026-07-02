@@ -1,4 +1,4 @@
-<!-- TARGET: buildHarness/builds/_template/CLAUDE.md  (copied to builds/<app>/CLAUDE.md by the launcher) -->
+<!-- TARGET: builds/_template/CLAUDE.md  (copied to builds/<app>/CLAUDE.md by the launcher) -->
 
 # Build: <APP_NAME>
 

@@ -5,9 +5,9 @@ the strategy/context session is separate). Read this, then `MCP_RECIPES/DISPATCH
 `MCP_RECIPES/RUNBOOK.md`. Don't re-derive the process — it's all here.
 
 ## Setup (do first)
-- **cwd** = this dir (`buildHarness/builds/home_banking/`).
+- **cwd** = this dir (`builds/home_banking/`).
 - **Tool belt:** `source ../../.venv/bin/activate` (harness-verify / build_banking resolve from the
-  buildHarness venv; `pip install -e .` already done there). Scripts live at `../../scripts/`.
+  repo venv; `pip install -e .` already done there). Scripts live at `../../scripts/`.
 - **MCP auth:** run `/mcp` to authenticate the `outsystems` server in THIS session (per-session, expected).
   Confirm with `auth_status` → tenant `your-tenant`.
 - **Re-render the prompts** (the `/tmp` output is ephemeral):
@@ -16,7 +16,7 @@ the strategy/context session is separate). Read this, then `MCP_RECIPES/DISPATCH
 
 ## Keys
 - **Target app** (the clone being built): `harnessbuild_hbcore` = `bf7ed15f-1819-4a65-a6f6-4b5d8528bfd4`
-- **Env**: Development = `3ba8afaa-fc56-4c7a-8704-939086449c7c`
+- **Env**: Development = `<your-dev-env-key>`
 - **Fidelity reference (the ORIGINAL — do NOT build from it, verify against it):**
   Home Banking Core = `695efc5b-8f39-4a53-8d71-35c59097d245`; Portal = `fa7ab595-f8cd-4140-8826-2acc484727b6`.
   Visual captures: `MCP_RECIPES/apps/home_banking/_raw/` + `compare/`.
@@ -74,7 +74,7 @@ WALL-003 is now NEUTRALIZED (parent FKs restored @ rev 17) so screen-phase joins
    **Subagent MUST return: `runId`, `mentor_session_id`, `mentor_session_token`, compilationErrors, what-it-built.**
    (The runId is required for cancel — last session it was omitted and had to be transcript-grepped.)
 2. **Never cancel a mutation before terminal** (rolls it back). Let authoring finish `succeeded`.
-3. **Publish from here:** `publish_start(session_id, token, env_key=3ba8afaa…)` → poll `publish_status` to `Finished`.
+3. **Publish from here:** `publish_start(session_id, token, env_key=<your-dev-env-key>)` → poll `publish_status` to `Finished`.
 4. **`mentor_cancel(runId)`** — EVERY session, after publish (RUNBOOK §1 cap hygiene). Bulk-cancel on `per_tenant_cap_reached`.
 5. **Verify** before advancing (validate-before-advance).
 

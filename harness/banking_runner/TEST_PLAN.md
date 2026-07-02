@@ -6,7 +6,7 @@ running the full rebuild. Each tier depends on the previous tier passing.
 ## Test target
 
 Primary: **TestRunnerSandbox** (`6d7a3257-4a75-4341-92ed-c9f7efc40584`) on
-Development env (`3ba8afaa-fc56-4c7a-8704-939086449c7c`). Already has:
+Development env (`<your-dev-env-key>`). Already has:
 - ChartDataOption (static, 3 records)
 - HBBranch (server, 7 attrs)
 - HBCustomer (server, 21 attrs + 2 FKs)

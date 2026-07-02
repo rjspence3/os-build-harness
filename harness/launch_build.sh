@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TARGET: buildHarness/harness/launch_build.sh
+# TARGET: harness/launch_build.sh
 #
 # Scaffolds builds/<app>/ and starts the build. The build runs as a normal Claude Code session
 # in the build root — the same operational pattern banking_runner ran under — with CC as the
@@ -24,7 +24,7 @@ RUN_MODE="${RUN_MODE:-session}"
 APP="${1:?usage: launch_build.sh <app-name> [spec-path]}"
 SPEC_SRC="${2:-}"
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # buildHarness/
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo root
 BUILD="$ROOT/builds/$APP"
 TEMPLATE="$ROOT/builds/_template"
 

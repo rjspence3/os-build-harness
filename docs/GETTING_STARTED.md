@@ -80,17 +80,42 @@ If those four work, your install is good.
 
 ---
 
-## 2. Connect your ODC tenant
+## 2. Connect the OutSystems Mentor MCP
+
+The harness authors your app through OutSystems' **Mentor MCP** — an ODC-hosted
+remote MCP server that is the *only* thing that writes to your app. To use it you
+need **(a)** an OutSystems ODC tenant and **(b)** the Mentor MCP enabled on it.
+(The Mentor MCP is an ODC capability; confirm it is available on your tenant — it
+may be in preview / limited release.)
+
+Its endpoint is your tenant's control-plane host,
+`https://<your-tenant>.outsystems.dev/mcp`. Register it once at **user scope** so
+every build session can see it:
+
+```bash
+claude mcp add --transport http outsystems https://<your-tenant>.outsystems.dev/mcp -s user
+```
+
+Then, **inside a Claude Code session, run `/mcp`** and complete the OAuth login in
+your browser (against your tenant). Confirm it connected:
+
+```bash
+claude mcp get outsystems   # → Status: ✔ Connected · Type: http
+```
+
+Optionally, for the `banking_runner` / CDP-capture scripts, also set the tenant in `.env`:
 
 ```bash
 cp .env.example .env
-# edit .env:
-#   OUTSYSTEMS_MCP_TENANT=<your-tenant>.outsystems.dev
+# edit .env → OUTSYSTEMS_MCP_TENANT=<your-tenant>.outsystems.dev
 ```
 
-Then, **inside a Claude Code session**, authenticate the `outsystems` MCP server
-(e.g. `/mcp`) so the session can author against your tenant. The build loop reads
-this MCP — see [`harness/CLAUDE.md`](../harness/CLAUDE.md) for the exact mechanics
+**How you run a build (the model):** **one Claude Code session per build, with its
+cwd inside `builds/<app>/`** — exactly what `launch_build.sh` (next section) gives you.
+You do **not** need a central orchestrator: the build's doctrine
+(`builds/<app>/CLAUDE.md` → `@import harness/CLAUDE.md`), the wall-cap safety hook,
+your authenticated MCP, and the run's captured state all key off that working
+directory. See [`harness/CLAUDE.md`](../harness/CLAUDE.md) for the loop mechanics
 (turn size, publish-per-turn, cap hygiene, read-back-lag polling).
 
 ---
@@ -120,6 +145,10 @@ Best starting point for a brand-new app. The flow:
    `builds/my_app/CLAUDE.md` (which `@import`s `harness/CLAUDE.md`): take the next
    unit of work from the spec → build it via the MCP → verify with
    `harness-verify <spec> --phase live` → continue or log a wall.
+   *(Note: the `--phase live` executors and `harness-capture` are honest stubs today —
+   they report `not-implemented` rather than silently passing. Until they land, verify
+   built state at runtime yourself: query the MCP / inspect the published app / eyeball
+   the screen. Offline `--phase spec` validation is fully implemented.)*
 
 > The spec-driven runner is still being generalized (see [`ROADMAP.md`](../ROADMAP.md));
 > the doctrine and verifier are the mature parts. Expect to drive more of the loop by

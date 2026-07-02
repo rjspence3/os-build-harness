@@ -1,4 +1,4 @@
-# buildHarness — ROADMAP (gap-fill plan)
+# os-build-harness — ROADMAP (gap-fill plan)
 
 Closes every gap in `STATE.md`, dependency-ordered. Each phase: **Goal · Steps · Depends · Acceptance
 (validate-before-assert) · Repos**. Three keystones gate almost everything: **P1 (the actuator —
@@ -16,15 +16,15 @@ Critical path to a working end-to-end build+grade:
 **Steps.**
 1. Install the D1 launcher (the `RUN_MODE=session|headless` version) over the current `claude -p`-only
    `harness/launch_build.sh`. (`HARNESS_DECISIONS.md` is already in the repo as of the planning pass.)
-2. Fix `kyleCohorts/CLAUDE.md:227` dangling `data/MENTOR_INDEX.md` — repoint to mentorMCP or vendor the
-   index slice.
+2. Fix the spec factory's dangling `data/MENTOR_INDEX.md` reference — repoint to the MCP doctrine notes or
+   vendor the index slice.
 3. Resolve the `app_spec.v0` embedded example: either complete it (add the `transfer` screen) or label it
    "illustrative excerpt, not a conformant spec" so full-verify-fails is expected, not a bug.
 4. Add a one-shot `scripts/cloneproof.sh` (clone→venv→`pip install -r`→gates) so the fresh-clone debt has
    a repeatable artifact instead of a notes claim.
 **Depends.** none. **Acceptance.** `launch_build.sh` has no `claude -p` in `session` mode; grep finds no
 dangling MENTOR_INDEX; `harness-verify` on the example exits as the chosen policy dictates; `cloneproof.sh`
-exits 0. **Repos.** buildHarness, kyleCohorts.
+exits 0. **Repos.** this repo, the spec factory.
 
 ## P1 — The actuator: `.mcp.json` + ODC MCP connectivity (KEYSTONE; ~1 day)
 **Goal.** A real, configured ODC MCP server the harness (and `harness-verify` live) can call.
@@ -37,7 +37,7 @@ exits 0. **Repos.** buildHarness, kyleCohorts.
 2. Smoke a read (e.g. `context_entities`) against a known app to confirm auth + reachability.
 3. Confirm `_mcp_configured()` in `verify.py` flips to true and the wall-cap hook still matches `mcp__.*`.
 **Depends.** P0. **Acceptance.** a scripted `context_entities` read returns rows; `harness-verify --phase
-live` on a spec now reports `not-implemented` (configured) rather than `unconfigured`. **Repos.** buildHarness.
+live` on a spec now reports `not-implemented` (configured) rather than `unconfigured`. **Repos.** this repo.
 
 ## P1.5 — Ground-truth reverse-build + channel calibration (~3–5 days)
 **Goal.** Reverse home_banking's structural spec from the live OML via the MCP, and use it to (a) find
@@ -52,20 +52,20 @@ what `app_spec` can't yet express and (b) **empirically** classify each assertio
    `mcp` / `capture` / `unverifiable` **with per-kind evidence**. This CALIBRATES (confirms or revises)
    `verify.py`'s current findings-based `LIVE_CHANNELS` scaffold — empirical result wins over the guess.
 **Depends.** P1. **Acceptance.** a structural `app_spec` reversed from home_banking; the schema-gap list;
-the channel map with per-kind evidence. **Repos.** buildHarness (+ mentorMCP read-only for findings cross-ref).
+the channel map with per-kind evidence. **Repos.** this repo (+ the MCP doctrine notes, read-only, for findings cross-ref).
 
 ## P2 — app_spec v1: `integrations` + close the schema gaps (~1–2 days)
 **Goal.** The spec expresses what P1.5 found the OML needs (incl. external systems), and the contract is
 stable enough for P4 to target.
 **Steps.**
 1. Add fields from P1.5's **schema-gap list**, plus an `integrations` block — **minimal v1: only the
-   connector kinds home_banking uses (likely REST)** per **[HD D3]**, derived from mentorMCP
-   `context_connections`. Widen later.
+   connector kinds home_banking uses (likely REST)** per **[HD D3]**, derived from the MCP doctrine notes'
+   `context_connections` findings. Widen later.
 2. Extend cross-ref checks (integration refs resolve); classify any integration assertion's channel from
    P1.5's channel map.
 3. Bump `specVersion` → `0.2`; update `harness-verify` + tests.
 **Depends.** P1.5 (schema-gap list). **Acceptance.** new `test_verify.py` cases pass; an integrations-bearing
-spec validates; integration-assertion channel cited to the P1.5 map. **Repos.** buildHarness.
+spec validates; integration-assertion channel cited to the P1.5 map. **Repos.** this repo.
 
 ## P3 — harness-verify LIVE executors, mcp channel (~2–3 days) — parallel to P4/P5
 **Goal.** Actually verify the structural half against a built ODC app.
@@ -74,15 +74,15 @@ spec validates; integration-assertion channel cited to the P1.5 map. **Repos.** 
    entityExists + attribute via `context_entities` `additionalData.attributes`; more if P1.5 shows them
    OML-readable).
 2. Map assertion result → `pass`/`fail`; wire exit codes (0 all-pass / 1 any-fail / 3 inconclusive).
-3. File an `mcp-wall` in mentorMCP **only for the kinds P1.5 empirically shows the platform cannot read**
-   (no pre-filing — the channel map decides).
+3. File an `mcp-wall` in the MCP doctrine notes **only for the kinds P1.5 empirically shows the platform
+   cannot read** (no pre-filing — the channel map decides).
 **Depends.** P1, P1.5. **Acceptance.** `--phase live` against a real app with a known entity → `pass`;
 wrong-dataType spec → `fail` exit 1; behind a `@pytest.mark.live` gate (skipped without `.mcp.json`).
-**Repos.** buildHarness (+ mentorMCP wall entry only if P1.5 warrants).
+**Repos.** this repo (+ an MCP doctrine-notes wall entry only if P1.5 warrants).
 
 ## P4 — Spec-creation phase: interview → app_spec (KEYSTONE, long pole; ~1–2 weeks)
 **Goal.** A human-approved `app_spec` produced by an interactive CC spec session **in the build root** —
-the build seam (per D1). The contract allows two producers — kyleCohorts cohort-specs and the harness
+the build seam (per D1). The contract allows two producers — the spec factory's cohort-specs and the harness
 interview-specs; **this phase is the harness interview producer**.
 **Steps.**
 1. Build the interview flow (a harness command/skill run in the build root): elicit app/roles → data model
@@ -91,10 +91,10 @@ interview-specs; **this phase is the harness interview producer**.
    the interview can't produce an invalid spec.
 3. Human-approval gate per **[HD D4]**: writes `builds/<app>/spec/APPROVED`; `launch_build.sh` refuses the
    build phase without it. Approved spec is the handoff.
-4. Re-seed **kyleCohorts** memory with the ODC-UI/theme/spec subset from mentorMCP (closes the under-seed debt).
+4. Re-seed **the spec factory's** memory with the ODC-UI/theme/spec subset from the MCP doctrine notes (closes the under-seed debt).
 **Depends.** P2 (schema target). **Acceptance.** an interview session produces an `app_spec` that passes
 `harness-verify --phase spec` clean; approval writes the marker; `launch_build.sh <app>` honors it.
-**Repos.** buildHarness (+ kyleCohorts for the P4.4 memory re-seed only).
+**Repos.** this repo (+ the spec factory for the P4.4 memory re-seed only).
 
 ## P5 — Design layer (FOLDED INTO SPEC CREATION per HD D10): reference → theme/mockups
 **Goal.** The spec carries an intended visual layer; design tokens drive the ODC theme. **Per HD D10 this
@@ -108,7 +108,7 @@ layer.** Design SOURCE depends on app type: **known app → reference screenshot
 3. Link each `screen.mockupRef` to its Figma frame (the advisory-diff reference for P6).
 **Depends.** P4 step 1 (the structural spec exists to lay out). **Acceptance.** a spec's screens have Figma
 frames + a generated `portal.css`; tokens round-trip to ODC theme variables on a test build. **Repos.**
-buildHarness (+ tooling).
+this repo (+ tooling).
 
 ## P6 — harness-capture: CDP visual diff vs Figma frame (~3–4 days)
 **Goal.** Implement the advisory (non-gating) visual channel.
@@ -117,7 +117,7 @@ buildHarness (+ tooling).
    parity method); diff vs the Figma frame using `scripts/pixel_diff.py`; emit a match% (advisory).
 2. Honest exit semantics: visual is NEVER gating (structure-first per harness doctrine).
 **Depends.** P1 (built app reachable) + P5 (frames). **Acceptance.** capture a known screen → match% vs its
-frame, written as advisory; no exit-1 on visual mismatch. **Repos.** buildHarness.
+frame, written as advisory; no exit-1 on visual mismatch. **Repos.** this repo.
 
 ## P7 — harness-verify LIVE executors, capture channel (~2–3 days; may shrink)
 **Goal.** Close whatever gating assertion kinds P1.5 routed to `capture`.
@@ -127,13 +127,13 @@ frame, written as advisory; no exit-1 on visual mismatch. **Repos.** buildHarnes
 2. For kinds that remain `capture`: `componentPresent` via rendered-DOM observation (mapping per **[HD D6]**,
    itself contingent on P1.5); `navigates` via CDP click→observe-navigation.
 **Depends.** P1.5 (routing) + P6 (for any capture-routed kind). **Acceptance.** for each capture-routed kind,
-built screen with the feature → `pass`, without it → `fail`. **Repos.** buildHarness.
+built screen with the feature → `pass`, without it → `fail`. **Repos.** this repo.
 
 ## P8 — harness-prompt-step (~2–3 days; anytime after P1)
 **Goal.** Bounded, templated MCP build sub-steps (cheaper than free-form for repetitive work).
 **Steps.** Harvest the recurring build steps that emerge from P1.5/P3 builds; template them against the MCP;
 expose as `harness-prompt-step <template> <args>`. **Depends.** P1 + some build experience. **Acceptance.**
-one real templated step (e.g. create-entity-from-spec) runs deterministically against the MCP. **Repos.** buildHarness.
+one real templated step (e.g. create-entity-from-spec) runs deterministically against the MCP. **Repos.** this repo.
 
 ## P9 — Grading test: Mentor × Figma on home_banking (CAPSTONE; ~1 week)
 **Goal.** Prove the full loop on a known-good target, graded honestly against the P1.5 ground truth.
@@ -153,10 +153,10 @@ spec; a written grade report (structural pass-rate + advisory visual match); blo
 ---
 
 ## Cross-cutting (slot into the phases above)
-- **Memory re-seed** for kyleCohorts → folded into P4.4.
-- **Fresh-clone CI** (`cloneproof.sh`) → created in P0, run on every buildHarness change.
-- **mcp-wall filings** → driven by P1.5's channel map: file in mentorMCP only the kinds P1.5 empirically
-  shows the platform can't read. No pre-filing.
+- **Memory re-seed** for the spec factory → folded into P4.4.
+- **Fresh-clone CI** (`cloneproof.sh`) → created in P0, run on every change to this repo.
+- **mcp-wall filings** → driven by P1.5's channel map: file in the MCP doctrine notes only the kinds P1.5
+  empirically shows the platform can't read. No pre-filing.
 - **Wall-cap + WALLS.md feedback to spec factory** — when builds hit `spec-gap` walls (P1.5/P3/P9), route
   them back to P4's interview as spec-quality signal (the doctrine already says spec-gap walls are factory signal).
 

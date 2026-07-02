@@ -34,7 +34,7 @@ def compute_global_key(producer_key: str, element_key: str) -> str:
     `Kn_hixxDWEm4lMd7mIpycQ*jGWcpKjbIEWYM4W62bEUKQ` round-trips exactly from
     assetKey 8be17f2a-431c-4958-b894-c77b988a7271 + elementKey
     a49c658c-dba8-4520-9833-85bad9b11429 (.NET GUID little-endian byte order,
-    urlsafe base64, padding stripped). Source: osMCP B2-rerun extract +
+    urlsafe base64, padding stripped). Source: MCP retest B2-rerun extract +
     Counter probe stub. Makes AddDependency emission fully deterministic —
     no getWebBlock round-trip needed.
     """
@@ -210,7 +210,7 @@ def format_instructions_block(refs: list[ElementRef]) -> str:
     # ── Step 3: AddDependency(ParseGlobalKey) — the load-bearing second half ──
     # v12 (2026-06-10): globalKeys are COMPUTED here (see compute_global_key) so
     # the AddDependency lines are literal — no getWebBlock round-trip, zero
-    # Mentor judgment. Per osMCP B2-rerun: `addReferenceToElements` returning
+    # Mentor judgment. Per the MCP retest B2-rerun: `addReferenceToElements` returning
     # null is EXPECTED (stages the import); the reference only materializes
     # after these AddDependency calls run via applyModelApiCode.
     # NOTE: deliberately NOT a ```csharp fence — scripts/batch_recipes.py's

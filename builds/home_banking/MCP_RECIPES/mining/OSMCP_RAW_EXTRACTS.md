@@ -1,7 +1,7 @@
-# osMCP Retest — Raw Transcript Extracts (verbatim)
+# MCP Retest — Raw Transcript Extracts (verbatim)
 
-Mined 2026-06-10 from `~/.claude/projects/-Users-rob-Development-osMCP/` (2 main sessions + 20 subagent transcripts).
-Source-of-record probe IDs match `~/Development/osMCP/MCP_RETEST_RESULTS_2026-06-09.md`.
+Mined 2026-06-10 from an MCP-capability retest (2 main sessions + 20 subagent transcripts).
+Source-of-record probe IDs match the MCP retest results dated 2026-06-09.
 
 Transcript provenance per extract is noted as `[agent-<id>]`.
 
@@ -362,7 +362,7 @@ Two simultaneous `mentor_start` first-turns against the same app (PROBE_LIFE) bo
 
 ---
 
-## Ready to bake — extract → kyleAccounts recipe mapping
+## Ready to bake — extract → harness recipe mapping
 
 | Extract | Target file | Action |
 |---|---|---|

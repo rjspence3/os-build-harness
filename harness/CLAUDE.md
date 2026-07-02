@@ -1,4 +1,4 @@
-<!-- TARGET: buildHarness/harness/CLAUDE.md  (shared doctrine; each builds/<app>/CLAUDE.md @imports this) -->
+<!-- TARGET: harness/CLAUDE.md  (shared doctrine; each builds/<app>/CLAUDE.md @imports this) -->
 
 # Build Harness — Shared Doctrine
 
@@ -76,7 +76,7 @@ Append to `./WALLS.md` in this exact format (the heading line is what the hard-c
 ```
 
 `<category>` ∈ `spec-gap` (spec ambiguous / incomplete / unbuildable) ·
-`mcp-wall` (ODC MCP can't do this — cross-ref mentorMCP findings) ·
+`mcp-wall` (ODC MCP can't do this — cross-ref the MCP doctrine notes) ·
 `parity-miss` (built, but fails verification) · `needs-human` (only the human can decide).
 
 **Hard cap: at more than 5 OPEN walls a hook halts the session.** When blocked, stop calling the MCP,
@@ -100,8 +100,20 @@ going; only genuinely-open blockers count toward the 5. (Strategy adjudicates `A
   split/rendered as chips; or **(b) a Block-per-row** taking the row id as input + its own aggregate. Default to
   (a). PROVEN authorable via MCP: sidebar app-shells, multi-column kanban (filtered aggregates per column), and
   glyph cells (If-on-value → CSS class) — structure is not the constraint; turn-size + row-correlation are.
+- **Fresh Mentor session per COMMITTING edit.** Start a new `mentor_start` for each edit that must persist.
+  A REUSED session goes **write-wedged after N edits** — it keeps reporting success while silently rolling
+  back, and the published revision never moves. Don't stretch one session across multiple committing turns.
+- **The published REVISION is the only trustworthy "it landed" signal.** Both `change_applied:true` and
+  `no_changes_detected` are unreliable — a turn can claim either and still not have moved the model. Confirm
+  every committing edit by re-publishing and checking `app_info.revision` incremented; treat the tool's own
+  success flags as hints, not proof.
+- **Additions persist; bare property mutations are flaky.** Creating elements/widgets/actions lands reliably.
+  A standalone property mutation (rename, retype, re-point) often silently reverts — carry it with a structural
+  op in the same turn, or delete-and-recreate the element with the desired shape. `.CustomStyle` (the inline
+  `style` attribute) is only honored at widget CREATION — setting it later no-ops; `.Style` (the class
+  attribute) IS client-reactive and can be set post-creation.
 
-**`spec-gap` walls are signal for the spec factory (kyleCohorts), not just local blockers** — write
+**`spec-gap` walls are signal for the spec factory, not just local blockers** — write
 them clearly enough that they can feed back into spec generation.
 
 ## Fall-out pattern: missing external dependency (producer reference)

@@ -126,7 +126,7 @@ Discovery: 2026-06-09 capture run 2. Biggest cost win after warm-session.
 
 `addReferenceToElements({elementKey, producerKey})` returning `null` is EXPECTED — it stages the import. The reference only materializes after a follow-up `applyModelApiCode` call runs `eSpace.AddDependency(Services.ModelServices.ParseGlobalKey("<globalKey>"))` per element. globalKey (NOT the elementKey UUID — different format) comes from `getWebBlock(objectName)`, which returns the verbatim AddDependency stub. Verify via `app_refs` after.
 
-Source: osMCP B2-rerun (`~/Development/osMCP/MCP_RETEST_RESULTS_2026-06-09.md`), memory `[[odc_mcp_addreferencetoelements_silent_noop]]` (corrected). Baked into chrome_wrap v11 IMPORT PREREQUISITES (5-step). The earlier "cache-warm" hypothesis is superseded.
+Source: MCP retest B2-rerun (2026-06-09), corrected. Baked into chrome_wrap v11 IMPORT PREREQUISITES (5-step). The earlier "cache-warm" hypothesis is superseded.
 
 ## Anti-patterns (NEVER do these)
 

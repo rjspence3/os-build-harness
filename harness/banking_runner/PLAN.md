@@ -335,7 +335,7 @@ If a session ends mid-phase, resume by:
 Cross-references that must NOT be lost:
 - TestRunnerSandbox asset_key: `6d7a3257-4a75-4341-92ed-c9f7efc40584`
 - TestRunnerSandbox currently has: HBBranch + HBCustomer + ChartDataOption (already validated via Recipes 01/02)
-- Env keys: Dev = `3ba8afaa-fc56-4c7a-8704-939086449c7c`
+- Env keys: Dev = `<your-dev-env-key>`
 - HomeBankingCore source asset_key (original): `695efc5b-8f39-4a53-8d71-35c59097d245`
 - HomeBankingPortal source: `fa7ab595-f8cd-4140-8826-2acc484727b6`
 - HomeBankingBackoffice source: `555cac1f-af92-4461-9750-b635d6570495`

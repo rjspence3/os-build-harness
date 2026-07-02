@@ -3,7 +3,7 @@
   "$id": "https://nomouthlabs.dev/schemas/app_spec.v0.json",
   "title": "App Build Spec (v0.2)",
   "$comment": "v0.2 (specVersion 0.2) extends v0.1 from the P1.5 live calibration of home_banking (Core rev 6): attributes gain length/decimals/description/references(FK); entities gain isStatic/records/description; screens gain inputParameters/uiFlow; a minimal optional `integrations` block is added. NOTE: dataType enum stays camelCase (LongInteger etc.) while live ODC reports space-form ('Long Integer') — harness-verify's mcp executor normalizes; the spec's authored form is camel. The embedded example (examples[0]) is an ILLUSTRATIVE EXCERPT, not a complete spec: a single-screen excerpt whose navigation/navigates reference a 'transfer' screen it never defines, so it passes JSON-Schema validation but FAILS full harness-verify cross-ref. EXPECTED, not a bug. Do NOT 'complete' the example by adding the transfer screen.",
-  "description": "Contract between the spec factory (kyleCohorts) and the build harness. kyleCohorts EMITS a document conforming to this. harness-verify VALIDATES a spec against this schema BEFORE building (validate-before-assert) — a spec that fails validation is a spec-gap wall up front, not a mid-build failure — then checks the built ODC app against each screen's acceptance assertions. Only describe what the ODC MCP can actually build: the dataType and componentType enums ARE the buildable surface.",
+  "description": "Contract between the spec factory and the build harness. The spec factory EMITS a document conforming to this. harness-verify VALIDATES a spec against this schema BEFORE building (validate-before-assert) — a spec that fails validation is a spec-gap wall up front, not a mid-build failure — then checks the built ODC app against each screen's acceptance assertions. Only describe what the ODC MCP can actually build: the dataType and componentType enums ARE the buildable surface.",
   "type": "object",
   "required": ["specVersion", "app", "dataModel", "screens"],
   "additionalProperties": false,
@@ -33,7 +33,7 @@
 
   "$defs": {
     "odcDataType": {
-      "description": "ALLOW-LIST = buildable surface for attribute types. Complete/trim from the ODC catalog in mentorMCP. Anything outside this set is, by construction, a spec-gap.",
+      "description": "ALLOW-LIST = buildable surface for attribute types. Complete/trim from the ODC catalog in the MCP doctrine notes. Anything outside this set is, by construction, a spec-gap.",
       "enum": ["Text", "Integer", "LongInteger", "Decimal", "Currency", "Boolean", "Date", "Time", "DateTime", "Email", "PhoneNumber", "Identifier", "BinaryData"]
     },
     "odcComponentType": {
@@ -180,7 +180,7 @@
         "does": {
           "type": "array",
           "items": { "enum": ["CreateEntity", "UpdateEntity", "DeleteEntity", "Navigate", "RunServerLogic", "ShowFeedback"] },
-          "description": "Coarse step kinds. Refine against the ODC logic surface in mentorMCP as the verifier matures."
+          "description": "Coarse step kinds. Refine against the ODC logic surface in the MCP doctrine notes as the verifier matures."
         }
       }
     },

@@ -14,8 +14,8 @@ Two phases, matching app_spec.v0.json's contract:
 
   live phase (SCAFFOLDED) — check the built ODC app against each screen's
     acceptance assertions. One handler per assertion kind routes to a channel
-    (mcp | capture | unverifiable). The channel per kind is GROUNDED in mentorMCP's
-    ODC findings, not assumption (see LIVE_CHANNELS citations). Actual MCP/CDP reads
+    (mcp | capture | unverifiable). The channel per kind is GROUNDED in the MCP
+    doctrine notes' ODC findings, not assumption (see LIVE_CHANNELS citations). Actual MCP/CDP reads
     are gated behind a real .mcp.json and are not implemented yet, so the phase
     currently returns unconfigured/not-implemented/unverifiable per assertion and
     never a silent pass.
@@ -344,7 +344,7 @@ def validate_spec(spec: dict) -> list[Finding]:
 
 
 # ── Live phase: assertion-kind -> channel dispatch ──────────────────────────
-# Channel per kind is GROUNDED in mentorMCP/data ODC findings, NOT assumed.
+# Channel per kind is GROUNDED in the MCP doctrine-notes ODC findings, NOT assumed.
 # Channels: "mcp" (an established context_* read path returns the fact) ·
 # "capture" (only observable on the rendered screen via CDP) · "unverifiable"
 # (findings establish NO read path — never passes; exit 3).

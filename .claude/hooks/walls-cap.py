@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# TARGET: buildHarness/.claude/hooks/walls-cap.py   (chmod +x)
+# TARGET: .claude/hooks/walls-cap.py   (chmod +x)
 #
 # PreToolUse hook, registered against the ODC MCP tools in .claude/settings.json.
 # Halts a build session once ./WALLS.md accumulates MORE THAN 5 OPEN walls, so the loop

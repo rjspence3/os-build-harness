@@ -33,7 +33,7 @@ Portal/Backoffice reference topology is not clone-ready — points at the ORIGIN
   Core key or fill producer keys is a recipe change (don't freestyle — recipes are the hardened plan).
 - needs: (a) redirect Portal/Backoffice Core reference to `bf7ed15f` (clone core) — renderer/config param or
   strategy-directed config edit; (b) pin the 4 TBD producer keys (D9 per-producer: decode from the original
-  Portal `fa7ab595`'s reference list, or `context_search` + disambiguate owner app). Feeds kyleCohorts.
+  Portal `fa7ab595`'s reference list, or `context_search` + disambiguate owner app). Feeds the spec factory.
 
 ## WALL-008 [spec-gap]
 Backoffice block capture incomplete — Backoffice visual phase not buildable.

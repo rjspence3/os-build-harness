@@ -1,10 +1,9 @@
 """Test bootstrap. Ensure repo root is on sys.path so `harness.*` imports cleanly.
 
-Trimmed from the original kyleAccounts conftest during the repo split: the
-`pytest_plugins = ["tests.conftest_browser"]` line was dropped (buildHarness has
-no browser tests; loading that plugin would abort collection). REPO_ROOT is
-computed relative to __file__ — never hardcoded — so tests always exercise THIS
-repo's source, not the kyleAccounts archive.
+Trimmed during the repo export: the `pytest_plugins = ["tests.conftest_browser"]`
+line was dropped (this repo has no browser tests; loading that plugin would abort
+collection). REPO_ROOT is computed relative to __file__ — never hardcoded — so
+tests always exercise THIS repo's source.
 """
 import sys
 from pathlib import Path
