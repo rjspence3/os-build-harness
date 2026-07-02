@@ -113,7 +113,13 @@ def render_spec_entities(app_spec: dict, recipes_dir=DEFAULT_RECIPES_DIR) -> str
     """Render the full entity-authoring batch text for an app_spec: static
     entities first (recipe 02), then server entities in FK-topological order
     (recipe 01). Returns the concatenated Mentor prompt strings. Dry-run only —
-    authors nothing, makes no network/MCP calls."""
+    authors nothing, makes no network/MCP calls.
+
+    NOTE: this emits `applyModelApiCode` C#. Live testing (2026-07-02) showed that
+    verbatim C# does NOT reliably persist on a from-scratch app — use
+    `render_spec_entities_nl` for actual authoring (Mentor native NL, proven to
+    persist + produce a spec-conformant app). This C# render is retained for
+    structure inspection / dry-run review, not as the authoring bridge."""
     manifest = spec_to_entities(app_spec)
     local_server = {e.name for e in manifest.server_entities}
     local_static = {e.name for e in manifest.static_entities}
