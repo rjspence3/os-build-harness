@@ -36,7 +36,8 @@ example:
 - **`live_entities.json`** — the shape of a `context_entities` MCP response (drives
   `entityExists` / `attribute`).
 - **`live_screens.json`** — a structured `applyModelApiCode` screen-walk (the contract
-  for `componentPresent` / `binding` / `navigates`).
+  for `componentPresent` / `binding` / `navigates`). Produce it from a built app with the
+  recipe in [`docs/SCREEN_WALK.md`](../docs/SCREEN_WALK.md).
 
 Both match `app_spec.json`, so all 9 live assertions pass:
 

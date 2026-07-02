@@ -148,7 +148,7 @@ Best starting point for a brand-new app. The flow:
    state via the MCP and hands it to the judge:
    ```bash
    #   entities.json ← the `context_entities` MCP response, saved to a file
-   #   screens.json  ← a read-only applyModelApiCode screen-walk (contract: examples/task_tracker/live_screens.json)
+   #   screens.json  ← a read-only applyModelApiCode screen-walk — recipe: docs/SCREEN_WALK.md
    harness-verify <spec> --phase live --entities entities.json --screens screens.json
    ```
    With the snapshot the executors return real pass/fail; with none the phase is
