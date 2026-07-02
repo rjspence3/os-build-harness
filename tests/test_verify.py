@@ -516,3 +516,28 @@ def test_navigates_matches_when_walk_emits_screen_name() -> None:
     results = run_live_phase(spec, mcp_config=None, screens_snapshot=scrn)
     nav = next(r for r in results if r.kind == "navigates")
     assert nav.status == "pass", nav.detail    # "Detail" (name) resolved to id "detail"
+
+
+def test_binding_matches_via_source_entity() -> None:
+    """A real walk emits the AGGREGATE as boundTo (GetTaskLists.List) plus the resolved
+    sourceEntity (TaskList). An entity-level spec binding matches sourceEntity — no heuristic."""
+    from harness.verify import run_live_phase, load_screens_snapshot
+    walk = {"screens": [{"id": "Issues", "components": [
+        {"id": "issuesTable", "type": "ITableRecords",
+         "boundTo": "GetIssues.List", "sourceEntity": "Issue"}, {"id": "newBtn"}],
+        "navigation": [{"fromComponent": "newBtn", "event": "onClick", "toScreen": "issues"}]}]}
+    results = run_live_phase(_walk_spec(), None, None, load_screens_snapshot(walk))
+    binding = next(r for r in results if r.kind == "binding")
+    assert binding.status == "pass", binding.detail          # spec 'Issue' == sourceEntity 'Issue'
+    assert "matched sourceEntity" in binding.detail
+
+
+def test_binding_wrong_source_entity_still_fails() -> None:
+    """sourceEntity resolution can't paper over a genuinely wrong binding (no false pass)."""
+    from harness.verify import run_live_phase, load_screens_snapshot
+    walk = {"screens": [{"id": "Issues", "components": [
+        {"id": "issuesTable", "type": "ITableRecords",
+         "boundTo": "GetProjects.List", "sourceEntity": "Project"}, {"id": "newBtn"}],
+        "navigation": [{"fromComponent": "newBtn", "event": "onClick", "toScreen": "issues"}]}]}
+    results = run_live_phase(_walk_spec(), None, None, load_screens_snapshot(walk))
+    assert next(r for r in results if r.kind == "binding").status == "fail"

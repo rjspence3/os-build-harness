@@ -94,16 +94,25 @@ ServiceStudio.Plugin.NRWidgets`.
 ## Running it via the Mentor MCP
 
 The Mentor MCP **will not execute user-supplied code verbatim** — it authors and runs its
-own. So instruct it *from a spec* (the emitted C# still prints the JSON, so the result is
-deterministic):
+own read walk from your *intent*. This is capture, not authoring: it reads and prints, and
+persists nothing (live-proven read-only — app revision unchanged after the walk). Instruct
+it from intent, not C#:
 
-> Run a **read-only** `applyModelApiCode` walk of screen `<SCREEN>`. Enumerate the screen's
-> `IMobileWidgetSignature` descendants; type each via `is` checks; read `Name` from the
-> concrete cast (`IMobileWidgetSignature` has no `.Name`). Set `boundTo` from
-> `IList.Source.DisplayName`; capture navigation from `OnClick.Destination as IMobileScreen`.
-> Emit named + typed widgets only. Inline code, string concatenation, no local functions,
-> no `System.` prefix. Print ONE line of JSON between `SCREENWALK_JSON_BEGIN` and
-> `SCREENWALK_JSON_END` in exactly this shape: `{"screens":[{"id":..,"components":[..],"navigation":[..]}]}`.
+> Run a **strictly read-only** `applyModelApiCode` walk of screen `<SCREEN>` — read the model
+> and print JSON only, author nothing. Enumerate the screen's `IMobileWidgetSignature`
+> descendants; type each via `is` checks (include `ITableRecords` for ODC Tables); read `Name`
+> from the concrete cast (`IMobileWidgetSignature` has no `.Name`). For a data-bound widget set
+> `boundTo` from the source aggregate's `DisplayName` (e.g. `GetTaskLists.List`) **and**
+> `sourceEntity` = the entity that aggregate queries (e.g. `TaskList`); else both null. Capture
+> navigation from `OnClick.Destination as IMobileScreen`. Emit named + typed widgets only.
+> Inline code, string concatenation, no local functions, no `System.` prefix. Print ONE line of
+> JSON between `SCREENWALK_JSON_BEGIN` and `SCREENWALK_JSON_END` in exactly this shape:
+> `{"screens":[{"id":..,"components":[{"id","type","boundTo","sourceEntity"}],"navigation":[..]}]}`.
+
+**Stdout fallback (observed live):** the Mentor sandbox's validation pipeline can swallow
+`applyModelApiCode` stdout. Mentor then derives the same JSON from its authoritative
+screen-detail read — identical read-only model data, so the result stays deterministic. Take
+the JSON from between the markers wherever it appears (tool stdout or terminal `result.summary`).
 
 Read the JSON from the `applyModelApiCode` `tool_end` event (`mentor_get_run details=true`
 → `mentor_get_event` on the id if truncated); `mentor_cancel` after `tool_end`. Save between
@@ -124,16 +133,17 @@ exercises offline.
   widgets unnamed → they're skipped by default (or get synthetic `type_<index>` ids under
   `FALLBACK_IDS=true`, which only match spec assertions using that same scheme). **Name the
   widgets your spec asserts on** (`componentPresent`/`binding`).
-- **`boundTo` — extend the cascade for ODC Table widgets (live finding 2026-07-02).** ODC
-  Table widgets are `ITableRecords`, which the base cascade above MISSES — add an
-  `ITableRecords` branch (type `"Table"`, read `.Name`; `boundTo` from the record source's
-  `DisplayName`). `IList` binding is proven via `IList.Source.DisplayName`.
-- **`boundTo` is the AGGREGATE, not the bare entity.** A data widget's live source is an
-  aggregate (`GetTaskLists.List`), not the entity (`TaskList`). So a spec `binding` assertion
-  that names the ENTITY will NOT match unless the walk resolves the aggregate to its source
-  entity (recommended: report the source entity as `boundTo`) — or the spec asserts the
-  aggregate form. (Live-proven: task_tracker `binding` failed `GetTaskLists.List` vs `TaskList`
-  — the build was correct; the walk needs the resolution.)
+- **ODC Table widgets are `ITableRecords` (live-proven 2026-07-02).** The base type cascade
+  MISSES them — include an `ITableRecords` branch (type `"Table"`/`"ITableRecords"`, read
+  `.Name`). `IList` binding is proven via `IList.Source.DisplayName`.
+- **`boundTo` is the AGGREGATE; `sourceEntity` is the resolved entity (both emitted, proven).**
+  A data widget's live source is an aggregate (`GetTaskLists.List`), not the bare entity
+  (`TaskList`). The walk emits BOTH: `boundTo` = the aggregate `DisplayName`, and `sourceEntity`
+  = the entity that aggregate queries, resolved in the walk. `verify._eval_binding` matches a
+  spec `binding` against **either** form — so an entity-level assertion (`TaskList`) passes
+  against an aggregate-bound widget with no fragile name heuristic. Live-proven end-to-end:
+  task_tracker `harness-verify --phase live` scores **9/9, exit 0** (both table bindings match
+  via `sourceEntity`). A wrong `sourceEntity` still fails — no false pass.
 - **Navigation** captures `OnClick.Destination` that resolves to a screen (emit the target as
   the screen name or id — `harness-verify` normalizes both to the spec id). Navigation via a
   screen *action* (Destination null) is intentionally not captured.

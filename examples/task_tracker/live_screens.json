@@ -1,22 +1,25 @@
 {
-  "_comment": "A structured screen-walk snapshot for a BUILT task_tracker app — the shape a read-only applyModelApiCode walk emits (per the contract in harness/verify.py: {id, components:[{id,type,boundTo}], navigation:[{fromComponent,event,toScreen}]}). The orchestrator fetches this via the MCP and feeds it to `harness-verify --phase live --screens`. Matches examples/task_tracker/app_spec.json, so live verify PASSES.",
+  "_comment": "A REAL structured screen-walk snapshot captured from the BUILT task_tracker app via a read-only applyModelApiCode walk (Mentor MCP, 2026-07-02, app specrunner_tasktracker_nl_looptest rev 3). Shape per the contract in harness/verify.py: {id|name, components:[{id,type,boundTo,sourceEntity}], navigation:[{fromComponent,event,toScreen}]}. A data widget's boundTo is the AGGREGATE (GetTaskLists.List); sourceEntity is the entity that aggregate queries (TaskList), resolved IN the walk so an entity-level spec binding matches without a name heuristic. Screen keys are the emitted NAMES (Lists/Tasks); the verifier normalizes name->id. Matches examples/task_tracker/app_spec.json, so `harness-verify --phase live --screens` PASSES 9/9.",
   "screens": [
     {
-      "id": "lists",
+      "id": "Lists",
       "components": [
-        {"id": "listsTable", "type": "Table", "boundTo": "TaskList"},
-        {"id": "openTasksBtn", "type": "Button"}
+        {"id": "listsTable", "type": "ITableRecords", "boundTo": "GetTaskLists.List", "sourceEntity": "TaskList"},
+        {"id": "openTasksBtn", "type": "IButton", "boundTo": null, "sourceEntity": null}
       ],
       "navigation": [
-        {"fromComponent": "openTasksBtn", "event": "onClick", "toScreen": "tasks"}
+        {"fromComponent": "openTasksBtn", "event": "onClick", "toScreen": "Tasks"}
       ]
     },
     {
-      "id": "tasks",
+      "id": "Tasks",
       "components": [
-        {"id": "tasksTable", "type": "Table", "boundTo": "Task"}
+        {"id": "tasksTable", "type": "ITableRecords", "boundTo": "GetTasks.List", "sourceEntity": "Task"},
+        {"id": "addTaskBtn", "type": "IButton", "boundTo": null, "sourceEntity": null}
       ],
-      "navigation": []
+      "navigation": [
+        {"fromComponent": "addTaskBtn", "event": "onClick", "toScreen": "Tasks"}
+      ]
     }
   ]
 }

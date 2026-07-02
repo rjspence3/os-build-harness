@@ -497,8 +497,10 @@ def _eval_attribute(a: dict, snap: dict) -> LiveResult:
 # ── screen-walk executor (componentPresent, binding, navigates) — D12 ────────
 # Consumes a STRUCTURED screen-walk snapshot the orchestrator fetches via a read-only
 # applyModelApiCode walk. Contract per screen (keyed by id or name):
-#   {"id"|"name", "components": [{"id","type"?,"boundTo"?,"groupBy"?,"columns"?}],
+#   {"id"|"name", "components": [{"id","type"?,"boundTo"?,"sourceEntity"?,"groupBy"?,"columns"?}],
 #    "navigation": [{"fromComponent"?,"event"?,"toScreen"}]}
+# boundTo is the aggregate DisplayName (GetTaskLists.List); sourceEntity is the entity
+# that aggregate queries (TaskList), resolved in the walk so entity-level spec bindings match.
 # Pure + deterministic — testable against a saved walk JSON. (The walker in
 # CAPTURE_PLAYBOOK must emit THIS shape; the rev5 narrative walk predates the contract.)
 def load_screens_snapshot(raw) -> dict:
@@ -545,9 +547,19 @@ def _eval_binding(a: dict, screen: dict, snap: dict) -> LiveResult:
         return LiveResult("binding", "mcp", "fail",
                           f"screen '{screen['id']}' component '{a['componentId']}' not in walk")
     live = comp.get("boundTo")
-    ok = live == a["boundTo"]
+    source_entity = comp.get("sourceEntity")
+    spec = a["boundTo"]
+    # A spec binding may name the aggregate (GetTaskLists.List) or the source ENTITY
+    # (TaskList). The read-only walk carries both: boundTo (the aggregate DisplayName)
+    # and sourceEntity (the entity that aggregate queries, resolved in the walk). Match
+    # against either — so an entity-level assertion passes against an aggregate-bound
+    # widget without a fragile name heuristic. sourceEntity is absent on pre-contract
+    # walks; then only the aggregate form matches (backward compatible).
+    ok = spec == live or (source_entity is not None and spec == source_entity)
+    matched = " (matched sourceEntity)" if ok and spec != live else ""
     return LiveResult("binding", "mcp", "pass" if ok else "fail",
-                      f"screen '{screen['id']}' '{a['componentId']}' boundTo live={live!r} spec={a['boundTo']!r}")
+                      f"screen '{screen['id']}' '{a['componentId']}' spec={spec!r} "
+                      f"live boundTo={live!r} sourceEntity={source_entity!r}{matched}")
 
 
 def _eval_navigates(a: dict, screen: dict, snap: dict) -> LiveResult:
