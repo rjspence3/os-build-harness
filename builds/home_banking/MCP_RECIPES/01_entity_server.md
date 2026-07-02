@@ -63,13 +63,15 @@ eSpace => {
         a.Length = length;
         a.IsMandatory = mandatory;
     }
-    void AddBool(OutSystems.Model.Data.IServerEntity ent, string name) {
+    void AddBool(OutSystems.Model.Data.IServerEntity ent, string name, bool mandatory) {
         var a = ent.CreateAttribute(name);
         a.DataType = eSpace.BooleanType;
+        a.IsMandatory = mandatory;
     }
-    void AddInt(OutSystems.Model.Data.IServerEntity ent, string name) {
+    void AddInt(OutSystems.Model.Data.IServerEntity ent, string name, bool mandatory) {
         var a = ent.CreateAttribute(name);
         a.DataType = eSpace.IntegerType;
+        a.IsMandatory = mandatory;
     }
     void AddDecimal(OutSystems.Model.Data.IServerEntity ent, string name, int length, int decimals) {
         var a = ent.CreateAttribute(name);
@@ -97,9 +99,10 @@ eSpace => {
         a.DataType = eSpace.CurrencyType;
         a.IsMandatory = mandatory;
     }
-    void AddBinary(OutSystems.Model.Data.IServerEntity ent, string name) {
+    void AddBinary(OutSystems.Model.Data.IServerEntity ent, string name, bool mandatory) {
         var a = ent.CreateAttribute(name);
         a.DataType = eSpace.BinaryDataType;
+        a.IsMandatory = mandatory;
     }
     void AddEmail(OutSystems.Model.Data.IServerEntity ent, string name, int length, bool mandatory) {
         var a = ent.CreateAttribute(name);

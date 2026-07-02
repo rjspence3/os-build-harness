@@ -113,7 +113,9 @@ def test_rendered_task_entity_contains_mapped_attributes(spec):
     task = next(e for e in manifest.server_entities if e.name == "Task")
     prompt = render_server_entity(task, local_server, set())
     assert 'AddText(e, "Title", 200, true);' in prompt
-    assert 'AddBool(e, "IsDone");' in prompt
+    # IsDone is mandatory:true in the spec — Boolean/Integer/Binary now propagate
+    # mandatory (was dropped; caught by live harness-verify on the built app).
+    assert 'AddBool(e, "IsDone", true);' in prompt
     assert 'AddIdentFk(e, "ListId", taskListEntity?.IdentifierType, true);' in prompt
     # FK target is a local server entity -> resolved via IServerEntity lookup.
     assert 'Named("TaskList")' in prompt

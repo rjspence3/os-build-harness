@@ -180,7 +180,7 @@ def render_attribute_line(attr: Attribute, fk_var_lookup: dict[str, str]) -> str
     if dt == "Currency":
         return f'AddCurrency(e, "{name}", {mand});'
     if dt == "Binary Data":
-        return f'AddBinary(e, "{name}");'
+        return f'AddBinary(e, "{name}", {mand});'
     if dt == "Date":
         return f'AddDate(e, "{name}", {mand});'
     if dt == "Long Integer":
@@ -191,9 +191,9 @@ def render_attribute_line(attr: Attribute, fk_var_lookup: dict[str, str]) -> str
         length = attr.length or 50
         return f'AddText(e, "{name}", {length}, {mand});'
     if dt == "Integer":
-        return f'AddInt(e, "{name}");'
+        return f'AddInt(e, "{name}", {mand});'
     if dt == "Boolean":
-        return f'AddBool(e, "{name}");'
+        return f'AddBool(e, "{name}", {mand});'
     if dt == "Decimal":
         length = attr.length or 37
         decimals = attr.decimals or 8

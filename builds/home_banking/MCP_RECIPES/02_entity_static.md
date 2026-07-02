@@ -62,13 +62,15 @@ eSpace => {
         a.Length = length;
         a.IsMandatory = mandatory;
     }
-    void AddBool(OutSystems.Model.Data.IStaticEntity ent, string name) {
+    void AddBool(OutSystems.Model.Data.IStaticEntity ent, string name, bool mandatory) {
         var a = ent.CreateAttribute(name);
         a.DataType = eSpace.BooleanType;
+        a.IsMandatory = mandatory;
     }
-    void AddInt(OutSystems.Model.Data.IStaticEntity ent, string name) {
+    void AddInt(OutSystems.Model.Data.IStaticEntity ent, string name, bool mandatory) {
         var a = ent.CreateAttribute(name);
         a.DataType = eSpace.IntegerType;
+        a.IsMandatory = mandatory;
     }
 
     // Record-attribute setter (handles literal expression strings)
