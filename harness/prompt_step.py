@@ -1,22 +1,88 @@
-"""harness-prompt-step — bounded, templated build sub-steps.
+"""harness-prompt-step — render bounded, pre-corrected build prompts from a recipe.
 
-NOT IMPLEMENTED. This is meant to run repetitive, well-specified build work as
-deterministic templated steps against the ODC MCP (cheaper than free-form agent
-reasoning). It needs the MCP actuator + a step-template library. Stubbed so
-`harness-prompt-step` resolves on PATH after `pip install -e .`; never a false pass.
+Renders ONE fully-formed Mentor prompt for a common build unit (nav-block,
+list-screen, role-gate, seed-entity, ...) from the recipe catalog in
+`harness/prompt_recipes.py`. Every known live-build correction is pre-applied so
+the prompt authors correctly the first time — the orchestrator feeds the rendered
+text to `mentor_start`. Deterministic + offline; the catalog is unit-tested.
+
+  harness-prompt-step --list
+  harness-prompt-step list-screen --params '{"screen":"documents","entity":"Document","columns":["Title","Author","UpdatedAt"]}'
+  harness-prompt-step role-gate --params @gate.json          # @file to read params from a file
+
+`--execute` (drive the rendered prompt through the ODC MCP) is intentionally not
+built here: the judge/orchestrator owns the MCP client (harness doctrine HD D7),
+so this tool renders and the main loop actuates. Requesting it exits 3, never a
+false success.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import sys
+from pathlib import Path
+
+from harness.prompt_recipes import RECIPES, render
 
 
 def main(argv: list[str] | None = None) -> int:
-    print(
-        "harness-prompt-step is NOT IMPLEMENTED. It should execute bounded, templated build "
-        "sub-steps against the ODC MCP. Define the step-template library + MCP wiring to implement.",
-        file=sys.stderr,
-    )
-    return 3
+    ap = argparse.ArgumentParser(
+        prog="harness-prompt-step",
+        description="Render a fully-formed, pre-corrected Mentor prompt from the recipe catalog.")
+    ap.add_argument("recipe", nargs="?", help="recipe name (see --list)")
+    ap.add_argument("--params", default="{}",
+                    help='recipe params as inline JSON, or @path to read JSON from a file')
+    ap.add_argument("--list", action="store_true", help="list available recipes and exit")
+    ap.add_argument("--json", action="store_true", help="emit {recipe, params, prompt} as JSON")
+    ap.add_argument("--execute", action="store_true",
+                    help="(not implemented) actuate via MCP — the orchestrator owns the MCP client")
+    args = ap.parse_args(argv)
+
+    if args.list:
+        print("recipes:")
+        for name in sorted(RECIPES):
+            doc = (RECIPES[name].__doc__ or "").strip().splitlines()[0]
+            print(f"  {name:14} {doc}")
+        return 0
+
+    if not args.recipe:
+        print("no recipe given (see --list)", file=sys.stderr)
+        return 1
+
+    raw = args.params
+    if raw.startswith("@"):
+        p = Path(raw[1:])
+        if not p.exists():
+            print(f"--params file not found: {p}", file=sys.stderr)
+            return 1
+        raw = p.read_text(encoding="utf-8")
+    try:
+        params = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"--params is not valid JSON: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        prompt = render(args.recipe, params)
+    except KeyError as e:
+        print(str(e).strip('"'), file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(f"recipe '{args.recipe}': {e}", file=sys.stderr)
+        return 1
+
+    if args.execute:
+        print("harness-prompt-step --execute is not implemented: the orchestrator (main CC loop) owns the "
+              "MCP client — feed the rendered prompt below to mentor_start yourself.", file=sys.stderr)
+        # still emit the prompt on stdout so the caller can use it
+        print(prompt)
+        return 3
+
+    if args.json:
+        print(json.dumps({"recipe": args.recipe, "params": params, "prompt": prompt}, indent=2))
+    else:
+        print(prompt)
+    return 0
 
 
 if __name__ == "__main__":

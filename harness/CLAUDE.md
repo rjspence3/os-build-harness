@@ -53,8 +53,15 @@ demo-picker, `pixel_diff --tol=16`). The recipe library is the debugged, hard-wo
   is contract-first: **builders should emit `data-spec-id="<componentId>"`** (plus `data-entity`, `data-row-id`)
   on rendered components so resolution is EXACT; without it a per-type heuristic runs and marks weak matches
   (`matchedBy`) — never a silent pass. `--nav-mode click` confirms JS/onClick navigation that has no href.
-- **`harness-prompt-step`** — bounded, templated build sub-steps. Prefer these for repetitive,
-  well-specified work over free-form reasoning: cheaper and deterministic.
+- **`harness-prompt-step`** — renders a **fully-formed, pre-corrected Mentor prompt** for a common build
+  unit from the recipe catalog (`harness/prompt_recipes.py`): `nav-block` (author the nav ONCE as a shared
+  Web Block, links dedup'd), `list-screen` (aggregate+table bound to an entity, emits `data-spec-id`/
+  `data-entity`, forbids an empty table), `role-gate` (app-local admin gate, no platform role), `seed-entity`
+  (LoadSampleDataFor<X> + orchestrator wiring + run-once warning). Every known live-build correction is baked
+  in, so the prompt authors correctly the first turn (kills the retry-factor). `harness-prompt-step <recipe>
+  --params '<json>'` prints the prompt for you to feed to `mentor_start`. Prefer these over free-form prompts
+  for repetitive, well-specified work: deterministic, and the emitted `data-spec-id` makes `harness-capture`
+  resolution exact. (The catalog renders; the main loop actuates — `--execute` is intentionally not built.)
 
 These are installed CLI commands — call them by name; they resolve from this build root.
 
