@@ -32,3 +32,14 @@ The subagent completed the write-path AND surfaced 6 seams. Fixes below.
 **Net after iteration 1:** all seams from iteration 1 are CLOSED or MITIGATED. The definition-of-done thread (1–4) is closed — `actions/does` flow spec → plan → recipe → behavioral gate, and "100% working" is a machine check (`harness-capture --behavioral`). Seam 5 (build-root permissions) and Seam 6 (auth-driven headless login) are closed; Seam 1c (fake-`<div>` FK pickers) is mitigated (native `<select>` handled). The only residual is legacy-app persistence *counting* being heuristic without the `data-entity` contract — new builds emit it, so they are exact.
 
 **Validation gate:** the true test is a from-scratch clone of the public repo running a build end-to-end. Each such run is the next iteration — its seams get logged here and fixed. Next: run a build-subagent from a clean clone on a fresh (non-linear) spec to surface seams the legacy app hides.
+
+---
+
+## Iteration 2 — clean-room clone E2E (2026-07-05)
+Cloned the public repo from scratch to a fresh dir, set it up (venv + deps + `playwright install chromium`), and ran the pipeline. `pytest` 252 passed, `harness-verify --phase spec` PASS, and `harness-prompt-step --plan` emitted the write-path step — but on a **new, non-linear spec** (`examples/task_tracker`, which linear never exercised) the plan surfaced one seam.
+
+| # | Seam | Status | Fix |
+|---|------|--------|-----|
+| 2a | Write-path **entity inference picked the wrong entity** on a list-screen create: `tasks.CreateTask` derived `TaskList` (the screen's parent-context input param `ListId`) instead of `Task` (the data-bound entity the screen lists). `_screen_write_entity` preferred the input param over the `boundTo` component — backwards for a list-screen create. The recipe would have built a form for the wrong entity. | **FIXED** | Flipped `_screen_write_entity` to prefer the screen's data-bound entity (`boundTo`), falling back to an entity-typed input param only for a pure detail/form screen with no data component (where the input IS the record). Regression test `test_write_path_entity_is_the_data_bound_one_not_the_context_input` locks it. Deeper fix logged: the spec action should name its own target entity so inference isn't heuristic at all. |
+
+**Why linear hid it:** linear's write-path work was a *detail* screen (`documentDetail`, a `DocumentId` input, no list) — the input-param-first heuristic happened to be right there. Only a **list-screen-with-create** (task_tracker's `tasks`) exposed the wrong ordering. This is exactly the point of running the clean-room E2E on a spec the legacy app never covered: the legacy app's shape masks seams a different shape reveals.

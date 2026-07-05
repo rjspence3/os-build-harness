@@ -220,14 +220,17 @@ def _form_fields(spec: dict, entity: str, cap: int = 4) -> list:
 
 
 def _screen_write_entity(spec: dict, screen: dict) -> str | None:
-    """The entity a write-path on this screen mutates: a detail/form screen's
-    entity-typed input parameter, else its first data-bound component."""
-    for ip in screen.get("inputParameters", []):
-        if ip.get("references"):
-            return ip["references"]
+    """The entity a write-path on this screen mutates. Prefer the screen's data-bound
+    entity (the thing the screen is ABOUT — a list of Tasks on the tasks screen means
+    CreateTask makes a Task); fall back to an entity-typed input parameter only for a
+    pure detail/form screen with no data component (its input param IS the record).
+    (A cleaner fix is for the spec action to name its target entity — seam logged.)"""
     for c in screen.get("components", []):
         if c.get("boundTo"):
             return c["boundTo"].split(".")[0]
+    for ip in screen.get("inputParameters", []):
+        if ip.get("references"):
+            return ip["references"]
     return None
 
 

@@ -233,6 +233,32 @@ def test_plan_emits_write_path_step_from_actions_does():
     assert p["id_param"] == "DocId" and p["creator_attr"] == "CreatorId" and p["return_screen"] == "docs"
 
 
+def test_write_path_entity_is_the_data_bound_one_not_the_context_input():
+    """Iteration-2 seam: a list screen that creates its listed entity while carrying a
+    parent-context input param. `tasks` lists Tasks (boundTo) inside a TaskList (ListId input);
+    CreateTask makes a Task, NOT a TaskList. The data-bound entity must win over the context
+    input — else the write-path recipe targets the wrong entity."""
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [
+                {"name": "TaskList", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Name", "dataType": "Text"}]},
+                {"name": "Task", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Title", "dataType": "Text"},
+                    {"name": "ListId", "dataType": "Identifier", "references": "TaskList"}]}]},
+            "screens": [
+                {"id": "tasks", "name": "Tasks",
+                 "inputParameters": [{"name": "ListId", "dataType": "Identifier", "references": "TaskList"}],
+                 "components": [{"id": "tbl", "type": "Table", "boundTo": "Task"}],
+                 "actions": [{"name": "CreateTask", "trigger": {"onComponent": "tbl", "event": "onClick"},
+                              "does": ["CreateEntity"]}],
+                 "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
+    wp = [s for s in pr.plan_from_spec(spec) if s["recipe"] == "create-form"]
+    assert len(wp) == 1
+    assert wp[0]["params"]["entity"] == "Task"   # boundTo wins; NOT the TaskList context input
+
+
 def test_plan_empty_for_bare_spec():
     bare = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
             "dataModel": {"entities": [{"name": "E", "attributes": [
