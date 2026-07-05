@@ -194,6 +194,45 @@ def test_cli_plan(capsys, tmp_path):
     assert "build plan" in out and "nav-block" in out and "role-gate" in out
 
 
+def test_create_form_recipe_encodes_the_write_path_corrections():
+    p = pr.render("create-form", {"screen": "documentDetail", "entity": "Document",
+                                  "fields": ["Title", "Content"], "id_param": "DocumentId",
+                                  "creator_attr": "CreatorId", "return_screen": "documents"})
+    assert "Public=FALSE" in p and "OS-BLD-40409" in p          # non-public server action
+    assert "NullIdentifier()" in p                              # create-vs-update branch
+    assert "inline record literal" in p                         # typed-local + per-attr, no inline
+    assert 'data-spec-id="titleinput"' in p and 'data-spec-id="savedocumentbtn"' in p
+    assert "ln_current_user" in p                               # identity for CreatorId
+
+
+def test_plan_emits_write_path_step_from_actions_does():
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [
+                {"name": "Doc", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Title", "dataType": "Text"},
+                    {"name": "CreatorId", "dataType": "Identifier", "references": "Member"},
+                    {"name": "CreatedAt", "dataType": "DateTime"}]},
+                {"name": "Member", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
+            "auth": {"provider": "app-local", "userEntity": "Member"},
+            "screens": [
+                {"id": "docs", "name": "D", "components": [{"id": "l", "type": "List", "boundTo": "Doc"}],
+                 "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "l"}]}},
+                {"id": "docDetail", "name": "DD",
+                 "inputParameters": [{"name": "DocId", "dataType": "Identifier", "references": "Doc"}],
+                 "components": [{"id": "b", "type": "Button", "label": "Save"}],
+                 "actions": [{"name": "SaveDoc", "trigger": {"onComponent": "b", "event": "onClick"},
+                              "does": ["CreateEntity", "UpdateEntity"]}],
+                 "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "b"}]}}]}
+    wp = [s for s in pr.plan_from_spec(spec) if s["recipe"] == "create-form"]
+    assert len(wp) == 1
+    p = wp[0]["params"]
+    assert p["entity"] == "Doc" and "Title" in p["fields"]
+    assert "CreatorId" not in p["fields"] and "CreatedAt" not in p["fields"]   # FK + audit dropped
+    assert p["id_param"] == "DocId" and p["creator_attr"] == "CreatorId" and p["return_screen"] == "docs"
+
+
 def test_plan_empty_for_bare_spec():
     bare = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
             "dataModel": {"entities": [{"name": "E", "attributes": [

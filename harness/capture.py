@@ -295,6 +295,125 @@ def _assert_capture_channel(spec: dict, snapshot: dict):
     return results, n_pass, n_fail
 
 
+# ── behavioral verification (Phase 6 — the definition of "working", not "present") ──
+# Drives each spec'd create action against the live app and asserts a row PERSISTS on
+# reload. This is the gate structural checks cannot provide (componentPresent is true for
+# a dead button). Spec-driven off actions/does + the create-form recipe's data-spec-id.
+def _route_of(spec: dict, screen_id: str) -> str:
+    for s in spec.get("screens", []):
+        if s["id"] == screen_id:
+            return s.get("route", "/" + screen_id)
+    return "/" + screen_id
+
+
+_COUNT_JS = r"""(entity) => {
+  const inNav=(el)=>!!el.closest('nav,aside,[role=navigation],[class*="sidebar-nav"],[class*="navbar"]');
+  // EXACT with the contract (data-entity on the list container); heuristic otherwise.
+  const host=[...document.querySelectorAll('[data-entity="'+entity+'"]')].find(x=>!inNav(x));
+  const scope=host||document.querySelector('.sidebar-content, main, [class*="content"]')||document;
+  let rows=[...scope.querySelectorAll('[data-row-id]')].filter(x=>!inNav(x));
+  if(!rows.length) rows=[...scope.querySelectorAll('table tbody tr')].filter(x=>!inNav(x));
+  if(!rows.length) rows=[...scope.querySelectorAll('li')].filter(x=>!inNav(x) && (x.innerText||'').trim().length>2);
+  if(!rows.length){ // repeated-sibling heuristic for div/anchor-based lists (largest same-shape group >=2)
+    const groups={};
+    [...scope.querySelectorAll('a,div')].filter(x=>!inNav(x) && (x.innerText||'').trim().length>3).forEach(x=>{
+      const p=x.parentElement; const k=(p?(p.className||p.tagName):'')+'|'+x.tagName+'|'+(x.className||'');
+      (groups[k]=groups[k]||[]).push(x);});
+    const big=Object.values(groups).filter(g=>g.length>=2).sort((a,b)=>b.length-a.length)[0];
+    rows=big||[];
+  }
+  return rows.length;
+}"""
+
+_FILL_JS = r"""(fields) => {
+  let n=0;
+  const bad=(el)=>!!el.closest('nav,aside,[role=navigation],[class*="sidebar-nav"],[class*="search"]')
+     || ['hidden','search','checkbox','radio','file'].includes(el.type) || el.disabled || el.readOnly || el.offsetParent===null;
+  const set=(el,v)=>{const proto=el.tagName==='TEXTAREA'?window.HTMLTextAreaElement:window.HTMLInputElement;
+    const d=Object.getOwnPropertyDescriptor(proto.prototype,'value'); el.focus(); d.set.call(el,v);
+    el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); el.blur();};
+  // 1. contract ids from the create-form recipe
+  for(const f of fields){let el=document.querySelector('[data-spec-id="'+f.toLowerCase()+'input"]');
+    if(el&&el.tagName!=='INPUT'&&el.tagName!=='TEXTAREA') el=el.querySelector('input,textarea');
+    if(el&&!bad(el)){set(el,'QA '+f+' '+Math.floor(performance.now())); n++;}}
+  // 2. fallback: ANY visible, editable, non-nav text input/textarea on the page (modal or form)
+  if(n===0){[...document.querySelectorAll('input,textarea')]
+     .filter(el=>!bad(el) && (el.tagName==='TEXTAREA' || ['text','email','url',''].includes(el.type)))
+     .forEach((el,i)=>{set(el,'QA test '+i); n++;});}
+  return n;
+}"""
+
+
+def _drive_create(page, base_url: str, spec: dict, form_screen: dict, entity: str) -> dict:
+    """Count rows on the list screen → click the "New <entity>" entry point (handles a
+    modal on the list OR a nav to a form screen, uniformly) → fill the editable inputs →
+    save → reload the list → assert the count grew. Verdict names exactly what happened."""
+    from harness.prompt_recipes import _form_fields, _list_screen_for_entity
+    r = {"entity": entity, "screen": form_screen["id"]}
+    base = base_url.rstrip("/")
+    try:
+        list_screen = _list_screen_for_entity(spec, entity)
+        if not list_screen:
+            r["verdict"] = "NO_LIST_SCREEN (cannot measure persistence)"
+            return r
+        list_url = base + "/" + _route_of(spec, list_screen).lstrip("/")
+        page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
+        before = page.evaluate(_COUNT_JS, entity); r["before"] = before
+        # the create entry point on the list screen: "New <entity>" / "+ New" / "Create"
+        opened = page.evaluate(
+            r"""(entity)=>{const re=new RegExp('(new|create|add)\\s*('+entity+')?|^\\s*\\+\\s*new','i');
+              const b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                 .find(x=>re.test((x.innerText||'').trim()) && !x.closest('nav,aside,[class*="sidebar-nav"]'));
+              if(b){b.click(); return (b.innerText||'').trim();} return null;}""", entity)
+        r["openedVia"] = opened
+        if not opened:
+            r["verdict"] = "NO_CREATE_ENTRY (no New/Create/Add button on the list)"; return r
+        page.wait_for_timeout(2600)
+        filled = page.evaluate(_FILL_JS, _form_fields(spec, entity)); r["inputsFilled"] = filled
+        if filled == 0:
+            r["verdict"] = "FORM_NOT_FOUND ('New' opened no editable form — dead button / read-only)"; return r
+        page.wait_for_timeout(400)
+        saved = page.evaluate(
+            r"""(entity)=>{let b=document.querySelector('[data-spec-id="save'+entity.toLowerCase()+'btn"]');
+              if(!b) b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                 .find(x=>/^\s*(save|create|add|submit|done)\b/i.test((x.innerText||'').trim()));
+              if(b){b.click(); return (b.innerText||'save').trim();} return null;}""", entity)
+        r["saveClicked"] = saved
+        if not saved:
+            r["verdict"] = "SAVE_NOT_FOUND (form present but no save/create button)"; return r
+        page.wait_for_timeout(3200)
+        page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2800)
+        after = page.evaluate(_COUNT_JS, entity); r["after"] = after
+        r["verdict"] = "PERSISTS" if (after is not None and before is not None and after > before) \
+            else "NO_PERSIST (submitted, list row count did not grow after reload)"
+    except Exception as e:
+        r["verdict"] = "ERROR " + repr(e)[:90]
+    return r
+
+
+def run_behavioral(spec: dict, base_url: str, login: dict) -> list[dict]:
+    """For every spec'd CreateEntity action, drive it and assert persistence."""
+    from harness.prompt_recipes import _screen_write_entity
+    sync_playwright = _lazy_playwright()
+    results, seen = [], set()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
+        _apply_login(page, base_url, login)
+        for screen in spec.get("screens", []):
+            for a in screen.get("actions", []):
+                if "CreateEntity" not in set(a.get("does", [])):
+                    continue
+                entity = _screen_write_entity(spec, screen)
+                key = (screen["id"], entity)
+                if not entity or key in seen:
+                    continue
+                seen.add(key)
+                results.append(_drive_create(page, base_url, spec, screen, entity))
+        browser.close()
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="harness-capture",
@@ -309,6 +428,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="how to confirm nav edges (default href; click drives real navigation)")
     ap.add_argument("--assert", dest="do_assert", action="store_true",
                     help="also run capture-channel assertions inline and exit nonzero on any fail")
+    ap.add_argument("--behavioral", action="store_true",
+                    help="Phase 6 WORKING gate: drive each spec'd create action and assert a row persists")
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON to stdout")
     args = ap.parse_args(argv)
 
@@ -330,6 +451,22 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:
             print(f"--login-config unreadable ({e})", file=sys.stderr)
             return 1
+
+    if args.behavioral:
+        results = run_behavioral(spec, args.base_url, login)
+        n_persist = sum(1 for r in results if r["verdict"] == "PERSISTS")
+        n_fail = len(results) - n_persist
+        if args.json:
+            print(json.dumps({"behavioral": results, "pass": n_persist, "fail": n_fail}, indent=2))
+        else:
+            print(f"behavioral gate — {len(results)} create write-path(s): {n_persist} persist, {n_fail} fail")
+            for r in results:
+                mark = "ok " if r["verdict"] == "PERSISTS" else "FAIL"
+                delta = f" ({r.get('before')}->{r.get('after')})" if "after" in r else ""
+                print(f"  [{mark}] {r['screen']} · create {r['entity']} — {r['verdict']}{delta}")
+            if not results:
+                print("  (no CreateEntity actions in spec — nothing to behaviorally verify)")
+        return 1 if n_fail else 0
 
     out_dir = args.out
     if out_dir is not None:

@@ -132,6 +132,43 @@ def seed_entity(params: dict) -> str:
     )
 
 
+def create_form(params: dict) -> str:
+    """Wire a WORKING create/edit form for an entity — the write-path (Phase 6, the
+    definition of done). Encodes every correction a hand-authored create turn needs
+    (extracted from the linear Documents write-path seam report).
+    params: screen, entity, fields:[attr], return_screen?, id_param?, creator_attr?"""
+    screen = _p(params, "screen", required=True)
+    entity = _p(params, "entity", required=True)
+    fields = _p(params, "fields", [], required=True)
+    ret = _p(params, "return_screen")
+    id_param = _p(params, "id_param", f"{entity}Id")
+    creator = _p(params, "creator_attr")           # e.g. CreatorId — set from session identity
+    flist = ", ".join(fields)
+    inputs = "; ".join(f'an Input bound to {entity}.{f} (data-spec-id="{f.lower()}input")' for f in fields)
+    creator_txt = (
+        f" Set {entity}.{creator} from the logged-in user: read localStorage 'ln_current_user' via a JavaScript "
+        f"node and Assign {creator} = LongIntegerToIdentifier(TextToLongInteger(thatValue))."
+        if creator else "")
+    ret_txt = f" After saving, Destination back to the {ret} screen." if ret else " After saving, RefreshData the screen."
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Make the {screen} screen a WORKING create/edit form for the {entity} entity that PERSISTS — a write-path, "
+        f"not a display. The screen receives a {id_param} input ({id_param} = a null/empty identifier means CREATE "
+        f"a new record; a real id means EDIT that one).\n"
+        f"1. Author a server action Save{entity}Record with Public=FALSE (a Public server action fails to publish, "
+        f"OS-BLD-40409). Input: a {entity} record. Inside: an If on the record's Id = NullIdentifier() — True branch "
+        f"calls {entity}.CreateAction, False branch calls {entity}.UpdateAction — return the id. Build the record "
+        f"with a TYPED LOCAL variable + one Assign PER attribute; NEVER an inline record literal (they fail on fresh apps).\n"
+        f"2. On the screen, add editable inputs: {inputs} (fields: {flist}), and a Save button "
+        f'(data-spec-id="save{entity.lower()}btn").{creator_txt}\n'
+        f"3. Wire Save OnClick to a screen action that reads the form values into a typed {entity} local, sets its Id "
+        f"from {id_param} (use LongIntegerToIdentifier(TextToLongInteger(...)) if a cast is needed), calls "
+        f"Save{entity}Record, then RefreshData.{ret_txt}\n"
+        f"The result MUST persist to the database and survive a page reload. If a 'New {entity}' entry point navigates "
+        f"here with an empty id, this screen IS the create form — do not leave it read-only."
+    )
+
+
 def json_1line(obj) -> str:
     import json
     return json.dumps(obj, separators=(", ", "="))
@@ -142,6 +179,7 @@ RECIPES = {
     "list-screen": list_screen,
     "role-gate": role_gate,
     "seed-entity": seed_entity,
+    "create-form": create_form,
 }
 
 
@@ -160,6 +198,63 @@ def _columns_of(comp: dict) -> list:
     for col in comp.get("columns", []) or []:
         cols.append(col.get("field", col) if isinstance(col, dict) else col)
     return cols
+
+
+_MUTATING = {"CreateEntity", "UpdateEntity", "DeleteEntity"}
+_AUDIT_ATTRS = {"CreatedAt", "UpdatedAt", "CreatedBy", "UpdatedBy"}
+
+
+def _entities_map(spec: dict) -> dict:
+    return {e["name"]: e for e in spec.get("dataModel", {}).get("entities", [])}
+
+
+def _form_fields(spec: dict, entity: str, cap: int = 4) -> list:
+    """User-editable text fields for a create/edit form: drop the identifier, FKs (set
+    programmatically), and audit columns."""
+    out = []
+    for a in _entities_map(spec).get(entity, {}).get("attributes", []):
+        if a.get("isIdentifier") or a.get("references") or a["name"] in _AUDIT_ATTRS:
+            continue
+        out.append(a["name"])
+    return out[:cap] or ["Name"]
+
+
+def _screen_write_entity(spec: dict, screen: dict) -> str | None:
+    """The entity a write-path on this screen mutates: a detail/form screen's
+    entity-typed input parameter, else its first data-bound component."""
+    for ip in screen.get("inputParameters", []):
+        if ip.get("references"):
+            return ip["references"]
+    for c in screen.get("components", []):
+        if c.get("boundTo"):
+            return c["boundTo"].split(".")[0]
+    return None
+
+
+def _screen_id_param(screen: dict, entity: str) -> str:
+    for ip in screen.get("inputParameters", []):
+        if ip.get("references") == entity:
+            return ip["name"]
+    return f"{entity}Id"
+
+
+def _creator_attr(spec: dict, entity: str, user_entity: str | None) -> str | None:
+    if not user_entity:
+        return None
+    for a in _entities_map(spec).get(entity, {}).get("attributes", []):
+        if a.get("references") == user_entity:
+            return a["name"]
+    return None
+
+
+def _list_screen_for_entity(spec: dict, entity: str, exclude: str | None = None) -> str | None:
+    for s in spec.get("screens", []):
+        if s["id"] == exclude:
+            continue
+        for c in s.get("components", []):
+            if c.get("type") in _DATA_COMPONENT_TYPES and (c.get("boundTo") or "").split(".")[0] == entity:
+                return s["id"]
+    return None
 
 
 def plan_from_spec(spec: dict) -> list[dict]:
@@ -218,4 +313,24 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 "home": acc.get("redirectTo", "Home"),
                 "login": login,
             }})
+        # Phase 6 write-path: any action that mutates an entity becomes a create-form step.
+        # This is the definition of done — the plan must not omit it (seam: linear Documents).
+        for a in s.get("actions", []):
+            if _MUTATING & set(a.get("does", [])):
+                entity = _screen_write_entity(spec, s)
+                if not entity:
+                    continue
+                p = {"screen": s["id"], "entity": entity,
+                     "fields": _form_fields(spec, entity),
+                     "id_param": _screen_id_param(s, entity)}
+                creator = _creator_attr(spec, entity, auth.get("userEntity"))
+                if creator:
+                    p["creator_attr"] = creator
+                ret = _list_screen_for_entity(spec, entity, exclude=s["id"])
+                if ret:
+                    p["return_screen"] = ret
+                steps.append({"recipe": "create-form",
+                              "why": f"{s['id']}.{a['name']} does {sorted(_MUTATING & set(a.get('does', [])))}",
+                              "params": p})
+                break  # one write-path step per screen
     return steps

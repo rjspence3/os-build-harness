@@ -97,10 +97,17 @@ regardless of how many structural assertions pass.
 
 ## Status of the harness's own intelligence (be honest with whoever runs this)
 
-- **Encoded + usable now:** the plan (`plan_from_spec`), pre-corrected prompts (`prompt_recipes`),
-  structural verification (`harness-capture` + `harness-verify --phase live`), and §Recovery above.
-- **The keystone still to build (Phase 6 tool):** a spec-driven **behavioral verifier** that drives
-  each mutating action and asserts persistence, so this gate is a machine check, not the agent's
-  judgement. Until it exists, run the behavioral gate by hand (drive each create/edit, confirm the
-  row persists on reload) — but treat building it as the top priority: it is what makes "100% working"
-  guaranteeable for any app by any agent, instead of dependent on a clever one.
+- **Encoded + usable now:** the plan incl. write-paths (`plan_from_spec` reads `actions/does`), the
+  pre-corrected prompts incl. `create-form` (`prompt_recipes`/`harness-prompt-step`), structural
+  verification (`harness-capture --assert` + `harness-verify --phase live`), the **behavioral gate**
+  (`harness-capture --behavioral` — drives each spec'd create and asserts a row persists on reload),
+  and §Recovery above.
+- **Run the behavioral gate as Phase 6's machine check:** `harness-capture <spec> --base-url <url>
+  --login-config <json> --behavioral`. It is EXACT when the build emits the contract (`data-entity`
+  on list containers, `data-spec-id="<field>input"`/`save<entity>btn"` on the form — the `create-form`
+  recipe emits these); on legacy apps that predate the contract, persistence counting is heuristic
+  (documented, never silent).
+- **Known-open seams (see `harness/SEAMS.md`):** complex-modal creates (FK pickers) aren't yet
+  driven by the gate's text-fill; auth-driven headless login is partial; and the build-root driver
+  needs its permission set to allowlist the harness venv (or the tools exposed via MCP) — the doctrine
+  does NOT guarantee CLI access. Track + close these via the run-subagent → document-seams → fix loop.
