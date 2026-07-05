@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://nomouthlabs.dev/schemas/app_spec.v0.json",
   "title": "App Build Spec (v0.2)",
-  "$comment": "v0.2 (specVersion 0.2) extends v0.1 from the P1.5 live calibration of home_banking (Core rev 6): attributes gain length/decimals/description/references(FK); entities gain isStatic/records/description; screens gain inputParameters/uiFlow; a minimal optional `integrations` block is added. NOTE: dataType enum stays camelCase (LongInteger etc.) while live ODC reports space-form ('Long Integer') — harness-verify's mcp executor normalizes; the spec's authored form is camel. The embedded example (examples[0]) is an ILLUSTRATIVE EXCERPT, not a complete spec: a single-screen excerpt whose navigation/navigates reference a 'transfer' screen it never defines, so it passes JSON-Schema validation but FAILS full harness-verify cross-ref. EXPECTED, not a bug. Do NOT 'complete' the example by adding the transfer screen.",
+  "$comment": "v0.2 (specVersion 0.2) extends v0.1 from the P1.5 live calibration of home_banking (Core rev 6): attributes gain length/decimals/description/references(FK); entities gain isStatic/records/description; screens gain inputParameters/uiFlow; a minimal optional `integrations` block is added. NOTE: dataType enum stays camelCase (LongInteger etc.) while live ODC reports space-form ('Long Integer') — harness-verify's mcp executor normalizes; the spec's authored form is camel. The embedded example (examples[0]) is an ILLUSTRATIVE EXCERPT, not a complete spec: a single-screen excerpt whose navigation/navigates reference a 'transfer' screen it never defines, so it passes JSON-Schema validation but FAILS full harness-verify cross-ref. EXPECTED, not a bug. Do NOT 'complete' the example by adding the transfer screen. v0.2 ALSO gained (additive, backward-compatible — all optional): app-level `navigation` (shared nav authored ONCE as a block, not per screen), app-level `auth` (anonymous | app-local | platform-idp, with userEntity/adminAttribute/testUsers), per-screen `access` (adminOnly/requiresRole/redirectTo), and product-UI component types Modal/Tabs/Avatar/Badge/CommandPalette. Existing specs stay valid.",
   "description": "Contract between the spec factory and the build harness. The spec factory EMITS a document conforming to this. harness-verify VALIDATES a spec against this schema BEFORE building (validate-before-assert) — a spec that fails validation is a spec-gap wall up front, not a mid-build failure — then checks the built ODC app against each screen's acceptance assertions. Only describe what the ODC MCP can actually build: the dataType and componentType enums ARE the buildable surface.",
   "type": "object",
   "required": ["specVersion", "app", "dataModel", "screens"],
@@ -28,7 +28,9 @@
     "screens": { "type": "array", "items": { "$ref": "#/$defs/screen" }, "minItems": 1 },
     "integrations": { "type": "array", "items": { "$ref": "#/$defs/integration" }, "description": "External systems/connectors. Optional. v1 is MINIMAL (REST only) per HD D3; home_banking uses none (context_connections is AI-model-only and returns empty). Widen as real apps need." },
     "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" }, "description": "The various ways and things a user can do (HD D11) — the user-flow layer. Each capability connects role(s) -> screen(s) -> action(s) -> entit(ies). Optional in JSON-schema, but REQUIRED for a complete spec; the harness-verify NO-HOLES check (--phase spec) enforces that every entity/screen/role is covered by a capability and every capability is fully pathed." },
-    "design": { "$ref": "#/$defs/design", "description": "Design layer reference (HD D10). For a KNOWN app, the reference is the real product's captures; for a NOVEL app, generated (Figma). Per-screen visuals go in screen.mockupRef; this is the app-level theme/reference." }
+    "design": { "$ref": "#/$defs/design", "description": "Design layer reference (HD D10). For a KNOWN app, the reference is the real product's captures; for a NOVEL app, generated (Figma). Per-screen visuals go in screen.mockupRef; this is the app-level theme/reference." },
+    "navigation": { "$ref": "#/$defs/appNavigation", "description": "App-level SHARED navigation (sidebar/menu). First-class so the persistent nav is authored ONCE as a reusable block and referenced by every screen — NOT re-authored per screen (the per-screen path multiplies turn-cost + defect surface). Optional; when absent, nav is whatever screens declare via Sidebar/Navigation components." },
+    "auth": { "$ref": "#/$defs/authSpec", "description": "App-level authentication model. First-class so access control is describable + verifiable. `app-local` = identity in an app entity bridged via browser storage (no ODC end-user IdP; the common clone pattern); `platform-idp` = ODC end-user provider; `anonymous` = no login. Optional; absent ⇒ anonymous." }
   },
 
   "$defs": {
@@ -37,8 +39,8 @@
       "enum": ["Text", "Integer", "LongInteger", "Decimal", "Currency", "Boolean", "Date", "Time", "DateTime", "Email", "PhoneNumber", "Identifier", "BinaryData"]
     },
     "odcComponentType": {
-      "description": "Buildable surface for screen widgets. Most are native ODC widgets (1:1). Board + Sidebar are COMPOSITE PRODUCT-UI PATTERNS (no single native widget) authored via a harness recipe and described by the structured `board`/`nav` props. Extend from the ODC catalog + the product-UI primitive set as benchmarks demand (North Star: 100%-to-spec incl. real structure).",
-      "enum": ["Container", "Form", "Input", "Dropdown", "Checkbox", "DatePicker", "Button", "Link", "Label", "Table", "List", "Card", "Chart", "Image", "Navigation", "Board", "Sidebar"]
+      "description": "Buildable surface for screen widgets. Most are native ODC widgets (1:1). Board, Sidebar, Modal, Tabs, Avatar, Badge, and CommandPalette are COMPOSITE PRODUCT-UI PATTERNS (no single native widget) authored via a harness recipe and described by structured props (`board`/`nav`, or `props`). Extend from the ODC catalog + the product-UI primitive set as benchmarks demand (North Star: 100%-to-spec incl. real structure).",
+      "enum": ["Container", "Form", "Input", "Dropdown", "Checkbox", "DatePicker", "Button", "Link", "Label", "Table", "List", "Card", "Chart", "Image", "Navigation", "Board", "Sidebar", "Modal", "Tabs", "Avatar", "Badge", "CommandPalette"]
     },
 
     "entity": {
@@ -92,6 +94,7 @@
         "uiFlow": { "type": "string", "description": "Owning UI flow, e.g. 'MainFlow' (role-gated) or 'Common' (Login/InvalidPermissions). Live ODC reports uiFlowName." },
         "inputParameters": { "type": "array", "items": { "$ref": "#/$defs/screenInput" }, "description": "Typed screen input parameters (e.g. a detail screen's record Id)." },
         "roles": { "type": "array", "items": { "type": "string" }, "description": "Subset of app.roles permitted to open this screen." },
+        "access": { "$ref": "#/$defs/screenAccess", "description": "First-class access rule for this screen (complements/refines `roles`). Expresses admin-only gating + where to redirect an unauthorized user, so the role-gate is describable and the built OnReady gate is verifiable. Optional." },
         "mockupRef": { "type": "string", "description": "Path to the screen mockup asset. Drives ADVISORY visual diff only — NOT gating." },
         "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
         "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
@@ -163,6 +166,57 @@
         "toScreen": { "type": "string", "description": "Target screen id (must exist in screens)." },
         "icon": { "type": "string" },
         "section": { "type": "string", "description": "Sidebar section grouping, e.g. 'Workspace' or a team name." }
+      }
+    },
+    "appNavigation": {
+      "type": "object",
+      "required": ["items"],
+      "additionalProperties": false,
+      "description": "The app's SHARED persistent navigation, authored once as a reusable block.",
+      "properties": {
+        "block": { "type": "string", "description": "Name of the reusable nav block to author (e.g. 'SidebarNav'). One block, referenced by every screen." },
+        "style": { "enum": ["sidebar", "topbar", "drawer"], "default": "sidebar", "description": "Nav chrome style." },
+        "workspaceLabel": { "type": "string", "description": "Header/brand label shown at the top of the nav." },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/navItem" }, "minItems": 1, "description": "Nav entries; each item.toScreen must exist in screens." },
+        "showOn": { "description": "Which screens render the nav. 'all' (default) or an explicit list of screen ids (e.g. exclude the login screen).", "oneOf": [ { "const": "all" }, { "type": "array", "items": { "type": "string" } } ] }
+      }
+    },
+    "authSpec": {
+      "type": "object",
+      "required": ["provider"],
+      "additionalProperties": false,
+      "description": "App authentication model.",
+      "properties": {
+        "provider": { "enum": ["anonymous", "app-local", "platform-idp"], "description": "anonymous = no login; app-local = identity in an app entity, session bridged via browser storage (no ODC end-user IdP — the common clone pattern); platform-idp = ODC end-user provider." },
+        "userEntity": { "type": "string", "description": "For app-local: the entity holding users (must exist in dataModel). Its rows are the app's identities." },
+        "adminAttribute": { "type": "string", "description": "For app-local: a Boolean attribute on userEntity marking admins (e.g. 'IsAdmin'); drives admin-only screen access." },
+        "loginScreen": { "type": "string", "description": "Screen id of the login screen (must exist in screens)." },
+        "sessionKeys": {
+          "type": "object", "additionalProperties": false,
+          "description": "For app-local: the browser-storage keys the session bridge reads/writes.",
+          "properties": { "userId": { "type": "string" }, "userName": { "type": "string" } }
+        },
+        "testUsers": { "type": "array", "items": { "$ref": "#/$defs/authTestUser" }, "description": "Seed identities to create per role so gated flows are exercisable (e.g. one Admin + one Member)." }
+      }
+    },
+    "authTestUser": {
+      "type": "object",
+      "required": ["role"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string", "description": "Role this test user holds (should be in app.roles, or 'Admin' when gated by adminAttribute)." },
+        "label": { "type": "string", "description": "Display name, e.g. 'Rob Spence'." },
+        "isAdmin": { "type": "boolean", "description": "Whether this seed user's adminAttribute is true." }
+      }
+    },
+    "screenAccess": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "First-class per-screen access rule.",
+      "properties": {
+        "adminOnly": { "type": "boolean", "default": false, "description": "Only admins (auth.adminAttribute true) may open this screen." },
+        "requiresRole": { "type": "string", "description": "A single role (must be in app.roles) required to open the screen." },
+        "redirectTo": { "type": "string", "description": "Screen id an unauthorized user is sent to (must exist in screens); e.g. the app home or the login screen." }
       }
     },
     "action": {

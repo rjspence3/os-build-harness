@@ -111,6 +111,20 @@ def _crossref_findings(spec: dict) -> list[Finding]:
                 gap("screen role not declared in app.roles",
                     f"screen '{sid}' role '{role}' not in {sorted(app_roles)}")
 
+        access = screen.get("access")
+        if access:
+            rr = access.get("requiresRole")
+            if rr is not None and rr not in app_roles:
+                gap("screen access.requiresRole not in app.roles",
+                    f"screen '{sid}' access.requiresRole '{rr}' not in {sorted(app_roles)}")
+            rt = access.get("redirectTo")
+            if rt is not None and rt not in screen_ids:
+                gap("screen access.redirectTo targets unknown screen",
+                    f"screen '{sid}' access.redirectTo '{rt}' not in screens")
+            if access.get("adminOnly") and not spec.get("auth", {}).get("adminAttribute"):
+                gap("screen access.adminOnly needs auth.adminAttribute",
+                    f"screen '{sid}' is adminOnly but app.auth defines no adminAttribute to gate on")
+
         for comp in screen.get("components", []):
             _check_binding(comp, sid, entities, gap, advise)
             _check_product_ui(comp, sid, entities, screen_ids, gap)
@@ -131,6 +145,46 @@ def _crossref_findings(spec: dict) -> list[Finding]:
                     f"screen '{sid}' action '{action['name']}' onComponent '{oc}' not on this screen")
 
         _check_assertions(screen, entities, screen_ids, integration_names, gap)
+
+    # App-level shared navigation: every nav item + showOn must resolve to a screen.
+    nav = spec.get("navigation")
+    if nav:
+        for item in nav.get("items", []):
+            to = item.get("toScreen")
+            if to is not None and to not in screen_ids:
+                gap("app navigation item targets unknown screen",
+                    f"navigation item '{item.get('label', '?')}' -> '{to}' not in screens")
+        show_on = nav.get("showOn")
+        if isinstance(show_on, list):
+            for s in show_on:
+                if s not in screen_ids:
+                    gap("app navigation showOn references unknown screen",
+                        f"navigation.showOn '{s}' not in screens")
+
+    # App-level auth: user entity / admin attribute / login screen / test users must resolve.
+    auth = spec.get("auth")
+    if auth:
+        provider = auth.get("provider")
+        ue = auth.get("userEntity")
+        if provider == "app-local" and ue is None:
+            advise("app-local auth without a userEntity",
+                   "auth.provider is app-local but no userEntity is declared — the identity source is unspecified")
+        if ue is not None and ue not in entities:
+            gap("auth.userEntity unknown", f"auth.userEntity '{ue}' not in dataModel.entities")
+        aa = auth.get("adminAttribute")
+        if aa is not None and ue in entities:
+            attr_names = {a["name"] for a in entities[ue]["attributes"]}
+            if aa not in attr_names:
+                gap("auth.adminAttribute not on userEntity",
+                    f"auth.adminAttribute '{aa}' is not an attribute of '{ue}'")
+        ls = auth.get("loginScreen")
+        if ls is not None and ls not in screen_ids:
+            gap("auth.loginScreen targets unknown screen", f"auth.loginScreen '{ls}' not in screens")
+        for tu in auth.get("testUsers", []):
+            r = tu.get("role")
+            if r is not None and r not in app_roles and r != "Admin":
+                advise("auth testUser role not in app.roles",
+                       f"auth.testUsers role '{r}' not in app.roles {sorted(app_roles)} (allowed: 'Admin')")
 
     _capability_findings(spec, entities, screen_ids, app_roles, gap, advise)
 
