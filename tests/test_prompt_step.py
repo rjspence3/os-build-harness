@@ -103,3 +103,101 @@ def test_cli_bad_params(capsys):
 def test_cli_execute_is_honest_not_implemented(capsys):
     rc = prompt_step.main(["--execute", "role-gate", "--params", '{"screen":"members"}'])
     assert rc == 3   # never a false success
+
+
+# ── spec -> build plan (the loop-closer) ─────────────────────────────────────
+def _spec_with_first_class_fields():
+    return {
+        "specVersion": "0.2",
+        "app": {"name": "t", "roles": ["User", "Admin"]},
+        "dataModel": {"entities": [
+            {"name": "Member", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                {"name": "IsAdmin", "dataType": "Boolean"}]},
+            {"name": "Doc", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                {"name": "Title", "dataType": "Text"}]}]},
+        "navigation": {"block": "SidebarNav", "workspaceLabel": "Acme",
+                       "items": [{"label": "Docs", "toScreen": "docs"}]},
+        "auth": {"provider": "app-local", "userEntity": "Member", "adminAttribute": "IsAdmin",
+                 "loginScreen": "login",
+                 "testUsers": [{"role": "Admin", "label": "Rob", "isAdmin": True},
+                               {"role": "User", "label": "Kira"}]},
+        "screens": [
+            {"id": "docs", "name": "Docs", "route": "/docs",
+             "components": [{"id": "docsTable", "type": "Table", "boundTo": "Doc",
+                             "columns": [{"field": "Title", "kind": "text"}]}],
+             "navigation": [{"fromComponent": "docsTable", "event": "onClick", "toScreen": "docDetail"}],
+             "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "docsTable"}]}},
+            {"id": "settings", "name": "Settings", "route": "/settings",
+             "access": {"adminOnly": True, "redirectTo": "docs"},
+             "components": [{"id": "cfg", "type": "Container"}],
+             "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "cfg"}]}},
+            {"id": "docDetail", "name": "Doc Detail", "route": "/doc",
+             "components": [{"id": "body", "type": "Container"}],
+             "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "body"}]}},
+            {"id": "login", "name": "Login", "route": "/login",
+             "components": [{"id": "form", "type": "Form"}],
+             "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "form"}]}},
+        ],
+    }
+
+
+def test_plan_derives_expected_ordered_steps():
+    steps = pr.plan_from_spec(_spec_with_first_class_fields())
+    recipes = [s["recipe"] for s in steps]
+    # nav-block first, seed the user entity, then the docs list, then the settings gate
+    assert recipes[0] == "nav-block"
+    assert "seed-entity" in recipes and "list-screen" in recipes and "role-gate" in recipes
+    nav = steps[0]["params"]
+    assert nav["block_name"] == "SidebarNav" and nav["logout_to"] == "login"
+    assert nav["items"][0] == {"label": "Docs", "toScreen": "docs"}
+
+
+def test_plan_seed_uses_testusers_with_admin_flag():
+    steps = pr.plan_from_spec(_spec_with_first_class_fields())
+    seed = next(s for s in steps if s["recipe"] == "seed-entity")
+    assert seed["params"]["entity"] == "Member"
+    rows = seed["params"]["rows"]
+    assert {"label": "Rob", "IsAdmin": True} in rows and {"label": "Kira", "IsAdmin": False} in rows
+
+
+def test_plan_list_screen_carries_columns_and_detail_nav():
+    steps = pr.plan_from_spec(_spec_with_first_class_fields())
+    ls = next(s for s in steps if s["recipe"] == "list-screen")
+    assert ls["params"]["entity"] == "Doc"
+    assert ls["params"]["columns"] == ["Title"]
+    assert ls["params"]["detail_screen"] == "docDetail"
+
+
+def test_plan_role_gate_pulls_auth_and_redirect():
+    steps = pr.plan_from_spec(_spec_with_first_class_fields())
+    gate = next(s for s in steps if s["recipe"] == "role-gate")
+    assert gate["params"]["screen"] == "settings"
+    assert gate["params"]["user_entity"] == "Member" and gate["params"]["admin_attr"] == "IsAdmin"
+    assert gate["params"]["home"] == "docs" and gate["params"]["login"] == "login"
+
+
+def test_plan_steps_all_render():
+    for step in pr.plan_from_spec(_spec_with_first_class_fields()):
+        prompt = pr.render(step["recipe"], step["params"])
+        assert "data-spec-id" in prompt and "do not publish" in prompt.lower()
+
+
+def test_cli_plan(capsys, tmp_path):
+    import json as _json
+    spec_file = tmp_path / "spec.json"
+    spec_file.write_text(_json.dumps(_spec_with_first_class_fields()))
+    rc = prompt_step.main(["--plan", str(spec_file)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "build plan" in out and "nav-block" in out and "role-gate" in out
+
+
+def test_plan_empty_for_bare_spec():
+    bare = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [{"name": "E", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
+            "screens": [{"id": "s", "name": "S", "components": [{"id": "c", "type": "Container"}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
+    assert pr.plan_from_spec(bare) == []

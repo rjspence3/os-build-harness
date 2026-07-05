@@ -149,3 +149,73 @@ def render(name: str, params: dict) -> str:
     if name not in RECIPES:
         raise KeyError(f"unknown recipe {name!r}; known: {', '.join(sorted(RECIPES))}")
     return RECIPES[name](params or {})
+
+
+# ── spec -> ordered build plan (the loop-closer) ─────────────────────────────
+_DATA_COMPONENT_TYPES = {"Table", "List", "Card", "Board"}
+
+
+def _columns_of(comp: dict) -> list:
+    cols = []
+    for col in comp.get("columns", []) or []:
+        cols.append(col.get("field", col) if isinstance(col, dict) else col)
+    return cols
+
+
+def plan_from_spec(spec: dict) -> list[dict]:
+    """Derive an ordered list of pre-corrected build steps directly from an
+    app_spec's first-class fields — the chain spec -> recipe -> (build) -> verify.
+    Each step is {recipe, params, why}; render each with `render(step['recipe'],
+    step['params'])`. Reads app.navigation, app.auth, and per-screen components +
+    access. Order: shared nav block -> seed the user entity -> per data screen
+    (bind its list, then gate it if access requires)."""
+    steps: list[dict] = []
+    screens = spec.get("screens", [])
+    auth = spec.get("auth") or {}
+    login = auth.get("loginScreen") or "Login"
+
+    nav = spec.get("navigation")
+    if nav and nav.get("items"):
+        steps.append({"recipe": "nav-block", "why": "app.navigation declared", "params": {
+            "block_name": nav.get("block", "SidebarNav"),
+            "workspace_label": nav.get("workspaceLabel", ""),
+            "logout_to": login,
+            "items": [{"label": i.get("label", ""), "toScreen": i.get("toScreen", "")}
+                      for i in nav["items"]],
+        }})
+
+    if auth.get("provider") == "app-local" and auth.get("userEntity") and auth.get("testUsers"):
+        ue, aa = auth["userEntity"], auth.get("adminAttribute")
+        rows = []
+        for tu in auth["testUsers"]:
+            row = {"label": tu.get("label", tu.get("role", ""))}
+            if aa:
+                row[aa] = bool(tu.get("isAdmin", tu.get("role") == "Admin"))
+            rows.append(row)
+        steps.append({"recipe": "seed-entity", "why": f"auth.testUsers seed {ue}",
+                      "params": {"entity": ue, "rows": rows}})
+
+    for s in screens:
+        for c in s.get("components", []):
+            if c.get("type") in _DATA_COMPONENT_TYPES and c.get("boundTo"):
+                entity = c["boundTo"].split(".")[0]
+                detail = next((e.get("toScreen") for e in s.get("navigation", [])
+                               if e.get("fromComponent") == c["id"]), None)
+                params = {"screen": s["id"], "entity": entity,
+                          "columns": _columns_of(c) or ["(entity display fields)"],
+                          "component_id": c["id"]}
+                if detail:
+                    params["detail_screen"] = detail
+                steps.append({"recipe": "list-screen",
+                              "why": f"{c['id']} ({c['type']}) bound to {entity}", "params": params})
+                break  # one primary data list per screen
+        acc = s.get("access") or {}
+        if acc.get("adminOnly") or acc.get("requiresRole"):
+            steps.append({"recipe": "role-gate", "why": f"screen.access on {s['id']}", "params": {
+                "screen": s["id"],
+                "user_entity": auth.get("userEntity", "Member"),
+                "admin_attr": auth.get("adminAttribute", "IsAdmin"),
+                "home": acc.get("redirectTo", "Home"),
+                "login": login,
+            }})
+    return steps

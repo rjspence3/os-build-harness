@@ -22,7 +22,7 @@ import json
 import sys
 from pathlib import Path
 
-from harness.prompt_recipes import RECIPES, render
+from harness.prompt_recipes import RECIPES, render, plan_from_spec
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,10 +33,36 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--params", default="{}",
                     help='recipe params as inline JSON, or @path to read JSON from a file')
     ap.add_argument("--list", action="store_true", help="list available recipes and exit")
-    ap.add_argument("--json", action="store_true", help="emit {recipe, params, prompt} as JSON")
+    ap.add_argument("--plan", type=Path, default=None,
+                    help="derive an ordered build plan from an app_spec.json (the spec->recipe loop-closer)")
+    ap.add_argument("--render", action="store_true", help="with --plan: also render each step's full prompt")
+    ap.add_argument("--json", action="store_true", help="emit {recipe, params, prompt} (or the plan) as JSON")
     ap.add_argument("--execute", action="store_true",
                     help="(not implemented) actuate via MCP — the orchestrator owns the MCP client")
     args = ap.parse_args(argv)
+
+    if args.plan is not None:
+        if not args.plan.exists():
+            print(f"spec not found: {args.plan}", file=sys.stderr)
+            return 1
+        try:
+            spec = json.loads(args.plan.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"spec is not valid JSON: {e}", file=sys.stderr)
+            return 1
+        steps = plan_from_spec(spec)
+        if args.json:
+            out = [dict(s, prompt=render(s["recipe"], s["params"])) for s in steps] if args.render else steps
+            print(json.dumps(out, indent=2))
+            return 0
+        print(f"build plan — {len(steps)} step(s) derived from {args.plan.name}:")
+        for i, s in enumerate(steps, 1):
+            print(f"\n[{i}] {s['recipe']}  ({s['why']})")
+            if args.render:
+                print(render(s["recipe"], s["params"]))
+            else:
+                print(f"    params: {json.dumps(s['params'])}")
+        return 0
 
     if args.list:
         print("recipes:")
