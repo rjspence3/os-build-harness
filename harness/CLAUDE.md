@@ -45,7 +45,14 @@ demo-picker, `pixel_diff --tol=16`). The recipe library is the debugged, hard-wo
   present and wired per spec); visual/pixel second — the design target IS part of the spec
   contract (North Star: 100%-to-spec incl. real structure + design). Build structure first, then drive pixel
   parity to the target; a plateau below 100% is a wall / harness work-item, never "advisory / done."
-- **`harness-capture`** — drive CDP to capture rendered screens when the MCP doesn't return them.
+- **`harness-capture`** — the **runtime (rendered-DOM) verification channel**. Given the spec + the deployed
+  base URL (+ an optional login config), it drives a headless browser over every screen, resolves each spec'd
+  component in the live DOM, confirms nav edges, screenshots, and emits a screen-walk snapshot that
+  `harness-verify --phase live --screens <snap>` ingests — so componentPresent/binding/navigates are proven
+  against the RUNNING app, MCP-free. `--assert` makes it a standalone CI gate (nonzero on any fail). Resolution
+  is contract-first: **builders should emit `data-spec-id="<componentId>"`** (plus `data-entity`, `data-row-id`)
+  on rendered components so resolution is EXACT; without it a per-type heuristic runs and marks weak matches
+  (`matchedBy`) — never a silent pass. `--nav-mode click` confirms JS/onClick navigation that has no href.
 - **`harness-prompt-step`** — bounded, templated build sub-steps. Prefer these for repetitive,
   well-specified work over free-form reasoning: cheaper and deterministic.
 
