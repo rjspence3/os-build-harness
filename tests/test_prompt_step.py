@@ -246,7 +246,7 @@ def test_write_path_entity_is_the_data_bound_one_not_the_context_input():
                 {"name": "Task", "attributes": [
                     {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
                     {"name": "Title", "dataType": "Text"},
-                    {"name": "ListId", "dataType": "Identifier", "references": "TaskList"}]}]},
+                    {"name": "ListId", "dataType": "Identifier", "mandatory": True, "references": "TaskList"}]}]},
             "screens": [
                 {"id": "tasks", "name": "Tasks",
                  "inputParameters": [{"name": "ListId", "dataType": "Identifier", "references": "TaskList"}],
@@ -256,7 +256,17 @@ def test_write_path_entity_is_the_data_bound_one_not_the_context_input():
                  "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
     wp = [s for s in pr.plan_from_spec(spec) if s["recipe"] == "create-form"]
     assert len(wp) == 1
-    assert wp[0]["params"]["entity"] == "Task"   # boundTo wins; NOT the TaskList context input
+    p = wp[0]["params"]
+    assert p["entity"] == "Task"                        # boundTo wins; NOT the TaskList context input
+    # seam 3a: the mandatory parent FK Task.ListId must be wired from the screen's ListId input param
+    assert p["context_fk"] == {"attr": "ListId", "from_param": "ListId"}
+    # seam 3b: no input param references Task itself -> create-only, id_param omitted (not a phantom "TaskId")
+    assert "id_param" not in p
+    # and the rendered prompt must instruct BOTH the create-only Id and the mandatory parent-FK assignment
+    prompt = pr.render("create-form", p)
+    assert "NullIdentifier() (always create)" in prompt
+    assert "Task.ListId = the screen's ListId input parameter" in prompt
+    assert "MANDATORY parent reference" in prompt
 
 
 def test_plan_empty_for_bare_spec():

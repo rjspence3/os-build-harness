@@ -82,3 +82,19 @@ def test_confirm_nav_href_matches_route_tail():
     assert capture._confirm_nav_href({"href": "/app/detail"}, "/detail") is True
     assert capture._confirm_nav_href({"href": "/app/other"}, "/detail") is False
     assert capture._confirm_nav_href({}, "/detail") is False
+
+
+def test_parent_context_nav_resolves_route_and_label_for_child_create():
+    """Seam 3c: the gate reaches a child create screen (tasks, needs ListId) by opening a
+    parent record on the list screen. The helper must resolve the parent route + the click
+    label from the parent's navigation entry."""
+    spec = {"screens": [
+        {"id": "lists", "route": "/lists",
+         "components": [{"id": "openTasksBtn", "type": "Button", "label": "Open"}],
+         "navigation": [{"fromComponent": "openTasksBtn", "event": "onClick",
+                         "toScreen": "tasks", "params": ["ListId"]}]},
+        {"id": "tasks", "route": "/tasks",
+         "inputParameters": [{"name": "ListId", "references": "TaskList", "isRequired": True}]}]}
+    assert capture._parent_context_nav(spec, spec["screens"][1]) == ("/lists", "Open")
+    # a screen nobody navigates into with params -> None (drive it by its own route)
+    assert capture._parent_context_nav(spec, spec["screens"][0]) is None

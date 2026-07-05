@@ -141,7 +141,8 @@ def create_form(params: dict) -> str:
     entity = _p(params, "entity", required=True)
     fields = _p(params, "fields", [], required=True)
     ret = _p(params, "return_screen")
-    id_param = _p(params, "id_param", f"{entity}Id")
+    id_param = _p(params, "id_param")              # None => create-only screen (no own-record id input)
+    ctx = _p(params, "context_fk")                 # {"attr","from_param"} mandatory parent FK from a screen param
     creator = _p(params, "creator_attr")           # e.g. CreatorId — set from session identity
     flist = ", ".join(fields)
     inputs = "; ".join(f'an Input bound to {entity}.{f} (data-spec-id="{f.lower()}input")' for f in fields)
@@ -149,21 +150,32 @@ def create_form(params: dict) -> str:
         f" Set {entity}.{creator} from the logged-in user: read localStorage 'ln_current_user' via a JavaScript "
         f"node and Assign {creator} = LongIntegerToIdentifier(TextToLongInteger(thatValue))."
         if creator else "")
+    context_txt = (
+        f" Set {entity}.{ctx['attr']} = the screen's {ctx['from_param']} input parameter — a MANDATORY parent "
+        f"reference the record CANNOT be saved without; it arrives via navigation from the parent list "
+        f"(cast with LongIntegerToIdentifier(TextToLongInteger(...)) if needed)."
+        if ctx else "")
+    if id_param:
+        recv_txt = (f"The screen receives a {id_param} input ({id_param} = a null/empty identifier means CREATE "
+                    f"a new record; a real id means EDIT that one).")
+        id_set_txt = f"sets its Id from {id_param} (use LongIntegerToIdentifier(TextToLongInteger(...)) if a cast is needed)"
+    else:
+        recv_txt = ("This is a CREATE-ONLY form: the screen has no own-record id input, so every save creates a "
+                    "new record (Id = NullIdentifier()).")
+        id_set_txt = "sets its Id = NullIdentifier() (always create)"
     ret_txt = f" After saving, Destination back to the {ret} screen." if ret else " After saving, RefreshData the screen."
     return (
         f"{_PREAMBLE}\n\n"
         f"Make the {screen} screen a WORKING create/edit form for the {entity} entity that PERSISTS — a write-path, "
-        f"not a display. The screen receives a {id_param} input ({id_param} = a null/empty identifier means CREATE "
-        f"a new record; a real id means EDIT that one).\n"
+        f"not a display. {recv_txt}\n"
         f"1. Author a server action Save{entity}Record with Public=FALSE (a Public server action fails to publish, "
         f"OS-BLD-40409). Input: a {entity} record. Inside: an If on the record's Id = NullIdentifier() — True branch "
         f"calls {entity}.CreateAction, False branch calls {entity}.UpdateAction — return the id. Build the record "
         f"with a TYPED LOCAL variable + one Assign PER attribute; NEVER an inline record literal (they fail on fresh apps).\n"
         f"2. On the screen, add editable inputs: {inputs} (fields: {flist}), and a Save button "
-        f'(data-spec-id="save{entity.lower()}btn").{creator_txt}\n'
-        f"3. Wire Save OnClick to a screen action that reads the form values into a typed {entity} local, sets its Id "
-        f"from {id_param} (use LongIntegerToIdentifier(TextToLongInteger(...)) if a cast is needed), calls "
-        f"Save{entity}Record, then RefreshData.{ret_txt}\n"
+        f'(data-spec-id="save{entity.lower()}btn").{creator_txt}{context_txt}\n'
+        f"3. Wire Save OnClick to a screen action that reads the form values into a typed {entity} local, {id_set_txt}, "
+        f"calls Save{entity}Record, then RefreshData.{ret_txt}\n"
         f"The result MUST persist to the database and survive a page reload. If a 'New {entity}' entry point navigates "
         f"here with an empty id, this screen IS the create form — do not leave it read-only."
     )
@@ -234,11 +246,34 @@ def _screen_write_entity(spec: dict, screen: dict) -> str | None:
     return None
 
 
-def _screen_id_param(screen: dict, entity: str) -> str:
+def _screen_id_param(screen: dict, entity: str) -> str | None:
+    """The screen's OWN-record id input param (the create/edit toggle), or None when the
+    screen has no input param referencing this entity — a create-only screen. Do NOT
+    fabricate an <Entity>Id that doesn't exist; that made the recipe author against a
+    phantom input (iteration-3 seam 3b)."""
     for ip in screen.get("inputParameters", []):
         if ip.get("references") == entity:
             return ip["name"]
-    return f"{entity}Id"
+    return None
+
+
+def _context_fk(spec: dict, entity: str, screen: dict, user_entity: str | None = None) -> dict | None:
+    """A mandatory parent FK on `entity` that must be filled from one of the screen's
+    context input params (e.g. Task.ListId <- the tasks screen's ListId input, which
+    arrives via navigation from the parent list). The user/creator FK is excluded — it's
+    wired from session identity via creator_attr, not from a screen param. Returns
+    {"attr", "from_param"} or None (iteration-3 seam 3a)."""
+    params = screen.get("inputParameters", [])
+    for a in _entities_map(spec).get(entity, {}).get("attributes", []):
+        parent = a.get("references")
+        if not parent or not a.get("mandatory"):
+            continue
+        if user_entity and parent == user_entity:
+            continue
+        for ip in params:
+            if ip.get("references") == parent:
+                return {"attr": a["name"], "from_param": ip["name"]}
+    return None
 
 
 def _creator_attr(spec: dict, entity: str, user_entity: str | None) -> str | None:
@@ -324,8 +359,13 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 if not entity:
                     continue
                 p = {"screen": s["id"], "entity": entity,
-                     "fields": _form_fields(spec, entity),
-                     "id_param": _screen_id_param(s, entity)}
+                     "fields": _form_fields(spec, entity)}
+                sid = _screen_id_param(s, entity)
+                if sid:
+                    p["id_param"] = sid
+                ctx = _context_fk(spec, entity, s, auth.get("userEntity"))
+                if ctx:
+                    p["context_fk"] = ctx
                 creator = _creator_attr(spec, entity, auth.get("userEntity"))
                 if creator:
                     p["creator_attr"] = creator

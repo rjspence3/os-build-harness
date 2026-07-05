@@ -323,6 +323,24 @@ def _route_of(spec: dict, screen_id: str) -> str:
     return "/" + screen_id
 
 
+def _parent_context_nav(spec: dict, form_screen: dict):
+    """(parent_route, click_label) to reach a child create screen that requires a parent-context
+    input param: the parent list has a component whose onClick navigates to this screen passing
+    the param, so opening a parent record supplies a real parent id. None if no such nav exists
+    (iteration-3 seam 3c)."""
+    fid = form_screen["id"]
+    for s in spec.get("screens", []):
+        for nav in s.get("navigation", []) or []:
+            if nav.get("toScreen") == fid and nav.get("params"):
+                label, fc = None, nav.get("fromComponent")
+                for c in s.get("components", []):
+                    if c.get("id") == fc:
+                        label = c.get("label")
+                        break
+                return (_route_of(spec, s["id"]), label)
+    return None
+
+
 _COUNT_JS = r"""(entity) => {
   const inNav=(el)=>!!el.closest('nav,aside,[role=navigation],[class*="sidebar-nav"],[class*="navbar"]');
   // EXACT with the contract (data-entity on the list container); heuristic otherwise.
@@ -378,7 +396,29 @@ def _drive_create(page, base_url: str, spec: dict, form_screen: dict, entity: st
         if not list_screen:
             r["verdict"] = "NO_LIST_SCREEN (cannot measure persistence)"
             return r
-        list_url = base + "/" + _route_of(spec, list_screen).lstrip("/")
+        # A create screen that requires a parent-context input param (e.g. tasks needs ListId)
+        # is only reachable faithfully by navigating from the parent list, which supplies a real
+        # parent id — so the create gets a valid mandatory FK on save (seam 3c).
+        needs_ctx = any(ip.get("references") for ip in form_screen.get("inputParameters", []))
+        ctx_nav = _parent_context_nav(spec, form_screen) if needs_ctx else None
+        if ctx_nav:
+            parent_route, click_label = ctx_nav
+            page.goto(base + "/" + parent_route.lstrip("/"), wait_until="networkidle", timeout=45000)
+            page.wait_for_timeout(2500)
+            opened_parent = page.evaluate(
+                r"""(label)=>{const re=label?new RegExp('^\\s*'+label+'\\s*$','i'):/^\s*(open|view|details?)\s*$/i;
+                  const b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                     .find(x=>re.test((x.innerText||'').trim()) && !x.closest('nav,aside,[class*="sidebar-nav"]'));
+                  if(b){b.click(); return true;} return false;}""", click_label)
+            r["parentOpened"] = opened_parent
+            if not opened_parent:
+                r["verdict"] = ("NO_PARENT_CONTEXT (no parent-list entry point to supply "
+                                + form_screen["id"] + "'s required context)")
+                return r
+            page.wait_for_timeout(2800)
+            list_url = page.url  # the contextualized child URL (carries the real parent id)
+        else:
+            list_url = base + "/" + _route_of(spec, list_screen).lstrip("/")
         page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
         before = page.evaluate(_COUNT_JS, entity); r["before"] = before
         # the create entry point on the list screen: "New <entity>" / "+ New" / "Create"
