@@ -121,6 +121,23 @@ def _apply_login(page, base_url: str, login: dict) -> dict:
     return {"type": ltype, "warning": "unknown login type — treated as none"}
 
 
+def _login_from_auth(spec: dict) -> dict:
+    """Derive a headless login config from the spec's `auth` block, so the behavioral
+    gate can authenticate with NO hand-fed --login-config (closes seam 6). For app-local
+    auth it uses a quick-login button matching an (admin) test user's label at the login
+    screen route. Falls back to {type:none}."""
+    auth = spec.get("auth") or {}
+    if auth.get("provider") == "app-local":
+        users = auth.get("testUsers") or []
+        chosen = next((u for u in users if u.get("isAdmin")), users[0] if users else None)
+        if chosen and chosen.get("label"):
+            login_screen = auth.get("loginScreen", "Login")
+            route = next((s.get("route", "/" + login_screen) for s in spec.get("screens", [])
+                          if s["id"] == login_screen), "/" + login_screen)
+            return {"type": "quickbutton", "match": chosen["label"], "route": route}
+    return {"type": "none"}
+
+
 # ── DOM resolution (contract-first, heuristic-fallback) ─────────────────────
 _RESOLVE_JS = r"""
 (comp) => {
@@ -340,6 +357,11 @@ _FILL_JS = r"""(fields) => {
   if(n===0){[...document.querySelectorAll('input,textarea')]
      .filter(el=>!bad(el) && (el.tagName==='TEXTAREA' || ['text','email','url',''].includes(el.type)))
      .forEach((el,i)=>{set(el,'QA test '+i); n++;});}
+  // 3. native dropdowns (partial handling for FK pickers): pick the last real option
+  [...document.querySelectorAll('select')]
+    .filter(el=>el.offsetParent!==null && !el.disabled && !el.closest('nav,aside,[class*="sidebar-nav"]'))
+    .forEach(el=>{ if(el.options.length>1){ el.selectedIndex=el.options.length-1;
+       el.dispatchEvent(new Event('change',{bubbles:true})); n++; } });
   return n;
 }"""
 
@@ -442,7 +464,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"spec is not valid JSON: {e}", file=sys.stderr)
         return 1
 
-    login = {"type": "none"}
     if args.login_config:
         raw = args.login_config
         p = Path(raw)
@@ -451,6 +472,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as e:
             print(f"--login-config unreadable ({e})", file=sys.stderr)
             return 1
+    else:
+        login = _login_from_auth(spec)   # seam 6: authenticate from the spec's auth block
 
     if args.behavioral:
         results = run_behavioral(spec, args.base_url, login)

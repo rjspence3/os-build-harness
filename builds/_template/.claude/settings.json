@@ -1,0 +1,21 @@
+{
+  "$comment": "Build-root permissions so the driver can actually run the harness (closes SEAMS.md #5). A build-root Claude session inherits this; without it, Bash-restricted sandboxes deny the harness CLIs and the doctrine's autonomy claim is false. Scope to the harness venv + tooling; the OutSystems MCP is the actuator and is authorized via /mcp.",
+  "permissions": {
+    "allow": [
+      "Bash(harness-verify:*)",
+      "Bash(harness-capture:*)",
+      "Bash(harness-prompt-step:*)",
+      "Bash(*/.venv/bin/harness-verify:*)",
+      "Bash(*/.venv/bin/harness-capture:*)",
+      "Bash(*/.venv/bin/harness-prompt-step:*)",
+      "Bash(*/.venv/bin/python:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(python -m harness.:*)",
+      "Bash(playwright:*)",
+      "Bash(*/.venv/bin/playwright:*)",
+      "Bash(pytest:*)",
+      "Bash(*/.venv/bin/pytest:*)",
+      "Bash(git:*)"
+    ]
+  }
+}
