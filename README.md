@@ -77,6 +77,32 @@ The harness supports two ways of defining "the source of truth" — a build root
   `task_tracker` (`--phase live` → **9/9**); the 47-spec kyleCohorts corpus renders **zero-gap** on
   both the entity and screen layers.
 
+## The verify + author loop (spec-driven — offline except the build)
+
+Three CLIs turn an `app_spec` into a buildable, gradable unit of work. Except for the authoring
+itself, they need no tenant:
+
+- **`harness-prompt-step --plan <spec>.json`** — derives the ordered, pre-corrected Mentor prompts
+  straight from the spec's first-class fields: `app.navigation` → author the shared nav **once** as
+  a reusable block; `app.auth` + `screen.access` → an app-local role gate; entity-bound lists → bind
+  + seed. Every hard-won correction (nav-link dedup, *no stray platform role*, *no empty tables*, the
+  sample-data run-once guard) is baked in, so each prompt authors right the first turn. Feed each to
+  `mentor_start`. (`harness-prompt-step <recipe> --params '{…}'` renders one unit; `--list` shows the
+  catalog: `nav-block`, `list-screen`, `role-gate`, `seed-entity`.)
+- **build** the unit via the Mentor MCP. The recipes ask the build to tag rendered widgets with
+  `data-spec-id="<componentId>"` — the contract that makes runtime verification exact.
+- **`harness-capture <spec>.json --base-url <url> --assert`** — the runtime verifier: drives a
+  headless browser over the deployed app, resolves each spec'd component in the live DOM (via the
+  `data-spec-id` contract, with a per-type heuristic fallback), and gates
+  componentPresent/binding/navigates — **MCP-free**, against any deployed URL. It also emits a
+  screen-walk snapshot (`--out d/`) for:
+- **`harness-verify <spec>.json --phase live --screens d/runtime_screens.json`** — the judge,
+  evaluating the same assertions against the captured runtime truth. `--phase spec` validates the
+  spec itself, fully offline.
+
+So the chain is **spec → `--plan` → build (emits `data-spec-id`) → `harness-capture` →
+`harness-verify`** — gradable at every step, and offline everywhere except the build.
+
 ## Requirements
 
 - **Python 3.11+**
@@ -96,7 +122,7 @@ pip install -r requirements.txt
 pip install -e .          # installs the harness-verify / harness-capture / harness-prompt-step CLIs
 
 # No tenant needed for these — they exercise the harness offline:
-pytest tests/ -q                                                  # → 213 passed
+pytest tests/ -q                                                  # → 250 passed
 python scripts/build_banking.py --list-apps                       # the home_banking manifest
 python scripts/build_banking.py --app core --dry-run --out /tmp/hb_run
 #   → rendered Mentor batches land under /tmp/hb_run/core/batches/
@@ -134,7 +160,7 @@ meaningless on empty screens. The full doctrine is in `harness/CLAUDE.md`.
 
 ## Caveats
 
-- The full unit suite passes (`pytest tests/ -q` → 213 passed). The renderers are pure
+- The full unit suite passes (`pytest tests/ -q` → 250 passed). The renderers are pure
   (spec → authoring text), so the tests run offline with no tenant or live Mentor dispatch.
 - `scripts/build_banking.py` (the `home_banking` **clone** entrypoint) still resolves paths to
   `builds/home_banking/`. The **spec-driven** path is generalized: `scripts/build_from_spec.py`
