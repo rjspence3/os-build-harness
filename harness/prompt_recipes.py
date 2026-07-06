@@ -126,6 +126,31 @@ def role_gate(params: dict) -> str:
     )
 
 
+def login(params: dict) -> str:
+    """App-local login screen: identity input -> lookup user -> write the localStorage session
+    the role-gate reads ('ln_current_user' = Id, 'ln_current_name' = identity). No platform role /
+    no ODC end-user IdP. params: screen, user_entity, identity_attr(default Name), home."""
+    screen = _p(params, "screen", required=True)
+    user_entity = _p(params, "user_entity", required=True)
+    identity_attr = _p(params, "identity_attr", "Name")
+    home = _p(params, "home", required=True)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Make the {screen} screen an APP-LOCAL login (Anonymous — do NOT add any platform Role; identity is bridged "
+        f"via browser localStorage, not an ODC end-user provider). The session keys are 'ln_current_user' (the user's "
+        f"Id) and 'ln_current_name' (their {identity_attr}) — the role-gate reads these.\n"
+        f"1. Add a text Input (data-spec-id=\"loginidentityinput\") for the user's {identity_attr}, and a Button "
+        f"labeled \"Log in\" (data-spec-id=\"loginbtn\").\n"
+        f"2. Wire the Log in button OnClick to a screen action that: fetches the SINGLE {user_entity} row whose "
+        f"{identity_attr} equals the input value (a screen aggregate, max 1 record, filtered by the input). If a row "
+        f"is found -> a JavaScript node sets localStorage['ln_current_user'] to that {user_entity}'s Id (as text) and "
+        f"localStorage['ln_current_name'] to its {identity_attr}, then Destination to the {home} screen. If NO row is "
+        f"found -> show a 'Invalid login' message and stay on the screen.\n"
+        f"Keep the screen Anonymous. At runtime a valid {identity_attr} must log in, set both session keys, and land "
+        f"on {home}."
+    )
+
+
 def seed_entity(params: dict) -> str:
     """Seed sample rows for an entity via the app's LoadSampleData orchestrator.
     params: entity, rows:[{...}] (or count+describe), fk_notes?"""
@@ -438,6 +463,7 @@ RECIPES = {
     "nav-block": nav_block,
     "list-screen": list_screen,
     "role-gate": role_gate,
+    "login": login,
     "seed-entity": seed_entity,
     "create-form": create_form,
     "row-actions": row_actions,
@@ -481,6 +507,15 @@ def _form_fields(spec: dict, entity: str, cap: int = 4) -> list:
             continue
         out.append(a["name"])
     return out[:cap] or ["Name"]
+
+
+def _identity_attr(spec: dict, user_entity: str) -> str:
+    """The login-identity attribute of the user entity — the first non-id, non-audit Text attr
+    (what testUsers seed populates and the login screen matches on)."""
+    for a in _entities_map(spec).get(user_entity, {}).get("attributes", []):
+        if a.get("dataType") == "Text" and not a.get("isIdentifier") and a["name"] not in _AUDIT_ATTRS:
+            return a["name"]
+    return "Name"
 
 
 def _screen_write_entity(spec: dict, screen: dict) -> str | None:
@@ -612,14 +647,22 @@ def plan_from_spec(spec: dict) -> list[dict]:
 
     if auth.get("provider") == "app-local" and auth.get("userEntity") and auth.get("testUsers"):
         ue, aa = auth["userEntity"], auth.get("adminAttribute")
+        id_attr = _identity_attr(spec, ue)   # the login identity attr the seed must populate + login matches on
         rows = []
         for tu in auth["testUsers"]:
-            row = {"label": tu.get("label", tu.get("role", ""))}
+            row = {id_attr: tu.get("label", tu.get("role", ""))}
             if aa:
                 row[aa] = bool(tu.get("isAdmin", tu.get("role") == "Admin"))
             rows.append(row)
         steps.append({"recipe": "seed-entity", "why": f"auth.testUsers seed {ue}",
                       "params": {"entity": ue, "rows": rows}})
+        # app-local login screen: identity input -> lookup -> localStorage session -> home.
+        login_screen = auth.get("loginScreen")
+        if login_screen:
+            home = next((s["id"] for s in screens if s["id"] != login_screen), login_screen)
+            steps.append({"recipe": "login", "why": f"app-local login on {login_screen}",
+                          "params": {"screen": login_screen, "user_entity": ue,
+                                     "identity_attr": id_attr, "home": home}})
 
     for s in screens:
         for c in s.get("components", []):

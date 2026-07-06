@@ -115,6 +115,7 @@ def _spec_with_first_class_fields():
         "dataModel": {"entities": [
             {"name": "Member", "attributes": [
                 {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                {"name": "Name", "dataType": "Text", "mandatory": True},
                 {"name": "IsAdmin", "dataType": "Boolean"}]},
             {"name": "Doc", "attributes": [
                 {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
@@ -162,7 +163,18 @@ def test_plan_seed_uses_testusers_with_admin_flag():
     seed = next(s for s in steps if s["recipe"] == "seed-entity")
     assert seed["params"]["entity"] == "Member"
     rows = seed["params"]["rows"]
-    assert {"label": "Rob", "IsAdmin": True} in rows and {"label": "Kira", "IsAdmin": False} in rows
+    # seeds the userEntity's identity attr (Name), not a literal "label", so login can match on it
+    assert {"Name": "Rob", "IsAdmin": True} in rows and {"Name": "Kira", "IsAdmin": False} in rows
+
+
+def test_plan_emits_login_step_for_app_local_auth():
+    steps = pr.plan_from_spec(_spec_with_first_class_fields())
+    lg = next(s for s in steps if s["recipe"] == "login")
+    assert lg["params"]["screen"] == "login" and lg["params"]["user_entity"] == "Member"
+    assert lg["params"]["identity_attr"] == "Name"
+    prompt = pr.render("login", lg["params"])
+    assert 'data-spec-id="loginidentityinput"' in prompt and 'data-spec-id="loginbtn"' in prompt
+    assert "ln_current_user" in prompt and "ln_current_name" in prompt
 
 
 def test_plan_list_screen_carries_columns_and_detail_nav():

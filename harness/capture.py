@@ -98,8 +98,9 @@ def _apply_login(page, base_url: str, login: dict) -> dict:
         page.evaluate(
             """(cfg) => {
                  const ins = [...document.querySelectorAll('input')];
-                 const u = cfg.userSel ? document.querySelector(cfg.userSel)
-                        : (ins.find(i=>/email|user|name|login/i.test((i.placeholder||'')+(i.name||'')+(i.id||''))) || ins[0]);
+                 const drill=(el)=> (el && el.tagName!=='INPUT') ? el.querySelector('input') : el;
+                 const u = cfg.userSel ? drill(document.querySelector(cfg.userSel))
+                        : (ins.find(i=>/email|user|name|login|identity/i.test((i.placeholder||'')+(i.name||'')+(i.id||''))) || ins[0]);
                  const p = cfg.passSel ? document.querySelector(cfg.passSel)
                         : (ins.find(i=>i.type==='password') || ins[1]);
                  const set=(el,v)=>{const d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
@@ -134,7 +135,8 @@ def _login_from_auth(spec: dict) -> dict:
             login_screen = auth.get("loginScreen", "Login")
             route = next((s.get("route", "/" + login_screen) for s in spec.get("screens", [])
                           if s["id"] == login_screen), "/" + login_screen)
-            return {"type": "quickbutton", "match": chosen["label"], "route": route}
+            return {"type": "form", "route": route, "user": chosen["label"],
+                    "userSel": '[data-spec-id="loginidentityinput"]', "submitText": "Log in"}
     return {"type": "none"}
 
 

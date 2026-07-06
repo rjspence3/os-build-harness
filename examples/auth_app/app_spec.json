@@ -1,0 +1,40 @@
+{
+  "specVersion": "0.2",
+  "app": { "name": "auth_app", "description": "Phase-4 auth construct proof: app-local login + an admin-gated screen, so --role can verify BLOCKS_ANON + ALLOWS_MEMBER.", "roles": ["Member", "Admin"] },
+  "dataModel": {
+    "entities": [
+      { "name": "Member", "description": "App identity.", "attributes": [
+        { "name": "Id", "dataType": "Identifier", "isIdentifier": true, "mandatory": true },
+        { "name": "Name", "dataType": "Text", "mandatory": true, "length": 100 },
+        { "name": "IsAdmin", "dataType": "Boolean", "mandatory": true, "default": false }
+      ] }
+    ]
+  },
+  "auth": {
+    "provider": "app-local", "userEntity": "Member", "adminAttribute": "IsAdmin", "loginScreen": "login",
+    "sessionKeys": { "userId": "ln_current_user", "userName": "ln_current_name" },
+    "testUsers": [ { "role": "Admin", "label": "Rob", "isAdmin": true }, { "role": "Member", "label": "Kira", "isAdmin": false } ]
+  },
+  "screens": [
+    { "id": "home", "name": "Home", "route": "/home", "uiFlow": "MainFlow", "roles": ["Member"],
+      "components": [ { "id": "membersTable", "type": "Table", "boundTo": "Member", "label": "Members" } ],
+      "acceptance": { "assertions": [
+        { "kind": "entityExists", "entity": "Member" },
+        { "kind": "componentPresent", "componentId": "membersTable" },
+        { "kind": "binding", "componentId": "membersTable", "boundTo": "Member" } ] } },
+    { "id": "admin", "name": "Admin", "route": "/admin", "uiFlow": "MainFlow", "roles": ["Admin"],
+      "access": { "adminOnly": true, "redirectTo": "home" },
+      "components": [ { "id": "adminPanel", "type": "Container", "label": "Admin only" } ],
+      "acceptance": { "assertions": [ { "kind": "componentPresent", "componentId": "adminPanel" } ] } },
+    { "id": "login", "name": "Login", "route": "/login", "uiFlow": "MainFlow", "roles": ["Member"],
+      "components": [ { "id": "loginPanel", "type": "Container", "label": "Sign in" } ],
+      "acceptance": { "assertions": [ { "kind": "componentPresent", "componentId": "loginPanel" } ] } }
+  ],
+  "capabilities": [
+    { "name": "Sign in", "description": "A member logs in.", "roles": ["Member", "Admin"], "screens": ["login", "home"], "entities": ["Member"],
+      "steps": [ { "description": "Enter identity and log in.", "screen": "login" }, { "description": "Land on home.", "screen": "home" } ] },
+    { "name": "Admin console", "description": "An admin opens the gated admin screen.", "roles": ["Admin"], "screens": ["admin", "home"], "entities": ["Member"],
+      "steps": [ { "description": "Open the admin screen (gated).", "screen": "admin" } ] }
+  ],
+  "design": { "source": "generated", "mode": "light" }
+}
