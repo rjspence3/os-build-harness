@@ -77,7 +77,9 @@
         { "id": "addTaskBtn", "type": "Button", "label": "Add task" }
       ],
       "actions": [
-        { "name": "CreateTask", "trigger": { "onComponent": "addTaskBtn", "event": "onClick" }, "does": ["CreateEntity"] }
+        { "name": "CreateTask", "trigger": { "onComponent": "addTaskBtn", "event": "onClick" }, "does": ["CreateEntity"] },
+        { "name": "EditTask", "trigger": { "onComponent": "tasksTable", "event": "onClick" }, "does": ["UpdateEntity"] },
+        { "name": "DeleteTask", "trigger": { "onComponent": "tasksTable", "event": "onClick" }, "does": ["DeleteEntity"] }
       ],
       "acceptance": {
         "assertions": [
