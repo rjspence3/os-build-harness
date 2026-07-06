@@ -126,3 +126,16 @@ The behavioral gate now verifies more than "creates persist":
 - The Edit affordance's "set New<X> = the row's record" assignment is API-heavy for Mentor to discover (hit `IServerEntity.RecordType` etc.). Named the exact shape in the recipe (`New<X> = <aggregate>.List.Current.<Entity>`) to shave it next time.
 
 **Remaining Phase-2 (build-dependent, not yet proven): role-gate enforcement (needs a non-anonymous app) + agent-reasoning-in-gate (needs the agent recipe to also emit a REST trigger).**
+
+---
+
+## Phase 4 — auth/login construct (2026-07-06)
+Built `examples/auth_app` (Member + Home/Admin/Login + seed + login + role-gate) to prove the auth/login construct + close the Phase-2 role-gate proof. Outcome: **construct built + anon-enforcement PROVEN; member-allow blocked on a seed flakiness.**
+
+- **`--role` result:** `admin · anon — BLOCKS_ANON` ✅ (the role-gate correctly redirects an anonymous visitor away from the gated screen — the security-critical half). `admin · member — BLOCKS_MEMBER` ❌.
+- **Root cause of the member failure (debugged, NOT a logic gap):** the `login` recipe built correctly — `loginidentityinput` + `loginbtn` present, `GetMemberByName` lookup + `DoLogin` action + localStorage session all wired; it correctly shows "Invalid login" when no member matches. The failure is that **Member was never seeded** — the `WhenPublished` `BootstrapData`/`LoadSampleData` timer did NOT populate Rob/Kira (zero error logs), even though the identical seed recipe populated task_tracker, notebooks, AND full_app. So there is no member to log in as.
+- **Seam A (login recipe):** Mentor set `ln_current_user` = the member's **Name** instead of its Id, wrongly concluding "Member has no Id attribute" (the auto-number Id exists). The role-gate had to be adapted to a Name lookup. Fix: the login recipe should name the Id attribute explicitly (or the session contract should standardize on a stable unique key the recipe guarantees).
+- **Seam B (seed timer flakiness):** the `WhenPublished` timer silently did not seed on this app (no error). Non-deterministic across apps — a real reliability gap in the seed mechanism worth a runtime-verify + retry (or a synchronous bootstrap-on-first-load fallback).
+- **Screen-scaffold cost:** step 2 (screens) phantomed once then took ~30 min of author↔validate cycling to persist; the login step ~35 min. This app was pathologically slow — the `.Name`-introspection foot-gun recurred on yet more interfaces (`IObjectSignature`) despite the broadened preamble.
+
+**Net:** the auth/login construct is CODE-COMPLETE (login recipe + plan emission + gate driver + seed alignment; 268 tests pass) and the **role-gate anon-enforcement is runtime-proven**. The member-allow proof is blocked by seed-timer flakiness (Seam B), not by the harness's auth logic. Closing this fully needs Seam A + B fixed + a re-run.
