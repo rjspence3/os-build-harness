@@ -476,6 +476,51 @@ def run_behavioral(spec: dict, base_url: str, login: dict) -> list[dict]:
     return results
 
 
+_CHART_JS = r"""(chartId) => {
+  const inNav=(el)=>!!el.closest('nav,aside,[role=navigation],[class*="sidebar-nav"]');
+  const byId = chartId && (document.querySelector('[data-spec-id="'+chartId.toLowerCase()+'"]')
+             || document.querySelector('[id*="'+chartId+'"]'));
+  const scope = byId || document.querySelector('main, [class*="content"]') || document;
+  const gfx = [...scope.querySelectorAll('svg, canvas')].filter(x=>!inNav(x)
+              && (x.getBoundingClientRect().width>40) && (x.getBoundingClientRect().height>40));
+  return gfx.length;    // a rendered chart is a non-trivial svg/canvas in the content area
+}"""
+
+
+def run_render(spec: dict, base_url: str, login: dict) -> list[dict]:
+    """Phase 2 render checks: a spec'd chart actually RENDERS (a non-trivial svg/canvas), and the
+    spec'd theme is APPLIED (its palette tokens live in the loaded stylesheet). Verdicts, exit nonzero
+    on any fail — so a chart that authored in-model but doesn't paint, or an inert theme, FAILS."""
+    sync_playwright = _lazy_playwright()
+    results = []
+    base = base_url.rstrip("/")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
+        _apply_login(page, base_url, login)
+        theme = (spec.get("design") or {}).get("theme")
+        if theme:
+            first = spec.get("screens", [{}])[0]
+            page.goto(base + "/" + _route_of(spec, first.get("id", "")).lstrip("/"),
+                      wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
+            palette = theme.get("palette") or {}
+            applied = page.evaluate(
+                r"""(keys)=>{const cs=getComputedStyle(document.documentElement);
+                  return keys.some(k=>cs.getPropertyValue('--'+k).trim().length>0);}""",
+                list(palette.keys()) or ["primary"])
+            results.append({"kind": "theme", "target": "design.theme",
+                            "verdict": "APPLIED" if applied else "NOT_APPLIED (palette tokens absent from live stylesheet)"})
+        for s in spec.get("screens", []):
+            for ch in s.get("charts", []) or []:
+                page.goto(base + "/" + _route_of(spec, s["id"]).lstrip("/"),
+                          wait_until="networkidle", timeout=45000); page.wait_for_timeout(3500)
+                n = page.evaluate(_CHART_JS, ch.get("id", ""))
+                results.append({"kind": "chart", "screen": s["id"], "target": ch.get("id"),
+                                "verdict": "RENDERS" if n else "NO_CHART (no non-trivial svg/canvas in content)"})
+        browser.close()
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="harness-capture",
@@ -492,6 +537,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="also run capture-channel assertions inline and exit nonzero on any fail")
     ap.add_argument("--behavioral", action="store_true",
                     help="Phase 6 WORKING gate: drive each spec'd create action and assert a row persists")
+    ap.add_argument("--render", action="store_true",
+                    help="Phase 2 render gate: assert each spec'd chart RENDERS and design.theme is APPLIED at runtime")
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON to stdout")
     args = ap.parse_args(argv)
 
@@ -529,6 +576,23 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  [{mark}] {r['screen']} · create {r['entity']} — {r['verdict']}{delta}")
             if not results:
                 print("  (no CreateEntity actions in spec — nothing to behaviorally verify)")
+        return 1 if n_fail else 0
+
+    if args.render:
+        results = run_render(spec, args.base_url, login)
+        good = {"APPLIED", "RENDERS"}
+        n_ok = sum(1 for r in results if r["verdict"] in good)
+        n_fail = len(results) - n_ok
+        if args.json:
+            print(json.dumps({"render": results, "pass": n_ok, "fail": n_fail}, indent=2))
+        else:
+            print(f"render gate — {len(results)} check(s): {n_ok} ok, {n_fail} fail")
+            for r in results:
+                mark = "ok " if r["verdict"] in good else "FAIL"
+                where = r.get("screen", "") and f"{r['screen']}·"
+                print(f"  [{mark}] {r['kind']} {where}{r.get('target')} — {r['verdict']}")
+            if not results:
+                print("  (no charts or design.theme in spec — nothing to render-verify)")
         return 1 if n_fail else 0
 
     out_dir = args.out
