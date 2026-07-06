@@ -13,6 +13,7 @@ FILES=(
   harness/capture.py
   harness/verify.py
   harness/prompt_step.py
+  harness/schemas/app_spec.v0.json
   harness/BUILD_LOOP.md
   harness/SEAMS.md
   harness/CAPABILITY_MATRIX.md
