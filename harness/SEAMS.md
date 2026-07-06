@@ -161,3 +161,27 @@ Member stays unseeded. This traces the root cause PAST the timer to two deeper p
 **Net:** Seam B's fix is implemented + unit-tested; role-gate anon-enforcement is proven. Fully proving
 member-allow needs Seam D fixed in the login recipe + a FRESH authed build (auth_app is too flaky to
 salvage economically). The honest blocker is Mentor per-app authoring reliability, not harness logic.
+
+### Phase 4 CLOSED — auth construct fully proven on a fresh build (2026-07-06, auth_app3)
+**Seams A/B/C/D/E are RESOLVED and the member-allow proof is GREEN.** A fresh app
+(`harnessbuild_authapp3`) built from the corrected recipes drove all 5 steps with **ZERO thrash**:
+0 cancels, 0 phantoms, 0 hand-steps, 0 failed publishes — every step landed `change_applied=true`,
+`error_count=0` on the FIRST fresh `mentor_start`. Contrast with auth_app/auth_app2, which were
+pathologically phantom-prone; the difference is the fully-corrected recipe set + the tight-poll driver.
+
+- **`--role` result: 2/2 OK — `BLOCKS_ANON` ✅ AND `ALLOWS_MEMBER` ✅.** The member-allow half that
+  was blocked on auth/auth_app2 is now runtime-proven.
+- **Seam E (identifier poison) — the last blocker — is FIXED and proven.** The prior cascade: login
+  stored `Name` in the session key but the role-gate looked members up by `Id` (Text→Id cast), so
+  Mentor silently changed Member's identifier Long→Text → OS-DPL-RDBS-40020 → undeployable. The fix
+  makes `login` and `role_gate` AGREE on the identity attribute (`Name`) as the app-local session key,
+  and both recipes explicitly forbid touching the entity Id/identifier. On auth_app3 step 5 published
+  CLEAN — Mentor's own summary: "No platform role was added and the Member entity was not modified."
+- **Seams B + D proven at runtime here too:** the OnReady bootstrap seeded Member (login succeeded for a
+  real member), and the login lookup refresh resolved the member before the found/not-found branch.
+
+**Net:** the app-local auth/login/role-gate construct is COMPLETE and END-TO-END PROVEN on a clean-room
+build — data-model → screens → seed(OnReady bootstrap) → login → role-gate, 0 thrash, `--role` green.
+Phase 2's last verification dimension (role-gate member-allow) is closed. The remaining honest caveat is
+Mentor per-app authoring reliability (auth_app was flaky where auth_app3 was clean) — a Mentor property,
+not a harness-logic gap; the tight-poll driver + corrected recipes are what made auth_app3 deterministic.
