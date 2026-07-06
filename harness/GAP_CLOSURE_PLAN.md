@@ -59,8 +59,17 @@ Gap: #5. Each construct follows recipe·spec·plan·verify and is DONE only when
 - **Batch C (advanced):** BPT/workflows (author refs+process+publish in ONE turn — avoids the verify-cache corruption), external .NET libraries, multi-app references (element-import every touched entity incl. static).
 **Exit criteria per row:** its four matrix checkmarks are ✓ and a clean build exercised it. Program-level exit: a "kitchen-sink" spec exercising Batches A–C builds first-try, fully verified.
 
-## Phase 5 — Autonomous executor + thrash enforcement (hand-it-to-a-stranger)
-Gap: #6 — BUILD_LOOP is a doc, thrash-avoidance is doctrine, subagent path blocked.
+## Phase 5 — Autonomous executor + thrash enforcement (hand-it-to-a-stranger) — CORE DONE (2026-07-06)
+Gap: #6. **Enforcement backbone shipped + proven:** `harness-gate <spec> --base-url <url>` is the
+single machine-checkable DEFINITION OF DONE — it composes spec+structural+behavioral+role+render+pixel
+into one verdict and exits 0 only when every DECLARED dimension is runtime-green (undeclared = omitted,
+never vacuously passed; a no-op publish never counts). Live-proven on auth_app3 (✅ DONE, exit 0; 9
+browser-free composition tests). **SEAM-001 closed in practice:** `launch_build.sh` now installs the
+build-root `.claude/settings.json` allowlist (harness CLIs incl. harness-gate) into every scaffold —
+verified a fresh scaffold carries it — so a launched per-build session can actually run the gate. The
+headless launch prompt now gates on `harness-gate` exit 0, not self-declaration. REMAINING: a fully
+unattended `RUN_MODE=headless` end-to-end run (claude -p building a fresh spec to gate-green with zero
+human turns) — the drive loop + machine-done are both in place; this is the live certification.
 1. **The runner:** a program that executes `plan_from_spec` steps through Mentor with §Turn/§Recovery ENCODED — one-poll-per-heartbeat, `change_applied=false` → auto re-author in a fresh session (phantom retry), publish-once grouping for `create-form` widgets→wire, cancel-and-split on a cascade timer, verify-at-runtime between phases.
 2. **Enforce, don't advise:** the runner refuses to advance a unit that didn't land; it never reports a no-op publish (`no_changes_detected`) as success.
 3. **Resolve SEAM-001:** expose the harness CLIs as MCP tools the driver is already authorized to call (or ship the build-root launch as the one-line documented path), so a subagent CAN drive.

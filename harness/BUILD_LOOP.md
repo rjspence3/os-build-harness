@@ -104,14 +104,23 @@ Between phases, verify at runtime; never advance on "publish succeeded" alone.
 
 ## §Done — completion criteria (all required)
 
+**One machine check enforces all of it:** `harness-gate <spec> --base-url <url>` runs every applicable
+gate (spec, structural, behavioral, role, render, and — with `--pixel <ref>` — fidelity) and exits 0
+ONLY when every dimension the spec DECLARES is runtime-green. A dimension the spec doesn't exercise is
+omitted, never vacuously passed. This is the "am I done?" the executor gates on — a green publish does
+not count; a no-op publish (`no_changes_detected`) is not progress. The individual gates below are what
+it composes:
+
 - `harness-verify --phase spec` → exit 0.
 - `harness-capture --assert` (structural: componentPresent/binding/navigates) → pass, verified at runtime.
-- **Behavioral gate (Phase 6): every spec'd write-path drives + persists.** ← the real bar.
+- **Behavioral gate: every spec'd write-path drives + persists.** ← the real bar.
+- Role gate (`--role`) for gated screens; render gate (`--render`) for charts/theme; pixel gate
+  (`--pixel`) for fidelity.
 - Every list renders real seeded rows; no dead buttons; 0 console errors.
 - Design parity per the spec's `design` target.
 
 If any write-path is a dead button or doesn't persist, the app is a scaffold, not done —
-regardless of how many structural assertions pass.
+regardless of how many structural assertions pass. `harness-gate` refuses to call it done.
 
 ---
 

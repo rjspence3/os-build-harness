@@ -207,3 +207,27 @@ The last missing verification pillar ("fool the head of product") is now a harne
   it. Lesson for reference authoring: a fidelity reference must differ in RENDERED pixels, not in
   clamped/no-op transforms.
 - 8 browser-free unit tests (`tests/test_pixel_gate.py`) pin the discriminating core.
+
+### Phase 5 CORE — autonomous-executor enforcement backbone + SEAM-001 closed (2026-07-06)
+The autonomous run model needs a done-check a green publish can't fake, and a launched build-root
+session that can actually run it. Both shipped.
+- **`harness-gate <spec> --base-url <url>` (harness/gate.py, new console script)** — the single
+  machine-checkable DEFINITION OF DONE. Composes spec + structural + behavioral + role + render +
+  (opt-in) pixel into ONE acceptance report + exit code. Policy: a dimension the spec DECLARES is
+  mandatory; a dimension it does not exercise is OMITTED (never a vacuous pass); the behavioral gate is
+  the real bar; exit 0 iff DONE (no FAIL and spec+structural actually ran). This is the enforcement the
+  headless executor and CI gate on — a no-op publish (no_changes_detected) never counts as done.
+  Live-proven on auth_app3: ✅ DONE, exit 0 (spec ok, structural 3/3, role 2/2, pixel 100%, behavioral
+  + render correctly OMITted). 9 browser-free composition tests (`tests/test_gate.py`) pin the policy
+  (undeclared→OMIT, spec-gap short-circuits before live gates, any FAIL flips the verdict + exit code).
+- **SEAM-001 (build-root can't run the harness CLIs) CLOSED IN PRACTICE.** Root cause found: the
+  `_template/.claude/settings.json` allowlist existed but `launch_build.sh` never COPIED it into a
+  scaffold — so a launched session's Bash sandbox still denied the CLIs. Fixed: the launcher now
+  installs `.claude/settings.json` (idempotently, never clobbering a human edit) alongside CLAUDE.md +
+  WALLS.md. Verified a fresh scaffold carries a valid 16-rule allowlist incl. harness-gate. The
+  build-root permission-scope artifact is gone; a per-build session can now run the whole gate.
+- **Headless launch now gates on the machine-done**, not self-declaration: the `RUN_MODE=headless`
+  `claude -p` prompt drives ONLY the auto-emitted plan and is DONE only when `harness-gate` exits 0.
+- REMAINING (live certification): a fully unattended headless build of a fresh spec to gate-green with
+  zero human Mentor turns. The drive loop (BUILD_LOOP §Turn/§Recovery) + the machine-done are both in
+  place; this is the end-to-end run, best executed as an actual dispatched per-build session.

@@ -13,6 +13,7 @@ dynamic = ["dependencies"]
 harness-verify = "harness.verify:main"
 harness-capture = "harness.capture:main"
 harness-prompt-step = "harness.prompt_step:main"
+harness-gate = "harness.gate:main"
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
