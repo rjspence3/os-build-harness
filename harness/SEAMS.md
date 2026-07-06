@@ -231,3 +231,12 @@ session that can actually run it. Both shipped.
 - REMAINING (live certification): a fully unattended headless build of a fresh spec to gate-green with
   zero human Mentor turns. The drive loop (BUILD_LOOP §Turn/§Recovery) + the machine-done are both in
   place; this is the end-to-end run, best executed as an actual dispatched per-build session.
+
+### Seam (schema↔planner disagreement) — isDefault, surfaced by the gate_demo capstone spec (2026-07-06)
+Building a FRESH CRUD spec (`gate_demo`) surfaced a real Phase-1 expressiveness gap the prior specs hid:
+`plan_from_spec`'s `screen` scaffold step READS `screen.isDefault` (to mark the landing screen), but
+`$defs/screen` was `additionalProperties:false` and never declared it — so `--phase spec` rejected any
+spec that set it. Harmless only when the default is the FIRST screen (the planner's fallback); any
+multi-screen app whose default isn't first was trapped (set it → spec-gap; omit it → wrong default).
+Fixed: added `isDefault` (boolean) to the screen schema + a cross-ref guard (≤1 screen may set it) +
+2 tests. This is the flywheel working — a new spec shape exposed a latent schema/consumer drift.

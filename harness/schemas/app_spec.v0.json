@@ -93,6 +93,7 @@
         "id": { "type": "string", "description": "Stable id; assertions and navigation reference it." },
         "name": { "type": "string" },
         "route": { "type": "string" },
+        "isDefault": { "type": "boolean", "description": "Marks this screen as the app's default (landing) screen. Consumed by plan_from_spec's `screen` scaffold step. At most one screen may set it; if none do, the first screen is the default." },
         "uiFlow": { "type": "string", "description": "Owning UI flow, e.g. 'MainFlow' (role-gated) or 'Common' (Login/InvalidPermissions). Live ODC reports uiFlowName." },
         "inputParameters": { "type": "array", "items": { "$ref": "#/$defs/screenInput" }, "description": "Typed screen input parameters (e.g. a detail screen's record Id)." },
         "roles": { "type": "array", "items": { "type": "string" }, "description": "Subset of app.roles permitted to open this screen." },

@@ -88,6 +88,11 @@ def _crossref_findings(spec: dict) -> list[Finding]:
     _check_unique([s["id"] for s in spec["screens"]], "screen id", gap)
     _check_unique([i["name"] for i in spec.get("integrations", [])], "integration name", gap)
 
+    default_screens = [s["id"] for s in spec["screens"] if s.get("isDefault")]
+    if len(default_screens) > 1:
+        gap("more than one screen marked isDefault",
+            f"screens {default_screens} all set isDefault=true; at most one may be the app default")
+
     for entity in spec["dataModel"]["entities"]:
         ename = entity["name"]
         _check_unique([a["name"] for a in entity["attributes"]], f"attribute name in {ename}", gap)

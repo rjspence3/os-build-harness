@@ -55,6 +55,23 @@ def test_chart_referencing_unknown_field_is_crossref_gap() -> None:
     assert any("chart series valueField" in f.summary for f in gaps)
 
 
+def test_isdefault_is_schema_valid_and_single_is_clean() -> None:
+    # isDefault is consumed by plan_from_spec's screen scaffold; the schema must permit it
+    # (regression: it used to be additionalProperties-rejected, forcing authors to drop it).
+    spec = _completed_example()
+    spec["screens"][1]["isDefault"] = True
+    assert _schema_findings(spec) == []
+    assert [f for f in validate_spec(spec) if f.severity == "spec-gap"] == []
+
+
+def test_two_default_screens_is_crossref_gap() -> None:
+    spec = _completed_example()
+    spec["screens"][0]["isDefault"] = True
+    spec["screens"][1]["isDefault"] = True
+    gaps = [f for f in validate_spec(spec) if f.severity == "spec-gap"]
+    assert any("isDefault" in f.summary for f in gaps)
+
+
 def test_valid_chart_is_clean() -> None:
     spec = _completed_example()
     spec["screens"][0]["charts"] = [{
