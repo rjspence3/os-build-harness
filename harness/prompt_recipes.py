@@ -24,11 +24,13 @@ _PREAMBLE = (
     "attribute data-spec-id=\"<the component id below>\" (OutSystems widget Attributes: Name=data-spec-id, "
     "Value=the id) so runtime verification can resolve it exactly; for a data table/list also set "
     "data-entity=\"<EntityName>\" on the container and data-row-id on each row. Do NOT add any platform Role "
-    "to a screen unless this unit is explicitly about auth — keep screens Anonymous. Author DIRECTLY; do NOT "
-    "spend turns on long read-only introspection loops, and do NOT call `.Name` on widget/type/flow interfaces "
-    "(IMobileWidget, ITypeSignature, IUIFlowNodeSignature, IIdentifierType, IBasicType do NOT expose `.Name` — "
-    "it is a compile error; use the correct *Signature* interface or skip the diagnostic). After authoring, run "
-    "the model validation and report errors/warnings; do NOT publish (the orchestrator publishes)."
+    "to a screen unless this unit is explicitly about auth — keep screens Anonymous. Author DIRECTLY and rely on the "
+    "final model validation — do NOT run read-only introspection loops to enumerate or 'verify' your own work. In "
+    "particular, do NOT read a `.Name` PROPERTY off Model-API node/widget/type interfaces: MANY do not expose one and "
+    "it is a compile error (IMobileWidget, IActionNode, IFlowNode, ITypeSignature, IUIFlowNodeSignature, "
+    "IIdentifierType, IBasicType all lack `.Name`). If you must name a type use GetInterface().Name; otherwise skip "
+    "the diagnostic and just author. After authoring, run the model validation and report errors/warnings; do NOT "
+    "publish (the orchestrator publishes)."
 )
 
 
@@ -406,8 +408,8 @@ def row_actions(params: dict) -> str:
         body = (
             f"On the {screen} screen's {entity} table, ADD an \"Edit\" Link to EACH row (set data-spec-id="
             f"\"edit{lentity}btn\"). Do NOT rebuild the table or aggregate — only add the link cell. Its OnClick "
-            f"screen action sets the screen-local {local} variable = the CURRENT row's {entity} record (all "
-            f"attributes incl. its Id), so the create/edit form is prefilled AND its Id is set. Because "
+            f"screen action does a SINGLE Assign: {local} = <the table's aggregate>.List.Current.{entity} (the whole "
+            f"row record, incl. its Id) — so the create/edit form is prefilled AND its Id is set. Because "
             f"{save_action} calls UpdateAction when the record's Id is not NullIdentifier(), a subsequent Save then "
             f"UPDATES that row. Do not change {save_action} or the form inputs; only add the Edit link + its action.")
     else:

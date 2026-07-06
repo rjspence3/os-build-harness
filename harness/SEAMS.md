@@ -113,3 +113,16 @@ Schema v0.3 (agents/charts/design.theme/sampleData, additive) + plan emission ma
 **Runtime-verified (not trusted):** CRUD `--behavioral` PERSISTS; `/Projects` renders the chart (`svg` present, chart element found); the theme applied (`--primary: #5E6AD2` live in the DOM); the agent app deployed + published clean (NO OS-APPS-40028). Both never-built-live recipes (chart, theme) were **buildable exactly as-written** — no seam.
 
 **Optimization (not a seam):** the chart step took ~112 min because Mentor had to discover the block-instance `ExtendedProperties` attribute API + the DataPoint `mapTo` argument-expression shape by trial. Folded both into the `chart` recipe (name `ExtendedProperties` not `.Attributes.Create()`; `mapTo {Value: IntegerToDecimal(<value>), Label: <category>}`; quote hex colors) to shave that on the next build. 0% thrash is met; this pushes toward least-TIME.
+
+---
+
+## Phase 2 — verification depth: render gate + full CRUD gate (2026-07-06)
+The behavioral gate now verifies more than "creates persist":
+- **`--render`** asserts a spec'd chart RENDERS (non-trivial svg/canvas) + `design.theme` is APPLIED (palette tokens live in the stylesheet). Proven on `full_app`: 2/2.
+- **`--behavioral` covers Create/Update/Delete.** Added the `row-actions` recipe (per-row Edit link → prefill+Update via the existing Save<X>Record UpdateAction branch; per-row Delete button → DeleteAction+RefreshData; split edit/delete phases) + gate drivers `_drive_update`/`_drive_delete`. Authored Edit+Delete on the live `full_app` and the gate returned **create PERSISTS · update UPDATES · delete DELETES** (3/3). A dead Update button now FAILS — Phase 2's exit criterion.
+
+**Two optimization findings (not seams — both authored first-try, just slow):**
+- The `.Name`-property foot-gun is broader than first enumerated: Mentor also hit it on `IActionNode`/`IFlowNode` while self-verifying, burning ~15 min in an introspection loop. Broadened `_PREAMBLE` to forbid reading `.Name` off any Model-API node/widget/type interface + reiterate "don't run read-only verification loops."
+- The Edit affordance's "set New<X> = the row's record" assignment is API-heavy for Mentor to discover (hit `IServerEntity.RecordType` etc.). Named the exact shape in the recipe (`New<X> = <aggregate>.List.Current.<Entity>`) to shave it next time.
+
+**Remaining Phase-2 (build-dependent, not yet proven): role-gate enforcement (needs a non-anonymous app) + agent-reasoning-in-gate (needs the agent recipe to also emit a REST trigger).**
