@@ -413,6 +413,30 @@ def test_plan_emits_v03_agent_chart_theme_and_sampledata_seed():
     assert {"Name": "Website", "Priority": 3} in seed["rows"]        # uses spec sampleData, not placeholders
 
 
+def test_plan_emits_row_actions_for_update_and_delete():
+    """Phase 2: a list screen whose action does Update/Delete gets row-actions (Edit/Delete) steps
+    in addition to the create-form; the recipe emits the drivable data-spec-ids."""
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [
+                {"name": "Task", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Title", "dataType": "Text"}]}]},
+            "screens": [{"id": "tasks", "name": "Tasks",
+                         "components": [{"id": "tbl", "type": "Table", "boundTo": "Task"}],
+                         "actions": [{"name": "SaveTask", "trigger": {"onComponent": "tbl", "event": "onClick"},
+                                      "does": ["CreateEntity", "UpdateEntity", "DeleteEntity"]}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
+    steps = pr.plan_from_spec(spec)
+    ra = [s for s in steps if s["recipe"] == "row-actions"]
+    phases = sorted(s["params"]["phase"] for s in ra)
+    assert phases == ["delete", "edit"]                         # both affordances, separate steps
+    assert [s for s in steps if s["recipe"] == "create-form"]   # create-form still emitted
+    edit = pr.render("row-actions", {"screen": "tasks", "entity": "Task", "phase": "edit"})
+    assert 'data-spec-id="edittaskbtn"' in edit and "UpdateAction" in edit
+    dele = pr.render("row-actions", {"screen": "tasks", "entity": "Task", "phase": "delete"})
+    assert 'data-spec-id="deletetaskbtn"' in dele and "DeleteAction" in dele
+
+
 def test_plan_scaffolds_but_no_list_or_write_for_bare_spec():
     """Scaffold steps (data-model + screens) are ALWAYS emitted — every app needs its entities
     and screens. But a bare screen with a Container (no data component) and no actions gets no

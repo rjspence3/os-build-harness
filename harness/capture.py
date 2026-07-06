@@ -453,8 +453,120 @@ def _drive_create(page, base_url: str, spec: dict, form_screen: dict, entity: st
     return r
 
 
+def _goto_entity_list(page, base: str, spec: dict, form_screen: dict, entity: str):
+    """Navigate to the entity's list, contextualized via the parent nav when the screen needs a
+    parent input param (seam 3c). Returns (list_url, None) or (None, error_verdict)."""
+    from harness.prompt_recipes import _list_screen_for_entity
+    list_screen = _list_screen_for_entity(spec, entity)
+    if not list_screen:
+        return None, "NO_LIST_SCREEN (cannot measure)"
+    needs_ctx = any(ip.get("references") for ip in form_screen.get("inputParameters", []))
+    ctx_nav = _parent_context_nav(spec, form_screen) if needs_ctx else None
+    if ctx_nav:
+        parent_route, click_label = ctx_nav
+        page.goto(base + "/" + parent_route.lstrip("/"), wait_until="networkidle", timeout=45000)
+        page.wait_for_timeout(2500)
+        opened = page.evaluate(
+            r"""(label)=>{const re=label?new RegExp('^\\s*'+label+'\\s*$','i'):/^\s*(open|view|details?)\s*$/i;
+              const b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                 .find(x=>re.test((x.innerText||'').trim()) && !x.closest('nav,aside,[class*="sidebar-nav"]'));
+              if(b){b.click(); return true;} return false;}""", click_label)
+        if not opened:
+            return None, "NO_PARENT_CONTEXT (no parent-list entry point)"
+        page.wait_for_timeout(2800)
+        list_url = page.url
+    else:
+        list_url = base + "/" + _route_of(spec, list_screen).lstrip("/")
+    page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
+    return list_url, None
+
+
+_CLICK_ROWACTION_JS = r"""([specId, textRe]) => {
+  const inNav=(el)=>!!el.closest('nav,aside,[class*="sidebar-nav"]');
+  let b=[...document.querySelectorAll('[data-spec-id="'+specId+'"]')].find(x=>!inNav(x));
+  if(!b){ const re=new RegExp(textRe,'i');
+    b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+       .find(x=>re.test((x.innerText||'').trim()) && !inNav(x)); }
+  if(b){ b.click(); return true; } return false;
+}"""
+
+_SET_FIELD_JS = r"""([fields, val]) => {
+  const bad=(el)=>el.disabled||el.readOnly||el.offsetParent===null||el.closest('nav,aside,[class*="sidebar-nav"]');
+  const set=(el,v)=>{const d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
+    el.focus(); d.set.call(el,v); el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true})); el.blur();};
+  for(const f of fields){ let el=document.querySelector('[data-spec-id="'+f.toLowerCase()+'input"]');
+    if(el&&el.tagName!=='INPUT'&&el.tagName!=='TEXTAREA') el=el.querySelector('input,textarea');
+    if(el&&!bad(el)){ set(el,val); return true; } }
+  return false;
+}"""
+
+
+def _drive_delete(page, base_url: str, spec: dict, form_screen: dict, entity: str) -> dict:
+    """Per-row Delete: count → click a row's Delete → reload → assert the count dropped."""
+    r = {"entity": entity, "screen": form_screen["id"], "op": "delete"}
+    base = base_url.rstrip("/")
+    try:
+        list_url, err = _goto_entity_list(page, base, spec, form_screen, entity)
+        if err:
+            r["verdict"] = err; return r
+        before = page.evaluate(_COUNT_JS, entity); r["before"] = before
+        if not before:
+            r["verdict"] = "NO_ROWS (nothing to delete)"; return r
+        clicked = page.evaluate(_CLICK_ROWACTION_JS, ["delete" + entity.lower() + "btn", r"^\s*delete\s*$"])
+        if not clicked:
+            r["verdict"] = "NO_DELETE_ENTRY (no Delete control on rows)"; return r
+        page.wait_for_timeout(3200)
+        page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2800)
+        after = page.evaluate(_COUNT_JS, entity); r["after"] = after
+        r["verdict"] = "DELETES" if (after is not None and before is not None and after < before) \
+            else "NO_DELETE (row count did not drop after reload)"
+    except Exception as e:
+        r["verdict"] = "ERROR " + repr(e)[:90]
+    return r
+
+
+def _drive_update(page, base_url: str, spec: dict, form_screen: dict, entity: str) -> dict:
+    """Per-row Update: open a row's Edit (prefills the form) → set the first text field to a unique
+    marker → save → reload → assert the marker appears in the list."""
+    from harness.prompt_recipes import _form_fields
+    r = {"entity": entity, "screen": form_screen["id"], "op": "update"}
+    base = base_url.rstrip("/")
+    try:
+        list_url, err = _goto_entity_list(page, base, spec, form_screen, entity)
+        if err:
+            r["verdict"] = err; return r
+        if not page.evaluate(_COUNT_JS, entity):
+            r["verdict"] = "NO_ROWS (nothing to edit)"; return r
+        opened = page.evaluate(_CLICK_ROWACTION_JS, ["edit" + entity.lower() + "btn", r"^\s*edit\s*$"])
+        if not opened:
+            r["verdict"] = "NO_EDIT_ENTRY (no Edit control on rows)"; return r
+        page.wait_for_timeout(1800)
+        marker = "QAEDIT" + str(int(page.evaluate("()=>Math.floor(performance.now())")))
+        setok = page.evaluate(_SET_FIELD_JS, [_form_fields(spec, entity), marker])
+        if not setok:
+            r["verdict"] = "EDIT_FORM_NOT_FOUND (Edit opened no editable field)"; return r
+        page.wait_for_timeout(300)
+        saved = page.evaluate(
+            r"""(entity)=>{let b=document.querySelector('[data-spec-id="save'+entity.toLowerCase()+'btn"]');
+              if(!b) b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                 .find(x=>/^\s*(save|update|submit|done)\b/i.test((x.innerText||'').trim()));
+              if(b){b.click(); return true;} return false;}""", entity)
+        if not saved:
+            r["verdict"] = "SAVE_NOT_FOUND (edit form present but no save button)"; return r
+        page.wait_for_timeout(3200)
+        page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2800)
+        present = page.evaluate("(m)=>document.body.innerText.includes(m)", marker)
+        r["marker"] = marker
+        r["verdict"] = "UPDATES" if present else "NO_UPDATE (edited value not present after reload)"
+    except Exception as e:
+        r["verdict"] = "ERROR " + repr(e)[:90]
+    return r
+
+
 def run_behavioral(spec: dict, base_url: str, login: dict) -> list[dict]:
-    """For every spec'd CreateEntity action, drive it and assert persistence."""
+    """For every spec'd Create/Update/Delete action, drive it and assert the change persists.
+    Order per screen: create (adds a row) → update (edits one) → delete (removes one)."""
     from harness.prompt_recipes import _screen_write_entity
     sync_playwright = _lazy_playwright()
     results, seen = [], set()
@@ -463,15 +575,19 @@ def run_behavioral(spec: dict, base_url: str, login: dict) -> list[dict]:
         page = browser.new_context(viewport={"width": 1440, "height": 900}).new_page()
         _apply_login(page, base_url, login)
         for screen in spec.get("screens", []):
+            does_all = set()
             for a in screen.get("actions", []):
-                if "CreateEntity" not in set(a.get("does", [])):
-                    continue
-                entity = _screen_write_entity(spec, screen)
-                key = (screen["id"], entity)
-                if not entity or key in seen:
-                    continue
-                seen.add(key)
-                results.append(_drive_create(page, base_url, spec, screen, entity))
+                does_all |= set(a.get("does", []))
+            entity = _screen_write_entity(spec, screen)
+            if not entity:
+                continue
+            for kind, driver in (("CreateEntity", _drive_create),
+                                 ("UpdateEntity", _drive_update),
+                                 ("DeleteEntity", _drive_delete)):
+                key = (screen["id"], entity, kind)
+                if kind in does_all and key not in seen:
+                    seen.add(key)
+                    results.append(driver(page, base_url, spec, screen, entity))
         browser.close()
     return results
 
@@ -564,18 +680,19 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.behavioral:
         results = run_behavioral(spec, args.base_url, login)
-        n_persist = sum(1 for r in results if r["verdict"] == "PERSISTS")
-        n_fail = len(results) - n_persist
+        good = {"PERSISTS", "UPDATES", "DELETES"}
+        n_ok = sum(1 for r in results if r["verdict"] in good)
+        n_fail = len(results) - n_ok
         if args.json:
-            print(json.dumps({"behavioral": results, "pass": n_persist, "fail": n_fail}, indent=2))
+            print(json.dumps({"behavioral": results, "pass": n_ok, "fail": n_fail}, indent=2))
         else:
-            print(f"behavioral gate — {len(results)} create write-path(s): {n_persist} persist, {n_fail} fail")
+            print(f"behavioral gate — {len(results)} write-path(s): {n_ok} ok, {n_fail} fail")
             for r in results:
-                mark = "ok " if r["verdict"] == "PERSISTS" else "FAIL"
+                mark = "ok " if r["verdict"] in good else "FAIL"
                 delta = f" ({r.get('before')}->{r.get('after')})" if "after" in r else ""
-                print(f"  [{mark}] {r['screen']} · create {r['entity']} — {r['verdict']}{delta}")
+                print(f"  [{mark}] {r['screen']} · {r.get('op', 'create')} {r['entity']} — {r['verdict']}{delta}")
             if not results:
-                print("  (no CreateEntity actions in spec — nothing to behaviorally verify)")
+                print("  (no Create/Update/Delete actions in spec — nothing to behaviorally verify)")
         return 1 if n_fail else 0
 
     if args.render:

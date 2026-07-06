@@ -391,6 +391,35 @@ def theme(params: dict) -> str:
         f"Verify at RUNTIME (loaded stylesheets / body background), not in-model. Do not publish.")
 
 
+def row_actions(params: dict) -> str:
+    """Per-row Edit/Delete affordances on a list screen — the Update + Delete write-paths.
+    Reuses the create-form's local var (New<Entity>) + Save<Entity>Record. Authored as separate
+    `edit` and `delete` phases (a combined per-row action-wiring turn on a populated screen cascades,
+    same lesson as create-form seam 3f). params: screen, entity, phase(edit|delete), save_action?."""
+    screen = _p(params, "screen", required=True)
+    entity = _p(params, "entity", required=True)
+    phase = _p(params, "phase", "delete")
+    save_action = _p(params, "save_action", f"Save{entity}Record")
+    lentity = entity.lower()
+    local = f"New{entity}"
+    if phase == "edit":
+        body = (
+            f"On the {screen} screen's {entity} table, ADD an \"Edit\" Link to EACH row (set data-spec-id="
+            f"\"edit{lentity}btn\"). Do NOT rebuild the table or aggregate — only add the link cell. Its OnClick "
+            f"screen action sets the screen-local {local} variable = the CURRENT row's {entity} record (all "
+            f"attributes incl. its Id), so the create/edit form is prefilled AND its Id is set. Because "
+            f"{save_action} calls UpdateAction when the record's Id is not NullIdentifier(), a subsequent Save then "
+            f"UPDATES that row. Do not change {save_action} or the form inputs; only add the Edit link + its action.")
+    else:
+        body = (
+            f"On the {screen} screen's {entity} table, ADD a \"Delete\" Button to EACH row (set data-spec-id="
+            f"\"delete{lentity}btn\"). Do NOT rebuild the table or aggregate — only add the button cell. Its OnClick "
+            f"screen action calls the {entity} entity's DeleteAction passing the CURRENT row's Id, then RefreshData "
+            f"the table aggregate so the row disappears. Do NOT add a confirmation dialog (keep it drivable).")
+    return (f"{_PREAMBLE}\n\n{body}\nKeep the screen Anonymous. The change MUST persist + survive a page reload. "
+            f"Do not publish.")
+
+
 def json_1line(obj) -> str:
     import json
     return json.dumps(obj, separators=(", ", "="))
@@ -404,6 +433,7 @@ RECIPES = {
     "role-gate": role_gate,
     "seed-entity": seed_entity,
     "create-form": create_form,
+    "row-actions": row_actions,
     "agent": agent,
     "chart": chart,
     "theme": theme,
@@ -613,15 +643,15 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 "home": acc.get("redirectTo", "Home"),
                 "login": login,
             }})
-        # Phase 6 write-path: any action that mutates an entity becomes a create-form step.
-        # This is the definition of done — the plan must not omit it (seam: linear Documents).
+        # Phase 6 write-paths: mutating actions become build steps (definition of done).
+        # CreateEntity -> create-form (3 thrash-free phases); UpdateEntity/DeleteEntity -> row-actions.
+        does_all = set()
         for a in s.get("actions", []):
-            if _MUTATING & set(a.get("does", [])):
-                entity = _screen_write_entity(spec, s)
-                if not entity:
-                    continue
-                p = {"screen": s["id"], "entity": entity,
-                     "fields": _form_fields(spec, entity)}
+            does_all |= set(a.get("does", []))
+        entity = _screen_write_entity(spec, s) if (_MUTATING & does_all) else None
+        if entity:
+            if "CreateEntity" in does_all:
+                p = {"screen": s["id"], "entity": entity, "fields": _form_fields(spec, entity)}
                 sid = _screen_id_param(s, entity)
                 if sid:
                     p["id_param"] = sid
@@ -634,10 +664,8 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 ret = _list_screen_for_entity(spec, entity, exclude=s["id"])
                 if ret:
                     p["return_screen"] = ret
-                # Seam 3f: emit the write-path as three thrash-free sub-steps instead of one
-                # cascade-prone turn. action = fresh turn; widgets = fresh turn; wire = RESUME the
-                # widgets turn's session (build on its unpublished widgets), then publish ONCE.
-                why = f"{s['id']}.{a['name']} does {sorted(_MUTATING & set(a.get('does', [])))}"
+                # Seam 3f: three thrash-free sub-steps. wire RESUMEs the widgets session; publish ONCE.
+                why = f"{s['id']} CreateEntity {entity}"
                 steps.append({"recipe": "create-form", "why": f"{why} — server action (fresh turn)",
                               "params": {**p, "phase": "action"}})
                 steps.append({"recipe": "create-form", "why": f"{why} — form widgets (fresh turn; publish deferred)",
@@ -645,7 +673,17 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 steps.append({"recipe": "create-form",
                               "why": f"{why} — wire OnClick (RESUME the widgets session; publish once after)",
                               "params": {**p, "phase": "wire"}})
-                break  # one write-path step per screen
+            # Update/Delete: per-row affordances on a LIST, each its own turn (avoid the combined-edit
+            # cascade). Skip on a detail screen with an id_param — its create-form already updates in place.
+            has_list = any(c.get("type") in _DATA_COMPONENT_TYPES
+                           and (c.get("boundTo") or "").split(".")[0] == entity
+                           for c in s.get("components", []))
+            if has_list and "UpdateEntity" in does_all:
+                steps.append({"recipe": "row-actions", "why": f"{s['id']} UpdateEntity {entity} (per-row Edit)",
+                              "params": {"screen": s["id"], "entity": entity, "phase": "edit"}})
+            if has_list and "DeleteEntity" in does_all:
+                steps.append({"recipe": "row-actions", "why": f"{s['id']} DeleteEntity {entity} (per-row Delete)",
+                              "params": {"screen": s["id"], "entity": entity, "phase": "delete"}})
         # v0.3: native charts declared on the screen -> one `chart` step each.
         for ch in s.get("charts", []) or []:
             steps.append({"recipe": "chart",
