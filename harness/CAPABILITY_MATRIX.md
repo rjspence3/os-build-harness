@@ -78,8 +78,9 @@
 | Business Process / BPT | ○ | ✗ | ✗ | `CreateBusinessProcess`+`CreateNode<IStartNode/IAutomaticActivityNode/IHumanActivityNode/IDecisionNode>`; auto-activity calls a PUBLIC Service Action (memory). **Publishing a Workflow app with 0 processes corrupts the verify cache — author refs+process in ONE turn.** |
 | Global event | ○ | ✗ | ✗ | `CreateGlobalEvent` (memory). |
 | Sample data / bootstrap (LoadSampleData) | ✓ (seed-entity) | ~ | ✓ | Empty-guarded LoadSampleData + WhenPublished timer. Runs once — idempotent guard, not the run-once flag (R5). |
-| AI Agent (internals: CreateAgent/CallAgent/BuildMessages/AgentTask) | ○ | ✗ | ~ | MCP authors a GOOD agent (proven); system prompt lives in BuildMessages literal. **AIModel↔agent binding is Portal-only — the one MCP wall (memory `odc_mcp_ai_model_binding_portal_only`).** |
-| AI Model connection | ✗ (Portal) | ✗ | ✗ | Portal step; app_create kind=AIAgent ships a blank shell. |
+| AI Agent (internals: CreateAgent/CallAgent/BuildMessages/AgentTask) | ~ | ✗ | ✓ (publish) | MCP authors a GOOD agent (proven); system prompt lives in BuildMessages literal. **FULLY MCP-BUILDABLE from scratch as of 2026-07-05** — see AIModel binding below. Needs an `agent` recipe + plan step. |
+| AI Model binding (agent AIModel slot ← AIModelConnection) | ~ | ✗ | ✓ (publish) | **WALL LIFTED 2026-07-05 (live-proven).** Bind the agent's AIModel to a **Trial** AIModelConnection (`TrialClaudeHaiku4_5`) in the same Mentor turn that authors the agent; publishes clean (rev 1→2, NO OS-APPS-40028). The old Portal-only step is gone. (Customer/non-Trial connection bind untested — use a Trial model.) |
+| AI Model connection asset | n/a (tenant) | n/a | ✓ (context_connections) | Trial models (`TrialClaudeHaiku4_5`/`TrialGPT5`/`TrialAmazonNovaPro`) exist tenant-wide, reference-able + bindable via MCP. app_create kind=AIAgent still ships a blank shell (author internals via MCP). |
 
 ## Security / identity / app-level
 | Construct | Recipe | Plan | Verify | Thrash-free note |
@@ -95,6 +96,6 @@
 **Tier 1 — close the proven thrash seams (make the CRUD slice 0%-thrash), then every task_tracker-shaped app is first-try:**
 - `entity`/`data-model` recipe + plan step (3d) · `screen` recipe with Anonymous baked + change_applied gate (3d/anon/phantom) · list-screen emits the spec nav component (3e) · seed step for list-bound entities lacking a create UI (3g) · create-form 3-phase — **DONE (3f)**. Tighten `_COUNT_JS` (G-count).
 **Tier 2 — breadth the common app needs:** exception handling (OnException) · input validation · REST consume · Web Blocks · static entities · charts · client variables.
-**Tier 3 — advanced:** BPT/workflows · AI agents (internals; flag the Portal AIModel-bind wall) · external libraries · multi-app references · SQL nodes · SOAP.
+**Tier 3 — advanced:** BPT/workflows · **AI agents (NOW fully MCP-buildable incl. model bind — needs an `agent` recipe: app_create AIAgent → author agent+AgentFlow+BuildMessages+public Call service action → bind AIModel to a Trial connection → publish)** · external libraries · multi-app references · SQL nodes · SOAP.
 
 Each tier: add the recipe (with its thrash-free note), emit it from `plan_from_spec` where the spec expresses it, add a verifier assertion, and prove it on a from-scratch build whose spec exercises it. A row is DONE only when a clean-room build authors it first-try AND a verifier confirms it at runtime.
