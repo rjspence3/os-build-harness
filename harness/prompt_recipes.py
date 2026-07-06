@@ -24,8 +24,11 @@ _PREAMBLE = (
     "attribute data-spec-id=\"<the component id below>\" (OutSystems widget Attributes: Name=data-spec-id, "
     "Value=the id) so runtime verification can resolve it exactly; for a data table/list also set "
     "data-entity=\"<EntityName>\" on the container and data-row-id on each row. Do NOT add any platform Role "
-    "to a screen unless this unit is explicitly about auth — keep screens Anonymous. After authoring, run the "
-    "model validation and report errors/warnings; do NOT publish (the orchestrator publishes)."
+    "to a screen unless this unit is explicitly about auth — keep screens Anonymous. Author DIRECTLY; do NOT "
+    "spend turns on long read-only introspection loops, and do NOT call `.Name` on widget/type/flow interfaces "
+    "(IMobileWidget, ITypeSignature, IUIFlowNodeSignature, IIdentifierType, IBasicType do NOT expose `.Name` — "
+    "it is a compile error; use the correct *Signature* interface or skip the diagnostic). After authoring, run "
+    "the model validation and report errors/warnings; do NOT publish (the orchestrator publishes)."
 )
 
 
@@ -131,14 +134,20 @@ def seed_entity(params: dict) -> str:
     fk_txt = f" {fk_notes}" if fk_notes else ""
     return (
         f"{_PREAMBLE}\n\n"
-        f"Populate the {entity} entity with sample data using the app's EXISTING sample-data mechanism — find the "
-        f"loader that seeds the other entities (a LoadSampleData orchestrator calling per-entity "
-        f"LoadSampleDataFor<X> actions, run by a timer on publish) and add a LoadSampleDataFor{entity} action in "
-        f"the same Assign->Create<Entity> style, wired into the orchestrator. Create these rows (set FKs to "
-        f"existing referenced rows so they resolve):{fk_txt}\n{rows_txt}\n"
-        f"This is a DATA-ONLY unit — do not touch any screen UI. Note: LoadSampleData often runs once on first "
-        f"publish; if the rows do not appear after publish, the run-once guard blocked it — clear the guard or "
-        f"delete+re-run so the {entity} rows actually insert. Verify the rows exist at runtime."
+        f"Seed the {entity} entity with sample data. This is a DATA-ONLY unit — do not touch any screen UI. Do NOT "
+        f"assume a sample-data mechanism already exists; on a fresh app there is none, so CREATE it (and REUSE it "
+        f"if it is already present):\n"
+        f"1. A server action LoadSampleData. Inside, guard on emptiness: use an aggregate (max 1 row) to check "
+        f"whether {entity} has zero rows; ONLY if empty, create these rows — each via the {entity} CreateAction "
+        f"using a typed local {entity} variable with one Assign PER attribute (NEVER an inline record literal, which "
+        f"fails on fresh apps).{fk_txt}\n{rows_txt}\n"
+        f"   (If a LoadSampleData action already exists, ADD this empty-guarded {entity} seeding to it instead of "
+        f"creating a second one.)\n"
+        f"2. Make LoadSampleData run automatically after deploy: if no such timer exists, create a Timer "
+        f"(e.g. BootstrapData) whose action is LoadSampleData and whose Schedule is WhenPublished. The empty-guard "
+        f"in step 1 makes it idempotent across re-publishes.\n"
+        f"After authoring, run validation. Verify the {entity} rows exist at RUNTIME after publish (the timer fires "
+        f"asynchronously on deploy)."
     )
 
 

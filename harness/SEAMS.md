@@ -92,3 +92,15 @@ For an anon master→detail app like task_tracker, the minimal clean path is **~
 Then `--behavioral` → PERSISTS. Every OPEN seam above is a place the current harness forces a hand-step or risks a cascade; closing them turns this playbook into emitted plan steps + first-try recipes.
 
 **Net:** iteration 3 PROVED the end goal (built + gate-certified a working app) AND produced the precise, prioritized backlog to make the next build thrash-free. 3a/3b/3c are closed in code; 3d–3g + G-count are the next code fixes, ranked by thrash cost (3f first).
+
+---
+
+## Phase 0.1 — clean-room re-build proving 0% thrash (2026-07-06)
+Built a NEW spec of the same shape (`notebooks`: Notebook→Note master-detail CRUD) by driving ONLY the auto-emitted 8-step plan (data-model → screen(anon) → list-screen×2 → create-form action/widgets/wire → seed) via a background build subagent that fired the harness-rendered prompts VERBATIM through MCP (subagent needed only MCP — the pre-rendered prompts sidestepped SEAM-001). Result: **behavioral gate PERSISTS** (`notes · create Note`, exit 0) — the plan built a working app. Thrash tally: **0 phantoms, 1 cancel, 1 hand-step** — two real seams, both fixed:
+
+| # | Seam | Status | Fix |
+|---|------|--------|-----|
+| 0.1-seed | The `seed-entity` recipe prompt said to REUSE the app's "EXISTING sample-data mechanism" — but a fresh MCP-created app has NONE (no LoadSampleData orchestrator/timer, and the sibling entity is populated via the runtime create form, not a loader). The driver had to CREATE the whole mechanism = 1 hand-step. | **FIXED** | `seed_entity` now instructs building LoadSampleData + a WhenPublished timer from scratch (empty-guarded, idempotent), reusing if present — the proven task_tracker pattern. Test locks it. |
+| 0.1-introspect | Mentor repeatedly emitted `Console.WriteLine(... .Name)` on interfaces that don't expose it (IMobileWidget/ITypeSignature/IUIFlowNodeSignature/IIdentifierType/IBasicType), burning turns on compile errors before authoring; on screen-touching steps it self-recovered, but on list-screen attempt 1 it never escaped → 1 cancel. | **FIXED** | Added to the shared `_PREAMBLE`: author directly, no long read-only introspection loops, and do NOT call `.Name` on those interfaces (compile error) — reduces the diagnostic cascade across every step. |
+
+**What the run VALIDATED (0 phantoms is the headline):** the `change_applied` gate + fresh-session-per-step killed phantoms; the screen scaffold with Anonymous baked (no separate anon turn), the `Open` nav link (3e), the create-form 3-phase resume+publish-once (no 30-min cascade), and the auto-seed all landed and produced a gate-green app. The two remaining thrash sources were a recipe-prompt premise (seed) and a Mentor read-phase foot-gun — both now closed. **Next clean-room build should approach 0/0/0; re-run to confirm.**

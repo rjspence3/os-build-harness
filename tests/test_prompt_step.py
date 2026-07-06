@@ -60,13 +60,15 @@ def test_role_gate_refuses_platform_role():
     assert "IsAdmin" in prompt and "Issues" in prompt
 
 
-def test_seed_entity_uses_existing_loader_and_warns_run_once():
+def test_seed_entity_creates_mechanism_from_scratch_on_fresh_app():
+    """Phase-0.1 fix: the seed recipe must NOT assume an existing loader (fresh apps have none —
+    it forced a hand-step). It creates LoadSampleData + a WhenPublished timer, empty-guarded."""
     prompt = pr.render("seed-entity", {"entity": "Document", "rows": [
         {"Title": "Q3 Product Planning"}, {"Title": "Onboarding Guide"}]})
-    assert "LoadSampleDataForDocument" in prompt
-    assert "runs once" in prompt.lower() and "guard" in prompt.lower()
-    assert "DATA-ONLY" in prompt
-    assert "Q3 Product Planning" in prompt
+    assert "Do NOT assume a sample-data mechanism already exists" in prompt
+    assert "server action LoadSampleData" in prompt and "WhenPublished" in prompt
+    assert "zero rows" in prompt and "idempotent" in prompt          # empty-guard
+    assert "DATA-ONLY" in prompt and "Q3 Product Planning" in prompt
 
 
 def test_missing_required_param_raises():
