@@ -146,10 +146,11 @@ def _spec_with_first_class_fields():
 def test_plan_derives_expected_ordered_steps():
     steps = pr.plan_from_spec(_spec_with_first_class_fields())
     recipes = [s["recipe"] for s in steps]
-    # nav-block first, seed the user entity, then the docs list, then the settings gate
-    assert recipes[0] == "nav-block"
-    assert "seed-entity" in recipes and "list-screen" in recipes and "role-gate" in recipes
-    nav = steps[0]["params"]
+    # scaffold first (data model, then all screens with Anonymous baked — seam 3d), then nav-block,
+    # seed the user entity, the docs list, and the settings gate
+    assert recipes[0] == "data-model" and recipes[1] == "screen"
+    assert "nav-block" in recipes and "seed-entity" in recipes and "list-screen" in recipes and "role-gate" in recipes
+    nav = next(s for s in steps if s["recipe"] == "nav-block")["params"]
     assert nav["block_name"] == "SidebarNav" and nav["logout_to"] == "login"
     assert nav["items"][0] == {"label": "Docs", "toScreen": "docs"}
 
@@ -274,10 +275,47 @@ def test_write_path_entity_is_the_data_bound_one_not_the_context_input():
     assert "NullIdentifier() (always create)" in combined
 
 
-def test_plan_empty_for_bare_spec():
+def test_data_model_recipe_authors_all_entities_one_turn_with_fks():
+    p = pr.render("data-model", {"entities": [
+        {"name": "TaskList", "attributes": [
+            {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+            {"name": "Title", "dataType": "Text", "mandatory": True, "length": 100}]},
+        {"name": "Task", "attributes": [
+            {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+            {"name": "IsDone", "dataType": "Boolean", "mandatory": True, "default": False},
+            {"name": "ListId", "dataType": "Identifier", "mandatory": True, "references": "TaskList"}]}]})
+    assert "ALL of these entities in THIS ONE turn" in p              # seam 3d: interdependent -> one turn
+    assert "Title: Text, mandatory, length 100" in p
+    assert "IsDone: Boolean, mandatory, default False" in p
+    assert "ListId: a mandatory foreign-key reference to TaskList" in p
+    assert "- TaskList: Title: Text" in p and "- Task: IsDone: Boolean" in p   # auto-number Id skipped (not re-authored)
+
+
+def test_screen_recipe_bakes_anonymous_and_input_params():
+    p = pr.render("screen", {"screens": [
+        {"id": "lists", "name": "Lists", "route": "/lists", "default": True},
+        {"id": "tasks", "name": "Tasks", "route": "/tasks",
+         "input_params": [{"name": "ListId", "references": "TaskList", "isRequired": True}]}]})
+    assert "BAKE Anonymous access at creation" in p and "clear all platform Roles" in p   # seam 3d-anon
+    assert "change_applied MUST be true" in p                          # seam 3d-phantom gate
+    assert '"Lists" at route /lists' in p and "default (home) screen" in p
+    assert "ListId (TaskList Identifier, mandatory)" in p             # input param w/ FK type
+
+
+def test_plan_scaffold_screens_carry_input_params_and_default():
+    steps = pr.plan_from_spec(_spec_with_first_class_fields())
+    scr = next(s for s in steps if s["recipe"] == "screen")["params"]["screens"]
+    ids = [s["id"] for s in scr]
+    assert "docs" in ids and scr[0]["default"] is True               # first screen defaults to home
+
+
+def test_plan_scaffolds_but_no_list_or_write_for_bare_spec():
+    """Scaffold steps (data-model + screens) are ALWAYS emitted — every app needs its entities
+    and screens. But a bare screen with a Container (no data component) and no actions gets no
+    list-screen / create-form / role-gate."""
     bare = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
             "dataModel": {"entities": [{"name": "E", "attributes": [
                 {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
             "screens": [{"id": "s", "name": "S", "components": [{"id": "c", "type": "Container"}],
                          "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
-    assert pr.plan_from_spec(bare) == []
+    assert [s["recipe"] for s in pr.plan_from_spec(bare)] == ["data-model", "screen"]

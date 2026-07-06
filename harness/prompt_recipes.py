@@ -221,12 +221,82 @@ def create_form(params: dict) -> str:
     )
 
 
+_DATATYPE_WORDS = {
+    "Identifier": "Identifier", "Text": "Text", "Integer": "Integer", "LongInteger": "Long Integer",
+    "Decimal": "Decimal", "Currency": "Currency", "Boolean": "Boolean", "DateTime": "DateTime",
+    "Date": "Date", "Time": "Time", "Email": "Email", "PhoneNumber": "Phone Number",
+}
+
+
+def _attr_line(a: dict) -> str:
+    if a.get("references"):
+        return (f"{a['name']}: a {'mandatory ' if a.get('mandatory') else ''}foreign-key reference to "
+                f"{a['references']}")
+    seg = f"{a['name']}: {_DATATYPE_WORDS.get(a.get('dataType', 'Text'), a.get('dataType', 'Text'))}"
+    if a.get("mandatory"):
+        seg += ", mandatory"
+    if a.get("length"):
+        seg += f", length {a['length']}"
+    if "default" in a:
+        seg += f", default {a['default']}"
+    return seg
+
+
+def data_model(params: dict) -> str:
+    """Author ALL entities in ONE turn (seam 3d). Interdependent entities must be created
+    together (a later separate turn that references an earlier one can roll it back)."""
+    entities = _p(params, "entities", [], required=True)
+    lines = []
+    for e in entities:
+        attrs = [a for a in e.get("attributes", []) if not a.get("isIdentifier")]
+        lines.append(f"- {e['name']}: " + "; ".join(_attr_line(a) for a in attrs))
+    body = "\n".join(lines)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Create the app's data model. Author ALL of these entities in THIS ONE turn (they may reference each "
+        f"other, so they must be created together). Keep the default auto-number Id identifier on each. Do NOT "
+        f"create any screens or UI in this turn.\n{body}\n"
+        f"After authoring, run model validation and report errors. Do not publish.")
+
+
+def screen(params: dict) -> str:
+    """Scaffold ALL screens in ONE turn with ANONYMOUS baked at creation (seam 3d/3d-anon).
+    A hand-authored screen otherwise inherits the module Role and renders _error for anon
+    visitors, costing a whole extra fix-up turn (R6). Verify change_applied (phantom, R7)."""
+    screens = _p(params, "screens", [], required=True)
+    lines = []
+    for s in screens:
+        parts = [f'"{s.get("name", s["id"])}" at route {s.get("route", "/" + s["id"])}']
+        ips = s.get("input_params") or []
+        if ips:
+            desc = ", ".join(
+                f'{ip["name"]} ({ip["references"] + " Identifier" if ip.get("references") else _DATATYPE_WORDS.get(ip.get("dataType", "Text"), ip.get("dataType", "Text"))}'
+                f'{", mandatory" if ip.get("isRequired") or ip.get("mandatory") else ""})'
+                for ip in ips)
+            parts.append(f"with input parameter(s): {desc}")
+        if s.get("default"):
+            parts.append("set as the app's default (home) screen")
+        lines.append("- Screen " + ", ".join(parts))
+    body = "\n".join(lines)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Create these screens in the app's main Reactive Web UI flow (create the flow, e.g. MainFlow, if the app "
+        f"has none). For EVERY screen, BAKE Anonymous access at creation: clear all platform Roles and enable "
+        f"Anonymous access — an auto-attached module Role makes unauthenticated visitors hit _error, and gating is "
+        f"done app-locally, not by a screen Role. Do NOT add tables, widgets, or data — ONLY the screens and their "
+        f"input parameters.\n{body}\n"
+        f"After authoring, CONFIRM each screen persisted (change_applied MUST be true; if a screen did not persist, "
+        f"re-author it in a fresh attempt) and run model validation. Do not publish.")
+
+
 def json_1line(obj) -> str:
     import json
     return json.dumps(obj, separators=(", ", "="))
 
 
 RECIPES = {
+    "data-model": data_model,
+    "screen": screen,
     "nav-block": nav_block,
     "list-screen": list_screen,
     "role-gate": role_gate,
@@ -346,6 +416,23 @@ def plan_from_spec(spec: dict) -> list[dict]:
     screens = spec.get("screens", [])
     auth = spec.get("auth") or {}
     login = auth.get("loginScreen") or "Login"
+
+    # Scaffold FIRST (seam 3d): the data model, then all screens with Anonymous baked. list-screen
+    # and create-form steps below assume the entities + screens already exist.
+    entities = spec.get("dataModel", {}).get("entities", [])
+    if entities:
+        steps.append({"recipe": "data-model", "why": "spec.dataModel.entities (all in one turn)",
+                      "params": {"entities": entities}})
+    if screens:
+        scaffold = []
+        for i, s in enumerate(screens):
+            scaffold.append({"id": s["id"], "name": s.get("name", s["id"]),
+                             "route": s.get("route", "/" + s["id"]),
+                             "input_params": s.get("inputParameters", []),
+                             "default": bool(s.get("isDefault")) or (i == 0 and not any(
+                                 sc.get("isDefault") for sc in screens))})
+        steps.append({"recipe": "screen", "why": "spec.screens scaffold (Anonymous baked, change_applied-gated)",
+                      "params": {"screens": scaffold}})
 
     nav = spec.get("navigation")
     if nav and nav.get("items"):
