@@ -75,4 +75,6 @@ Gap: #7 + sustainability.
 - **6** continuous.
 
 ## The measure of progress
-Not "recipes written" but **matrix rows at ✓/✓/✓/✓** and **# of distinct app shapes built clean-room, first-try, verified.** Today: 1.5 shapes (CRUD master-detail proven; agent proven; both with hand-steps that are now encoded-not-reproven). Target: arbitrary.
+Not "recipes written" but **matrix rows at ✓/✓/✓/✓** and **# of distinct app shapes built clean-room, first-try, verified.**
+- **2026-07-06:** `full_app` (CRUD + chart + theme + seed + a separate AIAgent) built clean-room in **0/0/0** (0 cancels/phantoms/hand-steps/seams), runtime-verified (CRUD PERSISTS, chart renders, theme applied, agent publishes clean + reasons). This is the first **multi-construct, first-try, verified** shape — and it confirms Phase 0.1's 0/0/0 for the CRUD slice. `chart`/`theme`/`agent` are now spec-reachable + live-proven.
+- **Phase 0 + Phase 1 = DONE.** Remaining: Phase 2 (verify Update/Delete/nav/role/agent-reasoning in the gate), Phase 3 (pixel fidelity), Phase 4 (Tier-2/3 breadth), Phase 5 (autonomous executor). Target: arbitrary.

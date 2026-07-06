@@ -358,13 +358,16 @@ def chart(params: dict) -> str:
         f"On the {scr} screen, add a native {ctype}Chart. Do NOT declare this a wall — it authors via MCP:\n"
         f"1. addReferenceToElements the OutSystemsCharts {ctype}Chart block (it resolves as a ReferenceWebBlock in "
         f"MobileFlows[\"Charts\"]).\n"
-        f"2. CreateWidget<IMobileBlockInstanceWidget> with SourceBlock = Charts\\{ctype}Chart; set data-spec-id.\n"
+        f"2. CreateWidget<IMobileBlockInstanceWidget> with SourceBlock = Charts\\{ctype}Chart. Set its data-spec-id via "
+        f"the widget's ExtendedProperties / IObject API (a block-instance widget does NOT support .Attributes.Create()).\n"
         f"3. Build the DataPoint list(s) — ONE list per series ({stxt}), category = {cat}.{src_txt}. Build the list "
         f"from a data AGGREGATE, NEVER (System).ListAppend onto a client-action node (it throws 'target of invocation' "
-        f"and rolls back the turn). Qualify aggregate APIs with the OutSystems.Model.Logic.Aggregates namespace and "
-        f"wrap literals in quotes.\n"
-        f"4. Bind the DataPointList; add per-series ChartSeriesStyling for colors. Verify the bars/slices render real "
-        f"values at RUNTIME.\nDo not publish.")
+        f"and rolls back the turn). Bind the DataPointList as an argument expression of shape "
+        f"`<Aggregate>.List` mapped to {{ Value: <numeric valueField>, Label: <categoryField {cat}> }} — Value must be "
+        f"Decimal, so wrap an Integer valueField in IntegerToDecimal(...). Qualify aggregate APIs with the "
+        f"OutSystems.Model.Logic.Aggregates namespace.\n"
+        f"4. Add per-series ChartSeriesStyling for colors — QUOTE hex colors (a bare '#' is a parser error, e.g. use "
+        f"\"#5E6AD2\"). Verify the bars/slices render real values at RUNTIME.\nDo not publish.")
 
 
 def theme(params: dict) -> str:

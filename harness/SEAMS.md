@@ -104,3 +104,12 @@ Built a NEW spec of the same shape (`notebooks`: Notebook→Note master-detail C
 | 0.1-introspect | Mentor repeatedly emitted `Console.WriteLine(... .Name)` on interfaces that don't expose it (IMobileWidget/ITypeSignature/IUIFlowNodeSignature/IIdentifierType/IBasicType), burning turns on compile errors before authoring; on screen-touching steps it self-recovered, but on list-screen attempt 1 it never escaped → 1 cancel. | **FIXED** | Added to the shared `_PREAMBLE`: author directly, no long read-only introspection loops, and do NOT call `.Name` on those interfaces (compile error) — reduces the diagnostic cascade across every step. |
 
 **What the run VALIDATED (0 phantoms is the headline):** the `change_applied` gate + fresh-session-per-step killed phantoms; the screen scaffold with Anonymous baked (no separate anon turn), the `Open` nav link (3e), the create-form 3-phase resume+publish-once (no 30-min cascade), and the auto-seed all landed and produced a gate-green app. The two remaining thrash sources were a recipe-prompt premise (seed) and a Mentor read-phase foot-gun — both now closed. **Next clean-room build should approach 0/0/0; re-run to confirm.**
+
+---
+
+## Phase 1 — spec expressiveness + first live chart/theme/agent build (2026-07-06)
+Schema v0.3 (agents/charts/design.theme/sampleData, additive) + plan emission made the orphan recipes spec-reachable. Then a clean-room build of `examples/full_app` (11 steps: CRUD + chart + theme + seed + a separate AIAgent app) driven by a subagent firing the rendered prompts verbatim through MCP returned **0 cancels · 0 phantoms · 0 hand-steps · 0 seams** — Phase 0.1's 0/0/0 CONFIRMED (the seed + introspection fixes held) AND the chart/theme/agent recipes proven live for the first time.
+
+**Runtime-verified (not trusted):** CRUD `--behavioral` PERSISTS; `/Projects` renders the chart (`svg` present, chart element found); the theme applied (`--primary: #5E6AD2` live in the DOM); the agent app deployed + published clean (NO OS-APPS-40028). Both never-built-live recipes (chart, theme) were **buildable exactly as-written** — no seam.
+
+**Optimization (not a seam):** the chart step took ~112 min because Mentor had to discover the block-instance `ExtendedProperties` attribute API + the DataPoint `mapTo` argument-expression shape by trial. Folded both into the `chart` recipe (name `ExtendedProperties` not `.Attributes.Create()`; `mapTo {Value: IntegerToDecimal(<value>), Label: <category>}`; quote hex colors) to shave that on the next build. 0% thrash is met; this pushes toward least-TIME.
