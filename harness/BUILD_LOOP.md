@@ -5,6 +5,20 @@
 
 # THE BUILD LOOP — execute this, don't improvise
 
+## RUN MODEL (read first) — one Claude session PER BUILD, IN the build root
+This loop is meant to be executed by a **dedicated Claude Code session launched from inside the
+build root** (`cd builds/<app>/ && claude`) — ONE session per app. That session IS the builder and
+the orchestrator. This is not incidental; it is what makes the loop work:
+- It is a **main loop**, so its fire→poll→publish cadence across long Mentor turns is reliable — the
+  harness re-invokes it deterministically on background-task completion. (A *nested subagent* driving
+  the same loop stalls: its background-sleep→re-wake handshake is unreliable and parks it. If you ever
+  MUST drive from a subagent, never `sleep`/yield — TIGHT-POLL the status tool to terminal, cap ~500.)
+- Launched in the build root, it **loads that root's `.claude/settings.json`**, which allowlists the
+  harness venv CLIs (`harness-verify`/`-prompt-step`/`-capture`) — without that, Bash denies them
+  (closes SEAM-001).
+Mission-control (the hub repo) **DISPATCHES** a build to such a session (`/dispatch-build <app>`); it
+does NOT hand-drive Mentor turns from the hub, nor orchestrate the build via subagents.
+
 You are the **executor**. The harness is the intelligence. Your job is to run the
 phases below in order, drive each step with the harness-rendered prompts, and react
 to tool output using the deterministic rules here. Every rule below exists because a
