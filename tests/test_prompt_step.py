@@ -382,6 +382,37 @@ def test_plan_seeds_listed_entity_with_no_create_ui():
     assert not any(s["params"]["entity"] == "Task" for s in seeds)
 
 
+def test_plan_emits_v03_agent_chart_theme_and_sampledata_seed():
+    """Phase 1: the v0.3 additive spec fields (agents/charts/design.theme/sampleData) must reach
+    their recipes — plan_from_spec emits chart/theme/agent steps and seeds from spec sampleData."""
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["Member"]},
+            "dataModel": {"entities": [
+                {"name": "Project", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Name", "dataType": "Text", "mandatory": True},
+                    {"name": "Priority", "dataType": "Integer", "mandatory": True}],
+                 "sampleData": [{"Name": "Website", "Priority": 3}]}]},
+            "screens": [{"id": "projects", "name": "Projects",
+                         "components": [{"id": "projectsTable", "type": "Table", "boundTo": "Project"}],
+                         "charts": [{"id": "priorityChart", "chartType": "Column", "entity": "Project",
+                                     "categoryField": "Name", "series": [{"name": "Priority", "valueField": "Priority"}]}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "projectsTable"}]}}],
+            "design": {"theme": {"palette": {"primary": "#5E6AD2"}, "css": ".x{}"}},
+            "agents": [{"name": "TaskHelperAgent", "systemPrompt": "You help.",
+                        "modelConnection": "TrialClaudeHaiku4_5"}]}
+    steps = pr.plan_from_spec(spec)
+    recipes = [s["recipe"] for s in steps]
+    assert "chart" in recipes and "theme" in recipes and "agent" in recipes
+    chart = next(s for s in steps if s["recipe"] == "chart")["params"]
+    assert chart["chart_type"] == "Column" and chart["category_field"] == "Name" and chart["screen"] == "projects"
+    ag = next(s for s in steps if s["recipe"] == "agent")["params"]
+    assert ag["agent_name"] == "TaskHelperAgent" and ag["model_connection"] == "TrialClaudeHaiku4_5"
+    theme = next(s for s in steps if s["recipe"] == "theme")["params"]
+    assert "--primary: #5E6AD2" in theme["css"]
+    seed = next(s for s in steps if s["recipe"] == "seed-entity")["params"]
+    assert {"Name": "Website", "Priority": 3} in seed["rows"]        # uses spec sampleData, not placeholders
+
+
 def test_plan_scaffolds_but_no_list_or_write_for_bare_spec():
     """Scaffold steps (data-model + screens) are ALWAYS emitted — every app needs its entities
     and screens. But a bare screen with a Container (no data component) and no actions gets no

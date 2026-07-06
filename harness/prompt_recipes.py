@@ -520,6 +520,17 @@ def _sample_rows(spec: dict, entity: str, n: int = 3) -> list:
     return [{f: f"Sample {entity} {i}" for f in fields} for i in range(1, n + 1)]
 
 
+def _theme_css(t: dict) -> str:
+    """Compile design.theme tokens (palette + raw css) into a stylesheet string for the theme recipe."""
+    parts = []
+    palette = t.get("palette") or {}
+    if palette:
+        parts.append(":root { " + "; ".join(f"--{k}: {v}" for k, v in palette.items()) + " }")
+    if t.get("css"):
+        parts.append(t["css"])
+    return "\n".join(parts) or "/* theme */"
+
+
 def plan_from_spec(spec: dict) -> list[dict]:
     """Derive an ordered list of pre-corrected build steps directly from an
     app_spec's first-class fields — the chain spec -> recipe -> (build) -> verify.
@@ -632,6 +643,13 @@ def plan_from_spec(spec: dict) -> list[dict]:
                               "why": f"{why} — wire OnClick (RESUME the widgets session; publish once after)",
                               "params": {**p, "phase": "wire"}})
                 break  # one write-path step per screen
+        # v0.3: native charts declared on the screen -> one `chart` step each.
+        for ch in s.get("charts", []) or []:
+            steps.append({"recipe": "chart",
+                          "why": f"{s['id']}.{ch['id']} ({ch['chartType']}Chart)",
+                          "params": {"screen": s["id"], "chart_type": ch["chartType"],
+                                     "category_field": ch["categoryField"], "series": ch["series"],
+                                     "source_aggregate": ch.get("sourceAggregate")}})
 
     # Seam 3g: an entity rendered in a list but with NO create UI can never be populated at runtime —
     # seed it so its list renders (and any parent-context create on it can be reached by the gate).
@@ -651,4 +669,17 @@ def plan_from_spec(spec: dict) -> list[dict]:
             steps.append({"recipe": "seed-entity",
                           "why": f"{ent} is listed but has no create UI — seed so its list renders",
                           "params": {"entity": ent, "rows": rows}})
+
+    # v0.3: app theme from design.theme tokens.
+    design = spec.get("design") or {}
+    if design.get("theme"):
+        t = design["theme"]
+        steps.append({"recipe": "theme", "why": "design.theme tokens",
+                      "params": {"css": _theme_css(t), "font_faces": t.get("fontFaces")}})
+    # v0.3: app-level AI agents — each is its OWN app_create kind=AIAgent (a separate app).
+    for ag in spec.get("agents", []) or []:
+        steps.append({"recipe": "agent", "why": f"AI agent {ag['name']} (separate AIAgent app)",
+                      "params": {"agent_name": ag["name"], "system_prompt": ag["systemPrompt"],
+                                 "model_connection": ag.get("modelConnection", "TrialClaudeHaiku4_5"),
+                                 "tools": ag.get("tools", [])}})
     return steps

@@ -30,7 +30,8 @@
     "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" }, "description": "The various ways and things a user can do (HD D11) — the user-flow layer. Each capability connects role(s) -> screen(s) -> action(s) -> entit(ies). Optional in JSON-schema, but REQUIRED for a complete spec; the harness-verify NO-HOLES check (--phase spec) enforces that every entity/screen/role is covered by a capability and every capability is fully pathed." },
     "design": { "$ref": "#/$defs/design", "description": "Design layer reference (HD D10). For a KNOWN app, the reference is the real product's captures; for a NOVEL app, generated (Figma). Per-screen visuals go in screen.mockupRef; this is the app-level theme/reference." },
     "navigation": { "$ref": "#/$defs/appNavigation", "description": "App-level SHARED navigation (sidebar/menu). First-class so the persistent nav is authored ONCE as a reusable block and referenced by every screen — NOT re-authored per screen (the per-screen path multiplies turn-cost + defect surface). Optional; when absent, nav is whatever screens declare via Sidebar/Navigation components." },
-    "auth": { "$ref": "#/$defs/authSpec", "description": "App-level authentication model. First-class so access control is describable + verifiable. `app-local` = identity in an app entity bridged via browser storage (no ODC end-user IdP; the common clone pattern); `platform-idp` = ODC end-user provider; `anonymous` = no login. Optional; absent ⇒ anonymous." }
+    "auth": { "$ref": "#/$defs/authSpec", "description": "App-level authentication model. First-class so access control is describable + verifiable. `app-local` = identity in an app entity bridged via browser storage (no ODC end-user IdP; the common clone pattern); `platform-idp` = ODC end-user provider; `anonymous` = no login. Optional; absent ⇒ anonymous." },
+    "agents": { "type": "array", "items": { "$ref": "#/$defs/agent" }, "description": "App-level ODC AI Agents (v0.3, additive). Each is authored FROM SCRATCH via the `agent` recipe — internals + AgentFlow + BuildMessages + public Call service action + AIModel bound to a Trial AIModelConnection (MCP-only, wall lifted 2026-07-05). plan_from_spec emits one `agent` step per entry." }
   },
 
   "$defs": {
@@ -53,6 +54,7 @@
         "isStatic": { "type": "boolean", "default": false, "description": "Static (lookup) entity vs database entity. Live ODC reports this as `isStatic`." },
         "attributes": { "type": "array", "items": { "$ref": "#/$defs/attribute" }, "minItems": 1 },
         "records": { "type": "array", "items": { "type": "object", "additionalProperties": true }, "description": "Seed records for a static entity (one object per row, attribute-name -> value). Only meaningful when isStatic=true." },
+        "sampleData": { "type": "array", "items": { "type": "object", "additionalProperties": true }, "description": "Sample rows for a DATABASE entity (v0.3, additive), seeded via a LoadSampleData + WhenPublished timer by the `seed-entity` recipe. Used when the entity is rendered in a list but has no create UI (else its list is empty). One object per row, attribute-name -> value. Absent ⇒ the plan generates deterministic placeholder rows." },
         "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } }
       }
     },
@@ -97,6 +99,7 @@
         "access": { "$ref": "#/$defs/screenAccess", "description": "First-class access rule for this screen (complements/refines `roles`). Expresses admin-only gating + where to redirect an unauthorized user, so the role-gate is describable and the built OnReady gate is verifiable. Optional." },
         "mockupRef": { "type": "string", "description": "Path to the screen mockup asset. Drives ADVISORY visual diff only — NOT gating." },
         "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
+        "charts": { "type": "array", "items": { "$ref": "#/$defs/chart" }, "description": "Native OutSystemsCharts on this screen (v0.3, additive). Each is authored via the `chart` recipe (addReferenceToElements + SourceBlock + DataPoints from an aggregate). plan_from_spec emits one `chart` step per entry." },
         "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
         "navigation": { "type": "array", "items": { "$ref": "#/$defs/navEdge" } },
         "acceptance": {
@@ -309,10 +312,49 @@
         "themeReference": { "type": "string", "description": "URL/path to the theme reference (palette, dark/light, typography)." },
         "mode": { "type": "string", "description": "e.g. 'dark' | 'light'." },
         "notes": { "type": "string" },
-        "references": { "type": "array", "items": { "type": "string" }, "description": "Reference screenshot/source URLs or paths backing the design." }
+        "references": { "type": "array", "items": { "type": "string" }, "description": "Reference screenshot/source URLs or paths backing the design." },
+        "theme": { "$ref": "#/$defs/themeTokens", "description": "Design tokens compiled into the app theme by the `theme` recipe (v0.3, additive). When present, plan_from_spec emits a `theme` step." }
       }
     },
 
+    "agent": {
+      "type": "object",
+      "required": ["name", "systemPrompt"],
+      "additionalProperties": false,
+      "description": "An ODC AI Agent (v0.3). Built from a blank app_create kind=AIAgent shell entirely via MCP.",
+      "properties": {
+        "name": { "type": "string", "description": "Agent name; a public Call<name> service action exposes it." },
+        "systemPrompt": { "type": "string", "description": "System prompt, authored as the BuildMessages System message ContentText." },
+        "modelConnection": { "type": "string", "default": "TrialClaudeHaiku4_5", "description": "AIModelConnection asset to bind to the agent's AIModel slot. A Trial connection binds + publishes clean via MCP." },
+        "tools": { "type": "array", "items": { "type": "string" }, "description": "Server Action names the agent may call as tools (each wired via a parameterless CreateActionHandler)." }
+      }
+    },
+    "chart": {
+      "type": "object",
+      "required": ["id", "chartType", "entity", "categoryField", "series"],
+      "additionalProperties": false,
+      "description": "A native OutSystemsCharts widget (v0.3).",
+      "properties": {
+        "id": { "type": "string" },
+        "chartType": { "enum": ["Column", "Pie", "Line", "Bar", "Area"] },
+        "entity": { "type": "string", "description": "Source entity (must exist in dataModel)." },
+        "categoryField": { "type": "string", "description": "Attribute rendered on the category axis." },
+        "series": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["valueField"], "additionalProperties": false, "properties": { "name": { "type": "string" }, "valueField": { "type": "string" } } }, "description": "One entry per series; each maps a valueField (attribute) to a DataPoint list." },
+        "sourceAggregate": { "type": "string", "description": "Optional named aggregate to source DataPoints from." }
+      }
+    },
+    "themeTokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Design tokens compiled into the app theme stylesheet by the `theme` recipe (v0.3).",
+      "properties": {
+        "palette": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Named colors, e.g. { \"primary\": \"#5E6AD2\", \"surface\": \"#FFFFFF\" }." },
+        "typography": { "type": "object", "additionalProperties": true, "description": "Font families / sizes / weights." },
+        "spacing": { "type": "object", "additionalProperties": true, "description": "Spacing scale tokens." },
+        "fontFaces": { "type": "string", "description": "Raw @font-face CSS for custom fonts (NOT @import — stripped at publish)." },
+        "css": { "type": "string", "description": "Additional raw CSS appended to the theme stylesheet." }
+      }
+    },
     "assertion": {
       "description": "A checkable predicate over live ODC state. These kinds define exactly what harness-verify must implement.",
       "oneOf": [

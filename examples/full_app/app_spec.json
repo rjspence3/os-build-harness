@@ -1,0 +1,121 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "full_app",
+    "description": "Phase-1 example exercising the v0.3 additive fields end-to-end: entities + list + write-path (CRUD), plus a chart, a themed design, per-entity sampleData, and an AI agent — so plan_from_spec emits chart/theme/agent/seed steps and a clean build authors them all.",
+    "roles": ["Member"]
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "Project",
+        "description": "A project that groups tasks.",
+        "attributes": [
+          { "name": "Id", "dataType": "Identifier", "isIdentifier": true, "mandatory": true },
+          { "name": "Name", "dataType": "Text", "mandatory": true, "length": 100 },
+          { "name": "Priority", "dataType": "Integer", "mandatory": true, "default": 1 }
+        ],
+        "sampleData": [
+          { "Name": "Website Redesign", "Priority": 3 },
+          { "Name": "Mobile App", "Priority": 2 },
+          { "Name": "Public API", "Priority": 1 }
+        ]
+      },
+      {
+        "name": "Task",
+        "description": "A task belonging to a project.",
+        "attributes": [
+          { "name": "Id", "dataType": "Identifier", "isIdentifier": true, "mandatory": true },
+          { "name": "Title", "dataType": "Text", "mandatory": true, "length": 200 },
+          { "name": "Done", "dataType": "Boolean", "mandatory": true, "default": false },
+          { "name": "ProjectId", "dataType": "Identifier", "mandatory": true, "references": "Project" }
+        ]
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "projects",
+      "name": "Projects",
+      "route": "/projects",
+      "uiFlow": "MainFlow",
+      "roles": ["Member"],
+      "components": [
+        { "id": "projectsTable", "type": "Table", "boundTo": "Project", "label": "Projects" },
+        { "id": "openTasksBtn", "type": "Button", "label": "Open" }
+      ],
+      "charts": [
+        { "id": "priorityChart", "chartType": "Column", "entity": "Project", "categoryField": "Name",
+          "series": [ { "name": "Priority", "valueField": "Priority" } ] }
+      ],
+      "actions": [
+        { "name": "GoToTasks", "trigger": { "onComponent": "openTasksBtn", "event": "onClick" }, "does": ["Navigate"] }
+      ],
+      "navigation": [
+        { "fromComponent": "openTasksBtn", "event": "onClick", "toScreen": "tasks", "params": ["ProjectId"] }
+      ],
+      "acceptance": {
+        "assertions": [
+          { "kind": "entityExists", "entity": "Project" },
+          { "kind": "componentPresent", "componentId": "projectsTable" },
+          { "kind": "binding", "componentId": "projectsTable", "boundTo": "Project" },
+          { "kind": "navigates", "fromComponent": "openTasksBtn", "event": "onClick", "toScreen": "tasks" }
+        ]
+      }
+    },
+    {
+      "id": "tasks",
+      "name": "Tasks",
+      "route": "/tasks",
+      "uiFlow": "MainFlow",
+      "roles": ["Member"],
+      "inputParameters": [
+        { "name": "ProjectId", "dataType": "Identifier", "isRequired": true, "references": "Project" }
+      ],
+      "components": [
+        { "id": "tasksTable", "type": "Table", "boundTo": "Task", "label": "Tasks" },
+        { "id": "addTaskBtn", "type": "Button", "label": "Add task" }
+      ],
+      "actions": [
+        { "name": "CreateTask", "trigger": { "onComponent": "addTaskBtn", "event": "onClick" }, "does": ["CreateEntity"] }
+      ],
+      "acceptance": {
+        "assertions": [
+          { "kind": "entityExists", "entity": "Task" },
+          { "kind": "attribute", "entity": "Task", "attribute": "Done", "dataType": "Boolean", "mandatory": true },
+          { "kind": "componentPresent", "componentId": "tasksTable" },
+          { "kind": "binding", "componentId": "tasksTable", "boundTo": "Task" }
+        ]
+      }
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "Browse projects", "description": "A member views projects and opens one.",
+      "roles": ["Member"], "screens": ["projects"], "entities": ["Project"], "actions": ["GoToTasks"],
+      "steps": [ { "description": "See projects + a priority chart.", "screen": "projects" },
+                 { "description": "Open a project's tasks.", "screen": "projects", "action": "GoToTasks" } ]
+    },
+    {
+      "name": "Manage tasks", "description": "A member adds tasks within a project.",
+      "roles": ["Member"], "screens": ["tasks"], "entities": ["Task"], "actions": ["CreateTask"],
+      "steps": [ { "description": "Open tasks for a project.", "screen": "tasks" },
+                 { "description": "Add a task.", "screen": "tasks", "action": "CreateTask" } ]
+    }
+  ],
+  "design": {
+    "source": "generated",
+    "mode": "light",
+    "theme": {
+      "palette": { "primary": "#5E6AD2", "surface": "#FFFFFF", "text": "#1F2430" },
+      "css": ".btn-primary { background: var(--primary); border-color: var(--primary); }"
+    }
+  },
+  "agents": [
+    {
+      "name": "TaskHelperAgent",
+      "systemPrompt": "You are a concise project assistant. Given a project name, suggest three next tasks as a short bulleted list.",
+      "modelConnection": "TrialClaudeHaiku4_5"
+    }
+  ]
+}
