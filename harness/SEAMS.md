@@ -53,3 +53,42 @@ Ran `harness-capture <linear spec> --base-url <live> --behavioral` from the fres
 **Calibration (important):** the gate's *driving* dimension — auth → navigate → detect entry point → fill → submit — is fully proven here and is **contract-independent**: the 4 `NO_CREATE_ENTRY`/`FORM_NOT_FOUND` verdicts involve no row-counting and are definitively linear scaffold. The 2 `NO_PERSIST` verdicts depend on the **heuristic** row-count because **linear is a legacy app the harness did not build** — it predates the `data-entity` contract (Seam 1b), so counting there is fuzzy by design (documented, not silent). `documentDetail` persisted (8→9) in an earlier session and now reads 9→9: either a genuine regression from later Mentor work OR a Seam-1b miscount — indistinguishable *on a legacy app*, and not worth disambiguating on one.
 
 **Consequence for the validation plan:** the definitive E2E is NOT "gate vs legacy linear" — it is **"gate vs an app THIS harness built from a spec,"** where the `create-form`/`list-screen` recipes emit `data-entity`/`data-spec-id` and every verdict (incl. persistence) is exact. Iteration 3 = run a build-subagent from the clean clone on a fresh spec (e.g. `examples/task_tracker`) through Mentor to a live app, then run `--behavioral` against it and drive to 6/6. That is the real proof of "100% working," and the harness now has every piece it needs to attempt it.
+
+---
+
+## Iteration 3 — FIRST from-scratch build to a live 100%-working app (2026-07-05)
+Built `examples/task_tracker` from an empty `app_create` through Mentor to a live app, and the harness's OWN behavioral gate — running **exact** against a contract-emitting build — certified it:
+
+> `harness-capture builds/task_tracker/spec/app_spec.json --base-url <live> --behavioral` → **`tasks · create Task — PERSISTS (0→2)`, 1/1, exit 0.**
+
+The gate drove the full real user path: `/Lists` → **Open** a TaskList → `/Tasks?ListId=<real>` → fill form → **Add task** → reload → row persisted. This exercises seams 3a (mandatory parent FK `Task.ListId` wired from the screen's `ListId` context), 3b (create-only `NullIdentifier`), and 3c (gate reaches the child create via the parent nav). **This is the north-star proof: the harness builds a working app from a spec, and its own gate verifies the write-path persists — exactly.**
+
+### Seams 3a/3b/3c (write-path master→detail) — FIXED before the build (see commit ecea67f)
+Encoded so `tasks.CreateTask` authored correctly first-try: `create_form` wires the mandatory parent FK from the screen's context input param; `_screen_id_param` returns None → create-only; the gate drives child creates through the parent nav. All unit-locked; the live gate confirmed them end-to-end.
+
+### The dominant NEW theme: REVISIONS + THRASH (the user's explicit optimization goal)
+"Done" is not enough — the harness must build in the **fewest Mentor turns / publishes, with zero cascade-thrash.** This build spent turns it should not have. The accounting, and the fix each implies:
+
+| # | Seam (thrash source) | Cost this build | Status | Fix that makes it first-try |
+|---|------|------|--------|-----|
+| 3d | **No data-model/screen scaffold step** — `plan_from_spec` starts at `list-screen`, which assumes the entity+screen already exist. A from-scratch build has to hand-author entities and screens. | +2 hand-authored turns | **OPEN** | Emit `entity` + `screen` scaffold steps in the plan (data model in ONE turn; screens with their input params). |
+| 3d-phantom | **Screen-create phantomed**: `status=succeeded` but `change_applied=false`; `context_screens`=0. The success narrative lied. | +1 retry turn | **DOCTRINED** | BUILD_LOOP already says verify runtime not summary; the `screen` recipe must assert `change_applied` and the loop retries fresh on phantom (R7). Caught here by trusting the honest signal. |
+| 3d-anon (R6) | **Auto-role on new screens**: hand-authored screens inherited the module Role despite asking for "anonymous", which renders `_error` for anon → a whole extra turn to `Roles.Clear()+AnonymousAccess`. | +1 turn +1 publish | **OPEN** | The `screen` scaffold recipe must BAKE `Roles.Clear()+AnonymousAccess` at creation for anon apps (folds the anon fix into screen-create). |
+| 3e | **`list-screen` ignores the spec's explicit nav component** — it emits generic "each row links", not the spec's `openTasksBtn` label "Open" + its `data-spec-id`, which the gate's parent-nav keys on. | hand-edited the prompt | **OPEN** | `list_screen` recipe should emit the screen's declared nav component (label + `data-spec-id`) when the spec has one; and/or the gate falls back to the first `[data-row-id]` row. |
+| 3f | **`create-form` cascades as ONE turn** — authoring a branching server action + form + save-wiring on a populated screen thrashed >32 min (a full cancel) then thrashed again combined. **The thrash-free path, proven live:** (1) server action `SaveTaskRecord` (fresh turn), (2) form widgets bound to a local var, OnClick left empty (fresh turn), (3) wire the button OnClick **resuming the same session as (2)** so it builds on the unpublished widgets, then publish ONCE. | 1 cancelled 32-min turn + 1 more cancel, vs the clean 3 | **OPEN (highest value)** | Expand the `create-form` plan step into these 3 ordered sub-steps, with the widgets+wire pair marked "same session, publish once". This is the single biggest thrash-killer. |
+| 3g | **No seed step for display entities** — the plan seeds only the auth user entity, so a list with no create UI (`Lists`) renders empty and the gate has no parent row to open. | +1 turn +1 publish | **OPEN** | Plan should emit a `seed-entity` step for any entity bound to a list on a screen that has NO create write-path (else it can never be populated), building the LoadSampleData + `WhenPublished` timer from scratch when the app has no loader yet. |
+| G-count | **Gate count heuristic double-counts** — `PERSISTS (0→2)` where one row was created; `_COUNT_JS` likely counts a row's cell + its `tr`. Harmless for `after>before` but inaccurate. | n/a (verdict correct) | **OPEN** | Tighten `_COUNT_JS` to count distinct row containers (prefer `[data-row-id]` rows, de-duped by nearest row ancestor). |
+
+**Also confirmed:** SEAM-001 (subagent can't run the harness CLIs — a build-root permission-scope artifact, not a harness-logic gap; the main session runs them fine, which is the documented intended configuration). SEAM-002 (the screen phantom above).
+
+### The thrash-free build playbook (what the harness should make deterministic)
+For an anon master→detail app like task_tracker, the minimal clean path is **~6 committing turns, 6 publishes, zero cancels**:
+1. `app_create`.
+2. **Entities** — all interdependent entities in ONE turn.
+3. **Screens** — all screens + input params in ONE turn, Anonymous BAKED (no separate anon turn), verify `change_applied` (retry fresh on phantom).
+4. **list-screen** per data screen (emit the spec's nav component).
+5. **create-form** as 3 sub-steps: server-action (fresh) → widgets (fresh) → wire-OnClick (resume) → publish once.
+6. **seed-entity** for list-bound entities lacking a create UI (LoadSampleData + WhenPublished timer).
+Then `--behavioral` → PERSISTS. Every OPEN seam above is a place the current harness forces a hand-step or risks a cascade; closing them turns this playbook into emitted plan steps + first-try recipes.
+
+**Net:** iteration 3 PROVED the end goal (built + gate-certified a working app) AND produced the precise, prioritized backlog to make the next build thrash-free. 3a/3b/3c are closed in code; 3d–3g + G-count are the next code fixes, ranked by thrash cost (3f first).
