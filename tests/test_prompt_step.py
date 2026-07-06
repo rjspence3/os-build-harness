@@ -205,6 +205,7 @@ def test_agent_recipe_binds_trial_model_and_gates_publish():
     assert "OS-APPS-40028" in p and "ServerRequestTimeout=120" in p
     assert "CreateActionHandler()" in p and "LookupOrder" in p           # tool wiring
     assert "CallHelperAgent" in p                                        # public contract
+    assert "AgentAPI" in p and "/rest/AgentAPI/ask" in p                 # invocable REST trigger (gate hits this)
 
 
 def test_chart_recipe_avoids_listappend_and_uses_aggregate():

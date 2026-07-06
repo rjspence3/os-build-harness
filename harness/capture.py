@@ -637,13 +637,36 @@ def run_render(spec: dict, base_url: str, login: dict) -> list[dict]:
     return results
 
 
+def run_agent(agent_base_url: str, question: str) -> dict:
+    """Phase 2 agent gate: POST a question to a deployed agent's AgentAPI/ask endpoint and assert a
+    non-empty answer — so an agent that built + published but does not actually REASON FAILS."""
+    import urllib.request
+    import urllib.error
+    url = agent_base_url.rstrip("/") + "/rest/AgentAPI/ask"
+    body = json.dumps({"Question": question}).encode()
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=130) as resp:
+            raw, status = resp.read().decode(), resp.status
+    except urllib.error.HTTPError as e:
+        return {"kind": "agent", "verdict": f"HTTP_{e.code}", "detail": e.read().decode()[:200]}
+    except Exception as e:
+        return {"kind": "agent", "verdict": "ERROR " + repr(e)[:120]}
+    try:
+        answer = (json.loads(raw).get("Answer") or "").strip()
+    except Exception:
+        answer = raw.strip()
+    return {"kind": "agent", "status": status, "answer": answer[:300], "question": question,
+            "verdict": "REASONS" if len(answer) > 1 else "NO_ANSWER (empty response)"}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="harness-capture",
         description="Runtime (rendered-DOM) verification channel: drive the live app, emit a "
                     "screen-walk snapshot for harness-verify --phase live, optionally gate.")
     ap.add_argument("spec", type=Path, help="app_spec.json")
-    ap.add_argument("--base-url", required=True, help="deployed app base URL")
+    ap.add_argument("--base-url", default=None, help="deployed app base URL (required except for --agent-url)")
     ap.add_argument("--login-config", default=None,
                     help="login config as inline JSON or a path to a .json file (see module docstring)")
     ap.add_argument("--out", type=Path, default=None, help="output dir for snapshot + screenshots")
@@ -655,6 +678,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Phase 6 WORKING gate: drive each spec'd create action and assert a row persists")
     ap.add_argument("--render", action="store_true",
                     help="Phase 2 render gate: assert each spec'd chart RENDERS and design.theme is APPLIED at runtime")
+    ap.add_argument("--agent-url", default=None,
+                    help="Phase 2 agent gate: base URL of a deployed agent app; POST a question to /rest/AgentAPI/ask")
+    ap.add_argument("--agent-question", default="Reply with a short greeting.",
+                    help="question to send the agent (with --agent-url)")
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON to stdout")
     args = ap.parse_args(argv)
 
@@ -665,6 +692,21 @@ def main(argv: list[str] | None = None) -> int:
         spec = json.loads(args.spec.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         print(f"spec is not valid JSON: {e}", file=sys.stderr)
+        return 1
+
+    if args.agent_url:
+        result = run_agent(args.agent_url, args.agent_question)
+        ok = result["verdict"] == "REASONS"
+        if args.json:
+            print(json.dumps({"agent": result}, indent=2))
+        else:
+            print(f"agent gate — [{'ok ' if ok else 'FAIL'}] {result['verdict']}")
+            if result.get("answer"):
+                print(f"  Q: {result.get('question')}\n  A: {result['answer']}")
+        return 0 if ok else 1
+
+    if args.base_url is None:
+        print("--base-url is required (except with --agent-url)", file=sys.stderr)
         return 1
 
     if args.login_config:

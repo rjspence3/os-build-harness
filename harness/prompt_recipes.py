@@ -338,9 +338,14 @@ def agent(params: dict) -> str:
         f"connections ARE reference-able + bindable via MCP and publish clean; do NOT expect OS-APPS-40028).{tools_txt}\n"
         f"6. A PUBLIC service action Call{name} exposing SessionId + UserInput -> Response (the standard agent "
         f"contract). Set ServerRequestTimeout=120 on the call node (LLM latency).\n"
+        f"7. An exposed REST endpoint so the agent is invocable + verifiable over HTTP (exec_in_app does not reach "
+        f"AIAgent actions): a REST API integration named EXACTLY \"AgentAPI\" with a POST method named EXACTLY \"Ask\", "
+        f"Authentication=None (anonymous), a Text request-body input \"Question\" and a Text response-body output "
+        f"\"Answer\"; inside, call AgentFlow passing Question as the user input (RequestId/SessionId = 0 / empty "
+        f"grounding) and Assign the agent's Response to Answer. Set ServerRequestTimeout=120 on that call node. "
+        f"The endpoint resolves to POST /<module>/rest/AgentAPI/ask.\n"
         f"After authoring, confirm change_applied=true and report the AIModel binding + any errors. The app MUST then "
-        f"publish to `succeeded` with NO OS-APPS-40028. (To invoke a deployed agent, add an anonymous exposed REST "
-        f"method that calls AgentFlow and fetch it same-origin — exec_in_app does not reach AIAgent actions.) Do not publish.")
+        f"publish to `succeeded` with NO OS-APPS-40028. Do not publish.")
 
 
 def chart(params: dict) -> str:
