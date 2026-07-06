@@ -71,11 +71,21 @@ def list_screen(params: dict) -> str:
     sort_by = _p(params, "sort_by")
     join = _p(params, "join")
     detail = _p(params, "detail_screen")
+    nav_label = _p(params, "nav_label")            # the spec's declared row-nav button label (seam 3e)
+    nav_cid = _p(params, "nav_component_id")
     cols = ", ".join(columns)
     sort_txt = f" sorted by {sort_by}" if sort_by else ""
     join_txt = (f" Join to {join} so its display fields resolve (use an explicit join in the aggregate, "
                 f"never a second data source).") if join else ""
-    detail_txt = (f" Each row links to the {detail} screen passing the record's Id.") if detail else ""
+    if detail and nav_label:
+        # emit the spec's explicit nav component so the runtime gate's parent-nav finds it by label
+        detail_txt = (f' Each row must have a Link with the text "{nav_label}" (data-spec-id="'
+                      f'{(nav_cid or "opendetailbtn").lower()}") that navigates to the {detail} screen passing '
+                      f"that row's Id.")
+    elif detail:
+        detail_txt = f" Each row links to the {detail} screen passing the record's Id."
+    else:
+        detail_txt = ""
     return (
         f"{_PREAMBLE}\n\n"
         f"On the {screen} screen, add a screen aggregate over the {entity} entity{sort_txt} (pin the aggregate "
@@ -488,6 +498,19 @@ def _list_screen_for_entity(spec: dict, entity: str, exclude: str | None = None)
     return None
 
 
+def _sample_rows(spec: dict, entity: str, n: int = 3) -> list:
+    """Rows to seed a display entity (seam 3g): the spec's `sampleData` if present, else n
+    deterministic placeholder rows over the entity's editable text fields."""
+    ent = _entities_map(spec).get(entity, {})
+    if ent.get("sampleData"):
+        return ent["sampleData"]
+    fields = [f for f in _form_fields(spec, entity, cap=2) if f != "Name" or "Name" in
+              [a["name"] for a in ent.get("attributes", [])]]
+    if not fields:
+        return []
+    return [{f: f"Sample {entity} {i}" for f in fields} for i in range(1, n + 1)]
+
+
 def plan_from_spec(spec: dict) -> list[dict]:
     """Derive an ordered list of pre-corrected build steps directly from an
     app_spec's first-class fields — the chain spec -> recipe -> (build) -> verify.
@@ -542,13 +565,19 @@ def plan_from_spec(spec: dict) -> list[dict]:
         for c in s.get("components", []):
             if c.get("type") in _DATA_COMPONENT_TYPES and c.get("boundTo"):
                 entity = c["boundTo"].split(".")[0]
-                detail = next((e.get("toScreen") for e in s.get("navigation", [])
-                               if e.get("fromComponent") == c["id"]), None)
                 params = {"screen": s["id"], "entity": entity,
                           "columns": _columns_of(c) or ["(entity display fields)"],
                           "component_id": c["id"]}
-                if detail:
-                    params["detail_screen"] = detail
+                # seam 3e: emit the spec's declared row-nav component (its label + id) so the
+                # gate's parent-nav finds it — from ANY nav entry on the screen, not just the table.
+                nav_entry = next((e for e in s.get("navigation", []) if e.get("toScreen")), None)
+                if nav_entry:
+                    params["detail_screen"] = nav_entry["toScreen"]
+                    comp = next((cc for cc in s.get("components", [])
+                                 if cc.get("id") == nav_entry.get("fromComponent")), None)
+                    if comp and comp.get("label"):
+                        params["nav_label"] = comp["label"]
+                        params["nav_component_id"] = comp["id"]
                 steps.append({"recipe": "list-screen",
                               "why": f"{c['id']} ({c['type']}) bound to {entity}", "params": params})
                 break  # one primary data list per screen
@@ -594,4 +623,23 @@ def plan_from_spec(spec: dict) -> list[dict]:
                               "why": f"{why} — wire OnClick (RESUME the widgets session; publish once after)",
                               "params": {**p, "phase": "wire"}})
                 break  # one write-path step per screen
+
+    # Seam 3g: an entity rendered in a list but with NO create UI can never be populated at runtime —
+    # seed it so its list renders (and any parent-context create on it can be reached by the gate).
+    listed = {c["boundTo"].split(".")[0] for s in screens for c in s.get("components", [])
+              if c.get("type") in _DATA_COMPONENT_TYPES and c.get("boundTo")}
+    created = set()
+    for s in screens:
+        for a in s.get("actions", []):
+            if "CreateEntity" in set(a.get("does", [])):
+                we = _screen_write_entity(spec, s)
+                if we:
+                    created.add(we)
+    already_seeded = {st["params"].get("entity") for st in steps if st["recipe"] == "seed-entity"}
+    for ent in sorted(listed - created - already_seeded):
+        rows = _sample_rows(spec, ent)
+        if rows:
+            steps.append({"recipe": "seed-entity",
+                          "why": f"{ent} is listed but has no create UI — seed so its list renders",
+                          "params": {"entity": ent, "rows": rows}})
     return steps

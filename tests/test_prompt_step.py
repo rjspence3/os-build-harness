@@ -335,6 +335,51 @@ def test_plan_scaffold_screens_carry_input_params_and_default():
     assert "docs" in ids and scr[0]["default"] is True               # first screen defaults to home
 
 
+def _master_detail_spec():
+    return {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [
+                {"name": "TaskList", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Title", "dataType": "Text", "mandatory": True}]},
+                {"name": "Task", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Title", "dataType": "Text"},
+                    {"name": "ListId", "dataType": "Identifier", "mandatory": True, "references": "TaskList"}]}]},
+            "screens": [
+                {"id": "lists", "name": "Lists",
+                 "components": [{"id": "listsTable", "type": "Table", "boundTo": "TaskList"},
+                                {"id": "openBtn", "type": "Button", "label": "Open"}],
+                 "navigation": [{"fromComponent": "openBtn", "event": "onClick", "toScreen": "tasks",
+                                 "params": ["ListId"]}],
+                 "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "listsTable"}]}},
+                {"id": "tasks", "name": "Tasks",
+                 "inputParameters": [{"name": "ListId", "dataType": "Identifier", "references": "TaskList"}],
+                 "components": [{"id": "tasksTable", "type": "Table", "boundTo": "Task"}],
+                 "actions": [{"name": "CreateTask", "trigger": {"onComponent": "tasksTable", "event": "onClick"},
+                              "does": ["CreateEntity"]}],
+                 "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tasksTable"}]}}]}
+
+
+def test_list_screen_emits_spec_nav_component_label(the=None):
+    """Seam 3e: the lists list-screen must carry the spec's declared nav button ("Open"/openBtn)
+    so the runtime gate's parent-nav finds it, and the rendered prompt authors that labeled link."""
+    ls = next(s for s in pr.plan_from_spec(_master_detail_spec())
+              if s["recipe"] == "list-screen" and s["params"]["entity"] == "TaskList")
+    assert ls["params"]["nav_label"] == "Open" and ls["params"]["nav_component_id"] == "openBtn"
+    prompt = pr.render("list-screen", ls["params"])
+    assert 'Link with the text "Open"' in prompt and 'data-spec-id="openbtn"' in prompt
+
+
+def test_plan_seeds_listed_entity_with_no_create_ui():
+    """Seam 3g: TaskList is rendered in a list but has no create UI (only Task does), so it can
+    never be populated at runtime — the plan must emit a seed-entity step for it."""
+    steps = pr.plan_from_spec(_master_detail_spec())
+    seeds = [s for s in steps if s["recipe"] == "seed-entity"]
+    assert any(s["params"]["entity"] == "TaskList" and s["params"]["rows"] for s in seeds)
+    # Task HAS a create write-path -> it is NOT auto-seeded
+    assert not any(s["params"]["entity"] == "Task" for s in seeds)
+
+
 def test_plan_scaffolds_but_no_list_or_write_for_bare_spec():
     """Scaffold steps (data-model + screens) are ALWAYS emitted — every app needs its entities
     and screens. But a bare screen with a Container (no data component) and no actions gets no
