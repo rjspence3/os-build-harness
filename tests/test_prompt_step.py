@@ -195,6 +195,32 @@ def test_cli_plan(capsys, tmp_path):
     assert "build plan" in out and "nav-block" in out and "role-gate" in out
 
 
+def test_agent_recipe_binds_trial_model_and_gates_publish():
+    p = pr.render("agent", {"agent_name": "HelperAgent", "system_prompt": "You are terse.",
+                            "tools": ["LookupOrder"]})
+    assert "kind=AIAgent" in p and "BuildMessages" in p and "ICallAgentNode" in p
+    assert "You are terse." in p and "AIModelConnection named \"TrialClaudeHaiku4_5\"" in p
+    assert "OS-APPS-40028" in p and "ServerRequestTimeout=120" in p
+    assert "CreateActionHandler()" in p and "LookupOrder" in p           # tool wiring
+    assert "CallHelperAgent" in p                                        # public contract
+
+
+def test_chart_recipe_avoids_listappend_and_uses_aggregate():
+    p = pr.render("chart", {"screen": "dashboard", "chart_type": "Column", "category_field": "Week",
+                            "series": [{"name": "Income", "value_field": "Income"},
+                                       {"name": "Expenses", "value_field": "Expenses"}]})
+    assert "OutSystemsCharts" in p and "Charts\\ColumnChart" in p
+    assert "NEVER (System).ListAppend" in p and "aggregate" in p.lower()
+    assert "OutSystems.Model.Logic.Aggregates" in p                      # ns qualification note
+
+
+def test_theme_recipe_activates_and_warns_import_stripped():
+    p = pr.render("theme", {"css": ".x{color:red}", "font_faces": "@font-face{font-family:Sora}"})
+    assert "ACTIVATE" in p and "DefaultMobileTheme" in p                 # inert-until-activated
+    assert "@import" in p and "stripped at publish" in p
+    assert "same-call read is stale" in p and "@font-face" in p
+
+
 def test_create_form_recipe_encodes_the_write_path_corrections():
     p = pr.render("create-form", {"screen": "documentDetail", "entity": "Document",
                                   "fields": ["Title", "Content"], "id_param": "DocumentId",

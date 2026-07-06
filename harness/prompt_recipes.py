@@ -289,6 +289,86 @@ def screen(params: dict) -> str:
         f"re-author it in a fresh attempt) and run model validation. Do not publish.")
 
 
+def agent(params: dict) -> str:
+    """Author a complete AI Agent from a blank `app_create kind=AIAgent` shell — internals AND
+    model binding, entirely via MCP (wall lifted + runtime-proven 2026-07-05). params: agent_name,
+    system_prompt, model_connection?(default a Trial connection), tools?:[server_action_name]."""
+    name = _p(params, "agent_name", required=True)
+    prompt = _p(params, "system_prompt", "You are a helpful assistant.")
+    model = _p(params, "model_connection", "TrialClaudeHaiku4_5")
+    tools = _p(params, "tools", []) or []
+    tools_txt = (
+        f"\n5. Give the agent these tools (each an existing Server Action): {', '.join(tools)}. Wire each with a "
+        f"PARAMETERLESS handler = agent.CreateActionHandler(); handler.Action = <the server action>; for system-"
+        f"supplied args set IsFilledByAI=false. (A tool is just a Server Action — there is no special Tool type.)"
+        if tools else "")
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"This is a blank ODC AI Agent app (app_create kind=AIAgent ships an empty shell). Author a COMPLETE working "
+        f"agent named {name} entirely in-model:\n"
+        f"1. Create the agent element{' (EnableActionCalling=true)' if tools else ''}.\n"
+        f"2. A BuildMessages server action that builds the AIMessage list: a System message whose "
+        f'SystemMessageContent.ContentText is exactly "{prompt}", and a User message from a UserInput text parameter '
+        f"(build the record with a typed local + Assign per attribute; an inline [{{Role:...}}] literal is rejected by "
+        f"the parser).\n"
+        f"3. An AgentFlow server action: call BuildMessages, then call the agent (CreateNode<ICallAgentNode>; "
+        f"n.Agent=agent), and Assign the agent's response text to a Response output.\n"
+        f"4. Bind the agent's AIModel slot to the EXISTING AIModelConnection named \"{model}\" (a Trial model — Trial "
+        f"connections ARE reference-able + bindable via MCP and publish clean; do NOT expect OS-APPS-40028).{tools_txt}\n"
+        f"6. A PUBLIC service action Call{name} exposing SessionId + UserInput -> Response (the standard agent "
+        f"contract). Set ServerRequestTimeout=120 on the call node (LLM latency).\n"
+        f"After authoring, confirm change_applied=true and report the AIModel binding + any errors. The app MUST then "
+        f"publish to `succeeded` with NO OS-APPS-40028. (To invoke a deployed agent, add an anonymous exposed REST "
+        f"method that calls AgentFlow and fetch it same-origin — exec_in_app does not reach AIAgent actions.) Do not publish.")
+
+
+def chart(params: dict) -> str:
+    """Add a native OutSystemsCharts widget (the ColumnChart 'wall' is retired — native charts author
+    via MCP; only DATA wiring is grammar-friction). params: screen, chart_type(Column|Pie),
+    category_field, series:[{name,value_field}], source_aggregate?."""
+    scr = _p(params, "screen", required=True)
+    ctype = _p(params, "chart_type", "Column")
+    cat = _p(params, "category_field", required=True)
+    series = _p(params, "series", [], required=True)
+    src = _p(params, "source_aggregate")
+    stxt = "; ".join(f'{s.get("name", s.get("value_field"))} = {s.get("value_field")}' for s in series)
+    src_txt = (f" Source the DataPoints from the {src} aggregate" if src else
+               " Source the DataPoints from a screen aggregate")
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"On the {scr} screen, add a native {ctype}Chart. Do NOT declare this a wall — it authors via MCP:\n"
+        f"1. addReferenceToElements the OutSystemsCharts {ctype}Chart block (it resolves as a ReferenceWebBlock in "
+        f"MobileFlows[\"Charts\"]).\n"
+        f"2. CreateWidget<IMobileBlockInstanceWidget> with SourceBlock = Charts\\{ctype}Chart; set data-spec-id.\n"
+        f"3. Build the DataPoint list(s) — ONE list per series ({stxt}), category = {cat}.{src_txt}. Build the list "
+        f"from a data AGGREGATE, NEVER (System).ListAppend onto a client-action node (it throws 'target of invocation' "
+        f"and rolls back the turn). Qualify aggregate APIs with the OutSystems.Model.Logic.Aggregates namespace and "
+        f"wrap literals in quotes.\n"
+        f"4. Bind the DataPointList; add per-series ChartSeriesStyling for colors. Verify the bars/slices render real "
+        f"values at RUNTIME.\nDo not publish.")
+
+
+def theme(params: dict) -> str:
+    """Set + ACTIVATE a theme's stylesheet (a fresh theme is inert until activated; @import is stripped
+    at publish). params: css, font_faces?(css @font-face text), activate?(default true)."""
+    css = _p(params, "css", required=True)
+    fonts = _p(params, "font_faces")
+    fonts_txt = (f" Include these @font-face rules for custom fonts (NOT @import — it is stripped at publish): "
+                 f"{fonts}." if fonts else "")
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Apply this theme stylesheet to the app:\n"
+        f"1. theme = eSpace.MobileThemes.First() ?? eSpace.CreateMobileTheme(\"AppTheme\"). Set theme.StyleSheet to the "
+        f"CSS below. The setter's same-call read is stale — verify the stylesheet with a SECOND applyModelApiCode call."
+        f"{fonts_txt}\n"
+        f"2. ACTIVATE the theme (a freshly-created theme is wired to NOTHING and renders inert): set it as the app's "
+        f"DefaultMobileTheme and/or the MainFlow.Theme so screens actually use it.\n"
+        f"3. Remember: Style = the class attribute (SetStyle/SetStyleClasses with class names as STRING literals — "
+        f"escape \\\" ; a bare identifier is read as a variable), CustomStyle = the inline style attribute.\n"
+        f"CSS:\n{css}\n"
+        f"Verify at RUNTIME (loaded stylesheets / body background), not in-model. Do not publish.")
+
+
 def json_1line(obj) -> str:
     import json
     return json.dumps(obj, separators=(", ", "="))
@@ -302,6 +382,9 @@ RECIPES = {
     "role-gate": role_gate,
     "seed-entity": seed_entity,
     "create-form": create_form,
+    "agent": agent,
+    "chart": chart,
+    "theme": theme,
 }
 
 
