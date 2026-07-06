@@ -226,7 +226,8 @@ def test_plan_emits_write_path_step_from_actions_does():
                               "does": ["CreateEntity", "UpdateEntity"]}],
                  "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "b"}]}}]}
     wp = [s for s in pr.plan_from_spec(spec) if s["recipe"] == "create-form"]
-    assert len(wp) == 1
+    # seam 3f: one write-path emits three thrash-free sub-steps (action -> widgets -> wire)
+    assert [s["params"]["phase"] for s in wp] == ["action", "widgets", "wire"]
     p = wp[0]["params"]
     assert p["entity"] == "Doc" and "Title" in p["fields"]
     assert "CreatorId" not in p["fields"] and "CreatedAt" not in p["fields"]   # FK + audit dropped
@@ -255,18 +256,22 @@ def test_write_path_entity_is_the_data_bound_one_not_the_context_input():
                               "does": ["CreateEntity"]}],
                  "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
     wp = [s for s in pr.plan_from_spec(spec) if s["recipe"] == "create-form"]
-    assert len(wp) == 1
+    assert [s["params"]["phase"] for s in wp] == ["action", "widgets", "wire"]   # seam 3f
     p = wp[0]["params"]
     assert p["entity"] == "Task"                        # boundTo wins; NOT the TaskList context input
     # seam 3a: the mandatory parent FK Task.ListId must be wired from the screen's ListId input param
     assert p["context_fk"] == {"attr": "ListId", "from_param": "ListId"}
     # seam 3b: no input param references Task itself -> create-only, id_param omitted (not a phantom "TaskId")
     assert "id_param" not in p
-    # and the rendered prompt must instruct BOTH the create-only Id and the mandatory parent-FK assignment
-    prompt = pr.render("create-form", p)
-    assert "NullIdentifier() (always create)" in prompt
-    assert "Task.ListId = the screen's ListId input parameter" in prompt
-    assert "MANDATORY parent reference" in prompt
+    # the WIRE phase instructs the mandatory parent-FK assignment; the ACTION phase the server action
+    wire = pr.render("create-form", {**p, "phase": "wire"})
+    assert "NewTask.ListId = the screen's ListId input parameter" in wire
+    assert "MANDATORY parent reference" in wire
+    action = pr.render("create-form", {**p, "phase": "action"})
+    assert "SaveTaskRecord" in action and "Public=FALSE" in action
+    # the combined (phase=None) prompt still carries the create-only Id instruction (backward-compatible)
+    combined = pr.render("create-form", {k: v for k, v in p.items() if k != "phase"})
+    assert "NullIdentifier() (always create)" in combined
 
 
 def test_plan_empty_for_bare_spec():

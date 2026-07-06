@@ -134,9 +134,18 @@ def seed_entity(params: dict) -> str:
 
 def create_form(params: dict) -> str:
     """Wire a WORKING create/edit form for an entity — the write-path (Phase 6, the
-    definition of done). Encodes every correction a hand-authored create turn needs
-    (extracted from the linear Documents write-path seam report).
-    params: screen, entity, fields:[attr], return_screen?, id_param?, creator_attr?"""
+    definition of done). Encodes every correction a hand-authored create turn needs.
+
+    params: screen, entity, fields:[attr], return_screen?, id_param?, context_fk?, creator_attr?, phase?
+
+    `phase` (iteration-3 seam 3f — thrash-free decomposition). Authoring the server action +
+    form + save-wiring in ONE Mentor turn cascades for many minutes on a populated screen. The
+    PROVEN thrash-free path is three sub-turns:
+      - "action"  : the Save<Entity>Record server action only (fresh turn).
+      - "widgets" : the form inputs + button bound to a local var, OnClick LEFT EMPTY (fresh turn).
+      - "wire"    : wire the button OnClick — RESUME the widgets turn's session so it builds on
+                    the unpublished widgets, then publish ONCE.
+    phase=None (default) returns the single combined prompt (backward-compatible)."""
     screen = _p(params, "screen", required=True)
     entity = _p(params, "entity", required=True)
     fields = _p(params, "fields", [], required=True)
@@ -144,16 +153,19 @@ def create_form(params: dict) -> str:
     id_param = _p(params, "id_param")              # None => create-only screen (no own-record id input)
     ctx = _p(params, "context_fk")                 # {"attr","from_param"} mandatory parent FK from a screen param
     creator = _p(params, "creator_attr")           # e.g. CreatorId — set from session identity
+    phase = _p(params, "phase")
+    lentity = entity.lower()
+    local = f"New{entity}"
     flist = ", ".join(fields)
-    inputs = "; ".join(f'an Input bound to {entity}.{f} (data-spec-id="{f.lower()}input")' for f in fields)
+    inputs = "; ".join(f'an Input bound to {local}.{f} (data-spec-id="{f.lower()}input")' for f in fields)
     creator_txt = (
-        f" Set {entity}.{creator} from the logged-in user: read localStorage 'ln_current_user' via a JavaScript "
-        f"node and Assign {creator} = LongIntegerToIdentifier(TextToLongInteger(thatValue))."
+        f" Assign {local}.{creator} from the logged-in user: read localStorage 'ln_current_user' via a JavaScript "
+        f"node and set {creator} = LongIntegerToIdentifier(TextToLongInteger(thatValue))."
         if creator else "")
     context_txt = (
-        f" Set {entity}.{ctx['attr']} = the screen's {ctx['from_param']} input parameter — a MANDATORY parent "
+        f" Assign {local}.{ctx['attr']} = the screen's {ctx['from_param']} input parameter — a MANDATORY parent "
         f"reference the record CANNOT be saved without; it arrives via navigation from the parent list "
-        f"(cast with LongIntegerToIdentifier(TextToLongInteger(...)) if needed)."
+        f"(cast with LongIntegerToIdentifier(TextToLongInteger(...)) only if a type cast is required)."
         if ctx else "")
     if id_param:
         recv_txt = (f"The screen receives a {id_param} input ({id_param} = a null/empty identifier means CREATE "
@@ -163,18 +175,46 @@ def create_form(params: dict) -> str:
         recv_txt = ("This is a CREATE-ONLY form: the screen has no own-record id input, so every save creates a "
                     "new record (Id = NullIdentifier()).")
         id_set_txt = "sets its Id = NullIdentifier() (always create)"
-    ret_txt = f" After saving, Destination back to the {ret} screen." if ret else " After saving, RefreshData the screen."
+    ret_txt = f" After saving, Destination back to the {ret} screen." if ret else " After saving, RefreshData the screen's list aggregate."
+
+    action_step = (
+        f"Author a server action Save{entity}Record with Public=FALSE (a Public server action fails to publish, "
+        f"OS-BLD-40409). Input: a {entity} record named {entity}Record. Inside: an If on {entity}Record.Id = "
+        f"NullIdentifier() — True branch calls {entity}.CreateAction, False branch calls {entity}.UpdateAction — "
+        f"return the resulting Id as an output. Build any record with a TYPED LOCAL variable + one Assign PER "
+        f"attribute; NEVER an inline record literal (they fail on fresh apps).")
+    widgets_step = (
+        f"On the {screen} screen, ADD ONLY these and nothing else — do NOT modify or rebind the existing table, "
+        f"aggregate, or any existing widget: a screen-local variable {local} of the {entity} data type; editable "
+        f"inputs: {inputs} (fields: {flist}); and a Button labeled \"Add {entity}\" (data-spec-id=\"save{lentity}btn\") "
+        f"with its OnClick LEFT EMPTY for now. Keep the screen Anonymous. Do NOT add any screen action or save logic "
+        f"in this turn.")
+    wire_step = (
+        f"Wire the \"Add {entity}\" button (data-spec-id=\"save{lentity}btn\") you just created. Create ONE screen "
+        f"action, set as that button's OnClick, that in order: Assign {local}.Id = NullIdentifier();{context_txt}"
+        f"{creator_txt} calls Save{entity}Record passing {local} as {entity}Record; then RefreshData the "
+        f"{screen} list aggregate so the new row appears.{ret_txt} Leave the inputs' bindings intact. The prior "
+        f"\"On Click must be set\" error MUST now be resolved.")
+
+    if phase == "action":
+        return (f"{_PREAMBLE}\n\n{action_step}\nDo NOT add or modify any screen or widget in this turn — ONLY the "
+                f"server action. Do not publish.")
+    if phase == "widgets":
+        return (f"{_PREAMBLE}\n\n{widgets_step}\nAfter authoring, run model validation. The button's \"On Click must "
+                f"be set\" error is EXPECTED here (you left OnClick empty) — it is resolved in the very next turn, which "
+                f"RESUMES this session. Do not publish.")
+    if phase == "wire":
+        return (f"{_PREAMBLE}\n\n{wire_step}\nThe result MUST persist to the database and survive a page reload.")
+
+    # phase=None: the single combined prompt (backward-compatible)
     return (
         f"{_PREAMBLE}\n\n"
         f"Make the {screen} screen a WORKING create/edit form for the {entity} entity that PERSISTS — a write-path, "
         f"not a display. {recv_txt}\n"
-        f"1. Author a server action Save{entity}Record with Public=FALSE (a Public server action fails to publish, "
-        f"OS-BLD-40409). Input: a {entity} record. Inside: an If on the record's Id = NullIdentifier() — True branch "
-        f"calls {entity}.CreateAction, False branch calls {entity}.UpdateAction — return the id. Build the record "
-        f"with a TYPED LOCAL variable + one Assign PER attribute; NEVER an inline record literal (they fail on fresh apps).\n"
+        f"1. {action_step}\n"
         f"2. On the screen, add editable inputs: {inputs} (fields: {flist}), and a Save button "
-        f'(data-spec-id="save{entity.lower()}btn").{creator_txt}{context_txt}\n'
-        f"3. Wire Save OnClick to a screen action that reads the form values into a typed {entity} local, {id_set_txt}, "
+        f'(data-spec-id="save{lentity}btn").{creator_txt}{context_txt}\n'
+        f"3. Wire Save OnClick to a screen action that reads the form values into the typed {entity} local, {id_set_txt}, "
         f"calls Save{entity}Record, then RefreshData.{ret_txt}\n"
         f"The result MUST persist to the database and survive a page reload. If a 'New {entity}' entry point navigates "
         f"here with an empty id, this screen IS the create form — do not leave it read-only."
@@ -372,8 +412,16 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 ret = _list_screen_for_entity(spec, entity, exclude=s["id"])
                 if ret:
                     p["return_screen"] = ret
+                # Seam 3f: emit the write-path as three thrash-free sub-steps instead of one
+                # cascade-prone turn. action = fresh turn; widgets = fresh turn; wire = RESUME the
+                # widgets turn's session (build on its unpublished widgets), then publish ONCE.
+                why = f"{s['id']}.{a['name']} does {sorted(_MUTATING & set(a.get('does', [])))}"
+                steps.append({"recipe": "create-form", "why": f"{why} — server action (fresh turn)",
+                              "params": {**p, "phase": "action"}})
+                steps.append({"recipe": "create-form", "why": f"{why} — form widgets (fresh turn; publish deferred)",
+                              "params": {**p, "phase": "widgets"}})
                 steps.append({"recipe": "create-form",
-                              "why": f"{s['id']}.{a['name']} does {sorted(_MUTATING & set(a.get('does', [])))}",
-                              "params": p})
+                              "why": f"{why} — wire OnClick (RESUME the widgets session; publish once after)",
+                              "params": {**p, "phase": "wire"}})
                 break  # one write-path step per screen
     return steps
