@@ -67,8 +67,23 @@ def test_seed_entity_creates_mechanism_from_scratch_on_fresh_app():
         {"Title": "Q3 Product Planning"}, {"Title": "Onboarding Guide"}]})
     assert "Do NOT assume a sample-data mechanism already exists" in prompt
     assert "server action LoadSampleData" in prompt and "WhenPublished" in prompt
-    assert "zero rows" in prompt and "idempotent" in prompt          # empty-guard
-    assert "DATA-ONLY" in prompt and "Q3 Product Planning" in prompt
+    assert "zero rows" in prompt and "ONLY if empty" in prompt        # empty-guard
+    assert "Q3 Product Planning" in prompt
+    assert "DETERMINISTIC BOOTSTRAP" not in prompt                    # no bootstrap_screens -> timer only
+
+
+def test_seed_entity_bootstrap_wires_onready(the=None):
+    """Seam B fix: when bootstrap_screens are given, the seed ALSO calls LoadSampleData from those
+    screens' OnReady, so seeding does not depend on the flaky WhenPublished timer."""
+    prompt = pr.render("seed-entity", {"entity": "Member", "rows": [{"Name": "Rob"}],
+                                       "bootstrap_screens": ["login"]})
+    assert "DETERMINISTIC BOOTSTRAP" in prompt and "OnReady" in prompt and "login" in prompt
+
+
+def test_plan_auth_seed_bootstraps_on_login_screen():
+    seed = next(s for s in pr.plan_from_spec(_spec_with_first_class_fields())
+                if s["recipe"] == "seed-entity" and s["params"]["entity"] == "Member")
+    assert seed["params"].get("bootstrap_screens") == ["login"]      # entry screen for an authed app
 
 
 def test_missing_required_param_raises():

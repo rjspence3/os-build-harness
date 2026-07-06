@@ -152,29 +152,37 @@ def login(params: dict) -> str:
 
 
 def seed_entity(params: dict) -> str:
-    """Seed sample rows for an entity via the app's LoadSampleData orchestrator.
-    params: entity, rows:[{...}] (or count+describe), fk_notes?"""
+    """Seed sample rows for an entity via a LoadSampleData orchestrator — deterministically.
+    params: entity, rows:[{...}], fk_notes?, bootstrap_screens?:[screen] (entry screens whose OnReady
+    also calls LoadSampleData, so seeding does NOT depend on the flaky WhenPublished timer — seam B)."""
     entity = _p(params, "entity", required=True)
     rows = _p(params, "rows", [], required=True)
     fk_notes = _p(params, "fk_notes", "")
+    bootstrap = _p(params, "bootstrap_screens", []) or []
     rows_txt = "\n".join(f"   - {json_1line(r)}" for r in rows)
     fk_txt = f" {fk_notes}" if fk_notes else ""
+    bootstrap_txt = (
+        f"3. DETERMINISTIC BOOTSTRAP (a WhenPublished timer is NOT reliable — it has silently failed to seed): "
+        f"ALSO call LoadSampleData as the FIRST node of the OnReady screen action of {', '.join(bootstrap)} (create "
+        f"the OnReady action if absent), so the data is guaranteed present on first load before any lookup/login. "
+        f"The step-1 empty-guard makes this call safe and idempotent. Add the call only if that OnReady does not "
+        f"already invoke LoadSampleData.\n"
+        if bootstrap else "")
     return (
         f"{_PREAMBLE}\n\n"
-        f"Seed the {entity} entity with sample data. This is a DATA-ONLY unit — do not touch any screen UI. Do NOT "
-        f"assume a sample-data mechanism already exists; on a fresh app there is none, so CREATE it (and REUSE it "
-        f"if it is already present):\n"
+        f"Seed the {entity} entity with sample data. Do NOT assume a sample-data mechanism already exists; on a fresh "
+        f"app there is none, so CREATE it (and REUSE it if already present):\n"
         f"1. A server action LoadSampleData. Inside, guard on emptiness: use an aggregate (max 1 row) to check "
         f"whether {entity} has zero rows; ONLY if empty, create these rows — each via the {entity} CreateAction "
         f"using a typed local {entity} variable with one Assign PER attribute (NEVER an inline record literal, which "
         f"fails on fresh apps).{fk_txt}\n{rows_txt}\n"
         f"   (If a LoadSampleData action already exists, ADD this empty-guarded {entity} seeding to it instead of "
         f"creating a second one.)\n"
-        f"2. Make LoadSampleData run automatically after deploy: if no such timer exists, create a Timer "
-        f"(e.g. BootstrapData) whose action is LoadSampleData and whose Schedule is WhenPublished. The empty-guard "
-        f"in step 1 makes it idempotent across re-publishes.\n"
-        f"After authoring, run validation. Verify the {entity} rows exist at RUNTIME after publish (the timer fires "
-        f"asynchronously on deploy)."
+        f"2. Also create a Timer (e.g. BootstrapData) whose action is LoadSampleData and whose Schedule is "
+        f"WhenPublished (a best-effort belt-and-suspenders alongside the bootstrap below), if no such timer exists.\n"
+        f"{bootstrap_txt}"
+        f"After authoring, run validation. Verify the {entity} rows exist at RUNTIME (load an entry screen, which "
+        f"triggers the OnReady bootstrap)."
     )
 
 
@@ -655,7 +663,7 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 row[aa] = bool(tu.get("isAdmin", tu.get("role") == "Admin"))
             rows.append(row)
         steps.append({"recipe": "seed-entity", "why": f"auth.testUsers seed {ue}",
-                      "params": {"entity": ue, "rows": rows}})
+                      "params": {"entity": ue, "rows": rows, "bootstrap_screens": [login]}})
         # app-local login screen: identity input -> lookup -> localStorage session -> home.
         login_screen = auth.get("loginScreen")
         if login_screen:
@@ -754,12 +762,17 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 if we:
                     created.add(we)
     already_seeded = {st["params"].get("entity") for st in steps if st["recipe"] == "seed-entity"}
+    default_screen = next((s["id"] for s in screens if s.get("isDefault")),
+                          screens[0]["id"] if screens else None)
     for ent in sorted(listed - created - already_seeded):
         rows = _sample_rows(spec, ent)
         if rows:
+            p = {"entity": ent, "rows": rows}
+            if default_screen:
+                p["bootstrap_screens"] = [default_screen]   # seam B: seed on first load, not just the timer
             steps.append({"recipe": "seed-entity",
                           "why": f"{ent} is listed but has no create UI — seed so its list renders",
-                          "params": {"entity": ent, "rows": rows}})
+                          "params": p})
 
     # v0.3: app theme from design.theme tokens.
     design = spec.get("design") or {}
