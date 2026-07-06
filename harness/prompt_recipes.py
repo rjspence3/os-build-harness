@@ -243,7 +243,11 @@ def create_form(params: dict) -> str:
         f"OS-BLD-40409). Input: a {entity} record named {entity}Record. Inside: an If on {entity}Record.Id = "
         f"NullIdentifier() — True branch calls {entity}.CreateAction, False branch calls {entity}.UpdateAction — "
         f"return the resulting Id as an output. Build any record with a TYPED LOCAL variable + one Assign PER "
-        f"attribute; NEVER an inline record literal (they fail on fresh apps).")
+        f"attribute; NEVER an inline record literal (they fail on fresh apps). "
+        f"Do NOT modify the {entity} ENTITY itself in any way — in particular do NOT rename, re-key, add, or change "
+        f"its identifier/Id attribute (the identifier is already settled; changing an entity identifier after its "
+        f"first publish is IRREVERSIBLE and blocks the deploy with OS-DPL-RDBS-40020). Only READ {entity} via its "
+        f"CreateAction/UpdateAction and a typed {entity} local — author ONLY the server action, touch no entity schema.")
     widgets_step = (
         f"On the {screen} screen, ADD ONLY these and nothing else — do NOT modify or rebind the existing table, "
         f"aggregate, or any existing widget: a screen-local variable {local} of the {entity} data type; editable "

@@ -240,3 +240,23 @@ spec that set it. Harmless only when the default is the FIRST screen (the planne
 multi-screen app whose default isn't first was trapped (set it → spec-gap; omit it → wrong default).
 Fixed: added `isDefault` (boolean) to the screen schema + a cross-ref guard (≤1 screen may set it) +
 2 tests. This is the flywheel working — a new spec shape exposed a latent schema/consumer drift.
+
+### Seam (create-form identifier poison) — surfaced by the gate_demo autonomous capstone (2026-07-06)
+The first fully-autonomous capstone build (gate_demo: Task CRUD, driven end-to-end by a tight-poll
+subagent, ZERO human Mentor turns) hard-blocked at STEP 4 (create-form :: action):
+`OS-DPL-RDBS-40020: Identifier of existing Entity 'Task' cannot be changed, ''->'ID'` (deploy failed
+after 3 server retries; deterministic, not transient). Steps 1-3 (data-model, screen, list-screen)
+published clean.
+- **Root cause (diagnosed, not guessed):** the `create_form` action turn authors `Save<Entity>Record`
+  referencing `{entity}.CreateAction/UpdateAction` + a typed `{entity}` local + a `{entity}Record.Id =
+  NullIdentifier()` branch. That heavy entity reference let Mentor "reconcile" by RE-KEYING the entity
+  identifier — the SAME poison class as Seam E (login/role-gate), which `create_form` never got guarded
+  against. Skeptical check ruled out the obvious alternative: notebooks AND task_tracker declare the
+  IDENTICAL explicit `Id` attribute and passed create-form clean — so the explicit `Id` is NOT the
+  trigger; they simply got lucky on Mentor's per-app nondeterminism. The guard removes the luck.
+- **Fix:** `create_form`'s `action_step` (used by both `phase="action"` and the combined prompt) now
+  forbids touching the entity: "do NOT rename, re-key, add, or change its identifier/Id … touch no
+  entity schema", citing OS-DPL-RDBS-40020. Mirrors the proven Seam E fix (auth_app3 published clean).
+  Test `test_create_form_action_phase_forbids_identifier_change`; 292 pass.
+- The wedged app (harnessbuild_gatedemo, model rev 5 diverged, deploy deterministically failing) is
+  unsalvageable by re-publish — the capstone re-run needs a FRESH app with the fixed recipe.

@@ -282,6 +282,21 @@ def test_create_form_recipe_encodes_the_write_path_corrections():
     assert "ln_current_user" in p                               # identity for CreatorId
 
 
+def test_create_form_action_phase_forbids_identifier_change():
+    """The action turn (Save<Entity>Record) references the entity heavily; without a guard Mentor
+    'reconciles' by re-keying the entity identifier ''->'ID' -> OS-DPL-RDBS-40020, an irreversible
+    deploy block. gate_demo (2026-07-06) hit exactly this. Both the action phase and the combined
+    prompt must forbid touching the entity identifier (mirrors the Seam E login/role-gate fix)."""
+    for params in (
+        {"screen": "tasks", "entity": "Task", "fields": ["Title", "Done"], "phase": "action"},
+        {"screen": "tasks", "entity": "Task", "fields": ["Title", "Done"]},  # combined
+    ):
+        p = pr.render("create-form", params)
+        assert "OS-DPL-RDBS-40020" in p
+        assert "do NOT rename, re-key, add, or change" in p
+        assert "touch no entity schema" in p
+
+
 def test_plan_emits_write_path_step_from_actions_does():
     spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
             "dataModel": {"entities": [
