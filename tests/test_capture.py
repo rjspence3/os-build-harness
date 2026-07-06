@@ -84,6 +84,16 @@ def test_confirm_nav_href_matches_route_tail():
     assert capture._confirm_nav_href({}, "/detail") is False
 
 
+def test_gated_screens_selects_access_restricted_only():
+    """Phase 2 role gate targets only access-gated screens (adminOnly/requiresRole)."""
+    spec = {"screens": [
+        {"id": "home", "route": "/home"},
+        {"id": "admin", "route": "/admin", "access": {"adminOnly": True}},
+        {"id": "team", "route": "/team", "access": {"requiresRole": "Manager"}}]}
+    ids = [s["id"] for s in capture._gated_screens(spec)]
+    assert ids == ["admin", "team"]
+
+
 def test_parent_context_nav_resolves_route_and_label_for_child_create():
     """Seam 3c: the gate reaches a child create screen (tasks, needs ListId) by opening a
     parent record on the list screen. The helper must resolve the parent route + the click

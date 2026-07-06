@@ -660,6 +660,49 @@ def run_agent(agent_base_url: str, question: str) -> dict:
             "verdict": "REASONS" if len(answer) > 1 else "NO_ANSWER (empty response)"}
 
 
+def _gated_screens(spec: dict) -> list[dict]:
+    return [s for s in spec.get("screens", [])
+            if (s.get("access") or {}).get("adminOnly") or (s.get("access") or {}).get("requiresRole")]
+
+
+def run_role(spec: dict, base_url: str, login: dict) -> list[dict]:
+    """Phase 2 role gate: for each access-gated screen, assert an ANONYMOUS visitor is redirected
+    away (BLOCKS_ANON) and a logged-in user is allowed (ALLOWS_MEMBER). Requires an app-local auth
+    build (login flow + OnReady gate) — see role-gate recipe; verdicts flag a leaky or over-tight gate."""
+    sync_playwright = _lazy_playwright()
+    results = []
+    base = base_url.rstrip("/")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        for screen in _gated_screens(spec):
+            route = _route_of(spec, screen["id"]).lstrip("/")
+            # ANON: fresh context, no session set
+            ctx = browser.new_context(viewport={"width": 1440, "height": 900}); page = ctx.new_page()
+            try:
+                page.goto(base + "/" + route, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
+                final = page.url
+                blocked = route.lower() not in final.lower()
+                results.append({"kind": "role", "screen": screen["id"], "check": "anon", "final": final,
+                                "verdict": "BLOCKS_ANON" if blocked else "LEAKS_TO_ANON (gated screen reachable without login)"})
+            except Exception as e:
+                results.append({"kind": "role", "screen": screen["id"], "check": "anon", "verdict": "ERROR " + repr(e)[:80]})
+            ctx.close()
+            # MEMBER: apply the app-local session, then navigate
+            ctx = browser.new_context(viewport={"width": 1440, "height": 900}); page = ctx.new_page()
+            try:
+                _apply_login(page, base_url, login)
+                page.goto(base + "/" + route, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
+                final = page.url
+                allowed = route.lower() in final.lower()
+                results.append({"kind": "role", "screen": screen["id"], "check": "member", "final": final,
+                                "verdict": "ALLOWS_MEMBER" if allowed else "BLOCKS_MEMBER (authorized user redirected away)"})
+            except Exception as e:
+                results.append({"kind": "role", "screen": screen["id"], "check": "member", "verdict": "ERROR " + repr(e)[:80]})
+            ctx.close()
+        browser.close()
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="harness-capture",
@@ -682,6 +725,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Phase 2 agent gate: base URL of a deployed agent app; POST a question to /rest/AgentAPI/ask")
     ap.add_argument("--agent-question", default="Reply with a short greeting.",
                     help="question to send the agent (with --agent-url)")
+    ap.add_argument("--role", action="store_true",
+                    help="Phase 2 role gate: assert each access-gated screen blocks anon + allows a logged-in member")
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON to stdout")
     args = ap.parse_args(argv)
 
@@ -735,6 +780,22 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  [{mark}] {r['screen']} · {r.get('op', 'create')} {r['entity']} — {r['verdict']}{delta}")
             if not results:
                 print("  (no Create/Update/Delete actions in spec — nothing to behaviorally verify)")
+        return 1 if n_fail else 0
+
+    if args.role:
+        results = run_role(spec, args.base_url, login)
+        good = {"BLOCKS_ANON", "ALLOWS_MEMBER"}
+        n_ok = sum(1 for r in results if r["verdict"] in good)
+        n_fail = len(results) - n_ok
+        if args.json:
+            print(json.dumps({"role": results, "pass": n_ok, "fail": n_fail}, indent=2))
+        else:
+            print(f"role gate — {len(results)} check(s): {n_ok} ok, {n_fail} fail")
+            for r in results:
+                mark = "ok " if r["verdict"] in good else "FAIL"
+                print(f"  [{mark}] {r['screen']} · {r['check']} — {r['verdict']}")
+            if not results:
+                print("  (no access-gated screens in spec — nothing to role-verify)")
         return 1 if n_fail else 0
 
     if args.render:
