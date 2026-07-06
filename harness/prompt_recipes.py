@@ -102,27 +102,31 @@ def list_screen(params: dict) -> str:
 
 
 def role_gate(params: dict) -> str:
-    """App-local Admin gate for a screen (no platform role / no end-user IdP).
-    params: screen, user_entity(default Member), admin_attr(default IsAdmin), home(default Issues), login(default Login)"""
+    """App-local Admin gate for a screen (no platform role / no end-user IdP). Looks the user up by
+    the IDENTITY ATTR (the same value the login stores in localStorage) — NOT by Id — so there is no
+    Text->Id cast and Mentor never 'reconciles' by changing the entity identifier (seam E).
+    params: screen, user_entity, admin_attr, home, login, identity_attr(default Name)"""
     screen = _p(params, "screen", required=True)
     user_entity = _p(params, "user_entity", "Member")
     admin_attr = _p(params, "admin_attr", "IsAdmin")
     home = _p(params, "home", "Issues")
     login = _p(params, "login", "Login")
+    identity_attr = _p(params, "identity_attr", "Name")
     return (
         f"{_PREAMBLE}\n\n"
         f"Add app-local access control to the {screen} screen so only Admin users can view it. IMPORTANT: do NOT "
-        f"add any platform Role to the screen — keep it Anonymous exactly like the other screens; a platform role "
-        f"breaks this app's localStorage-based identity. Add an On Ready screen action that runs in order:\n"
-        f"1. A JavaScript node reading localStorage: OutUserId = localStorage.getItem('ln_current_user')||''; "
-        f"OutName = localStorage.getItem('ln_current_name')||''.\n"
-        f"2. An Assign copying those into Text locals CurrentUserId, CurrentUserName.\n"
-        f"3. An If: when CurrentUserId = \"\" -> Destination {login}.\n"
-        f"4. An Aggregate fetching the single {user_entity} where Id = the parsed CurrentUserId "
-        f"(cast Text->identifier), refreshed after CurrentUserId is set.\n"
-        f"5. An If: when that {user_entity}'s {admin_attr} is False -> Destination {home}.\n"
-        f"So: logged-out -> {login}, non-admin -> {home}, admin -> through. Seed at least one Admin and one "
-        f"non-admin test user so the gate is exercisable. Verify all three paths at runtime."
+        f"add any platform Role (keep it Anonymous — a platform role breaks this app's localStorage identity), and "
+        f"do NOT modify the {user_entity} entity in any way — especially do NOT change its identifier/Id (that is an "
+        f"irreversible post-publish change, OS-DPL-RDBS-40020); only READ {user_entity}. Add an OnReady screen "
+        f"action that runs in order:\n"
+        f"1. A JavaScript node reading localStorage: OutUser = localStorage.getItem('ln_current_user')||''.\n"
+        f"2. An Assign copying OutUser into a Text local CurrentUser.\n"
+        f"3. An If: when CurrentUser = \"\" -> Destination {login}.\n"
+        f"4. A screen Aggregate (max 1) fetching the single {user_entity} where {user_entity}.{identity_attr} = "
+        f"CurrentUser (a plain Text equality — NO cast to the Id), refreshed AFTER CurrentUser is set.\n"
+        f"5. An If: when that aggregate is empty OR the {user_entity}'s {admin_attr} is False -> Destination {home}.\n"
+        f"So: logged-out -> {login}, non-admin -> {home}, admin -> through. The login stores the user's {identity_attr} "
+        f"in 'ln_current_user', so this lookup matches it directly with no identifier change. Verify all three paths."
     )
 
 
@@ -145,11 +149,12 @@ def login(params: dict) -> str:
         f"the input value. Wire the Log in button OnClick to a screen action that FIRST calls RefreshData on that "
         f"aggregate (a screen aggregate is fetched at screen-load when the input is still empty — it MUST be "
         f"re-fetched with the typed value before the check, or every login reads as not-found), THEN: if a row "
-        f"is found -> a JavaScript node sets localStorage['ln_current_user'] to that {user_entity}'s Id (as text) and "
-        f"localStorage['ln_current_name'] to its {identity_attr}, then Destination to the {home} screen. If NO row is "
+        f"is found -> a JavaScript node sets BOTH localStorage['ln_current_user'] AND localStorage['ln_current_name'] "
+        f"to that {user_entity}'s {identity_attr} value, then Destination to the {home} screen. If NO row is "
         f"found -> show a 'Invalid login' message and stay on the screen.\n"
-        f"Keep the screen Anonymous. At runtime a valid {identity_attr} must log in, set both session keys, and land "
-        f"on {home}."
+        f"The app-local session key IS the {identity_attr} (what the role-gate looks the user up by) — do NOT use or "
+        f"change the entity's Id/identifier. Keep the screen Anonymous. At runtime a valid {identity_attr} must log "
+        f"in, set both session keys, and land on {home}."
     )
 
 
@@ -702,6 +707,7 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 "admin_attr": auth.get("adminAttribute", "IsAdmin"),
                 "home": acc.get("redirectTo", "Home"),
                 "login": login,
+                "identity_attr": _identity_attr(spec, auth.get("userEntity", "Member")),
             }})
         # Phase 6 write-paths: mutating actions become build steps (definition of done).
         # CreateEntity -> create-form (3 thrash-free phases); UpdateEntity/DeleteEntity -> row-actions.

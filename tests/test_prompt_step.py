@@ -80,6 +80,26 @@ def test_seed_entity_bootstrap_wires_onready(the=None):
     assert "DETERMINISTIC BOOTSTRAP" in prompt and "OnReady" in prompt and "login" in prompt
 
 
+def test_role_gate_looks_up_by_identity_not_id_and_forbids_identifier_change():
+    """Seam E: role-gate must look the user up by the identity attr (what login stores), NOT by Id
+    (a Text->Id cast makes Mentor 'reconcile' by changing the entity identifier — irreversible)."""
+    p = pr.render("role-gate", {"screen": "admin", "user_entity": "Member", "admin_attr": "IsAdmin",
+                                "home": "home", "login": "login", "identity_attr": "Name"})
+    assert "Member.Name = CurrentUser" in p and "NO cast to the Id" in p
+    assert "do NOT change its identifier" in p           # forbid the poison
+    assert "ln_current_user" in p
+
+
+def test_login_and_role_gate_agree_on_identity_session_key():
+    """login stores the identity attr in the session key; role-gate reads it — consistent, no Id cast."""
+    steps = pr.plan_from_spec(_spec_with_first_class_fields())
+    lg = next(s for s in steps if s["recipe"] == "login")["params"]
+    rg = next(s for s in steps if s["recipe"] == "role-gate")["params"]
+    assert lg["identity_attr"] == rg["identity_attr"] == "Name"   # same key both sides
+    login_p = pr.render("login", lg)
+    assert "do NOT use or change the entity's Id/identifier" in login_p
+
+
 def test_plan_auth_seed_bootstraps_on_login_screen():
     seed = next(s for s in pr.plan_from_spec(_spec_with_first_class_fields())
                 if s["recipe"] == "seed-entity" and s["params"]["entity"] == "Member")
