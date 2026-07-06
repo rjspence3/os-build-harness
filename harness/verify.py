@@ -144,6 +144,21 @@ def _crossref_findings(spec: dict) -> list[Finding]:
                 gap("action trigger references unknown component",
                     f"screen '{sid}' action '{action['name']}' onComponent '{oc}' not on this screen")
 
+        for chart in screen.get("charts", []):
+            ce = chart["entity"]
+            if ce not in entities:
+                gap("chart entity unknown",
+                    f"screen '{sid}' chart '{chart['id']}' entity '{ce}' not in dataModel.entities")
+            else:
+                attr_names = {a["name"] for a in entities[ce]["attributes"]}
+                if chart["categoryField"] not in attr_names:
+                    gap("chart categoryField not an attribute",
+                        f"screen '{sid}' chart '{chart['id']}' categoryField '{chart['categoryField']}' not on {ce}")
+                for ser in chart["series"]:
+                    if ser["valueField"] not in attr_names:
+                        gap("chart series valueField not an attribute",
+                            f"screen '{sid}' chart '{chart['id']}' series valueField '{ser['valueField']}' not on {ce}")
+
         _check_assertions(screen, entities, screen_ids, integration_names, gap)
 
     # App-level shared navigation: every nav item + showOn must resolve to a screen.
@@ -185,6 +200,10 @@ def _crossref_findings(spec: dict) -> list[Finding]:
             if r is not None and r not in app_roles and r != "Admin":
                 advise("auth testUser role not in app.roles",
                        f"auth.testUsers role '{r}' not in app.roles {sorted(app_roles)} (allowed: 'Admin')")
+
+    agents = spec.get("agents", [])
+    if agents:
+        _check_unique([a["name"] for a in agents], "agent name", gap)
 
     _capability_findings(spec, entities, screen_ids, app_roles, gap, advise)
 

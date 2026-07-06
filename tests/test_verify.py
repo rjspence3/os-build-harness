@@ -46,6 +46,23 @@ def test_completed_example_is_clean() -> None:
     assert [f for f in findings if f.severity == "spec-gap"] == []
 
 
+def test_chart_referencing_unknown_field_is_crossref_gap() -> None:
+    spec = _completed_example()
+    spec["screens"][0]["charts"] = [{
+        "id": "balChart", "chartType": "Column", "entity": "Account", "categoryField": "Nickname",
+        "series": [{"name": "Bal", "valueField": "NopeField"}]}]   # NopeField is not an Account attribute
+    gaps = [f for f in validate_spec(spec) if f.severity == "spec-gap"]
+    assert any("chart series valueField" in f.summary for f in gaps)
+
+
+def test_valid_chart_is_clean() -> None:
+    spec = _completed_example()
+    spec["screens"][0]["charts"] = [{
+        "id": "balChart", "chartType": "Column", "entity": "Account", "categoryField": "Nickname",
+        "series": [{"name": "Bal", "valueField": "Balance"}]}]
+    assert [f for f in validate_spec(spec) if f.severity == "spec-gap"] == []
+
+
 def test_bad_datatype_is_schema_gap() -> None:
     spec = _completed_example()
     spec["dataModel"]["entities"][0]["attributes"][1]["dataType"] = "Money"  # not in allow-list
