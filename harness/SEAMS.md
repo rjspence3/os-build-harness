@@ -139,3 +139,25 @@ Built `examples/auth_app` (Member + Home/Admin/Login + seed + login + role-gate)
 - **Screen-scaffold cost:** step 2 (screens) phantomed once then took ~30 min of author↔validate cycling to persist; the login step ~35 min. This app was pathologically slow — the `.Name`-introspection foot-gun recurred on yet more interfaces (`IObjectSignature`) despite the broadened preamble.
 
 **Net:** the auth/login construct is CODE-COMPLETE (login recipe + plan emission + gate driver + seed alignment; 268 tests pass) and the **role-gate anon-enforcement is runtime-proven**. The member-allow proof is blocked by seed-timer flakiness (Seam B), not by the harness's auth logic. Closing this fully needs Seam A + B fixed + a re-run.
+
+### Phase 4 follow-up — seam B fix + deeper auth_app findings (2026-07-06)
+**Seam B FIXED in the recipe (code-complete + unit-tested, 270 pass):** `seed-entity` now ALSO calls
+LoadSampleData from an entry screen's OnReady (empty-guarded), so seeding no longer depends on the
+flaky WhenPublished timer. The plan wires `bootstrap_screens=[loginScreen]` (authed) / `[defaultScreen]`
+(display seeds). The OnReady wiring was authored + deployed on the live auth_app and validated.
+**BUT the auth_app member-allow proof is STILL blocked** — even with the OnReady bootstrap firing,
+Member stays unseeded. This traces the root cause PAST the timer to two deeper per-app Mentor flaws:
+- **Seam C:** on auth_app, `LoadSampleData` does not actually INSERT (no error) — the same recipe seeded
+  task_tracker/notebooks/full_app fine, so it is a non-deterministic Mentor authoring flaw in the
+  seed action's guard/create logic, not the recipe text.
+- **Seam D (login recipe):** the login lookup aggregate `GetMemberByName` is filtered by the input but
+  is likely fetched at screen-start (empty) and NOT refreshed inside `DoLogin` before the lookup → even
+  a seeded member would read as "Invalid login". The `login` recipe must explicitly `RefreshData` the
+  lookup aggregate in the OnClick action after reading the input, before the found/not-found branch.
+- auth_app is also **pathologically phantom-prone**: the screens step and the OnReady-bootstrap step each
+  phantomed once (change_applied=false + confabulated success) and needed a fresh-session retry (R7); the
+  screen + login steps took ~30-35 min each of author↔validate cycling.
+
+**Net:** Seam B's fix is implemented + unit-tested; role-gate anon-enforcement is proven. Fully proving
+member-allow needs Seam D fixed in the login recipe + a FRESH authed build (auth_app is too flaky to
+salvage economically). The honest blocker is Mentor per-app authoring reliability, not harness logic.
