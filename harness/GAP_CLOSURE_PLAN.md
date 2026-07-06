@@ -37,8 +37,15 @@ Gap: #3 — gate is create-only + structural.
 3. **`--phase live` breadth:** extend structural asserts to blocks, charts, input params.
 **Exit criteria:** `--behavioral` covers Create/Update/Delete + nav + role + agent, each proven on a build; a dead Update button or an unbound chart FAILS the gate.
 
-## Phase 3 — Design / pixel fidelity (the missing pillar for "fool the head of product")
-Gap: #4 — zero harness support today.
+## Phase 3 — Design / pixel fidelity (the missing pillar for "fool the head of product") — DONE (2026-07-06)
+Gap: #4 — CLOSED. `harness-capture --pixel <reference>` ports the pixel gate into the harness:
+per-screen match% + overall fidelity score, heatmap per screen, same-session auth + masked viewport,
+exits nonzero below `--pixel-threshold`. `_theme_css` now compiles the full token set
+(palette/typography/spacing + fontFaces) deterministically. **Exit criteria met + live-proven** on
+`harnessbuild_authapp3`: self-vs-self → 3/3 MATCH, fidelity 100.0%, exit 0; a darkened-reference
+restyle regression → home DRIFT 0.0%, fidelity 66.67%, **exit 1** + heatmap. Browser-free unit tests
+(`tests/test_pixel_gate.py`, 8) pin the discriminating core (identical=PASS, restyle=FAIL, tolerance
+absorbs anti-alias noise, mask neutralizes overlays, size-mismatch reported).
 1. **Reference capture:** ingest either a live original (headless screenshot + DOM/theme capture) or a `/design-layer` token set into `design`.
 2. **Theme from tokens:** `theme` recipe consumes the token set (palette/typography/spacing/fonts) deterministically.
 3. **Pixel-diff gate:** port `pixel_diff.py` into the harness as `harness-capture --pixel <reference>` — match%/heatmap/bbox, exits nonzero below threshold, same-session auth + masked viewport (per the clone-parity method).
@@ -77,4 +84,6 @@ Gap: #7 + sustainability.
 ## The measure of progress
 Not "recipes written" but **matrix rows at ✓/✓/✓/✓** and **# of distinct app shapes built clean-room, first-try, verified.**
 - **2026-07-06:** `full_app` (CRUD + chart + theme + seed + a separate AIAgent) built clean-room in **0/0/0** (0 cancels/phantoms/hand-steps/seams), runtime-verified (CRUD PERSISTS, chart renders, theme applied, agent publishes clean + reasons). This is the first **multi-construct, first-try, verified** shape — and it confirms Phase 0.1's 0/0/0 for the CRUD slice. `chart`/`theme`/`agent` are now spec-reachable + live-proven.
-- **Phase 0 + Phase 1 = DONE.** Remaining: Phase 2 (verify Update/Delete/nav/role/agent-reasoning in the gate), Phase 3 (pixel fidelity), Phase 4 (Tier-2/3 breadth), Phase 5 (autonomous executor). Target: arbitrary.
+- **2026-07-06:** `harnessbuild_authapp3` (data-model → screens → seed → login → role-gate) built clean-room in **0/0/0** and proved the app-local auth construct end-to-end: `--role` → BLOCKS_ANON + **ALLOWS_MEMBER** green (Seam E identifier-poison fix held; step 5 published clean, no OS-DPL-RDBS-40020). Closes Phase 2's last verification dimension.
+- **2026-07-06:** Phase 3 pixel/fidelity gate shipped + live-proven on auth_app3 (self=100%/PASS, restyle regression=DRIFT/exit 1). `harness-capture --pixel`.
+- **Phase 0, 1, 2, 3 = DONE.** Remaining: Phase 4 (Tier-2/3 breadth), Phase 5 (autonomous executor), Phase 6 (hardening/flywheel). Target: arbitrary.

@@ -49,7 +49,13 @@ are necessary but not sufficient.
    created/updated/deleted AND survives a reload. A create button that opens no form, or a form
    that doesn't persist, is a FAIL — fix it. The app is not done until every write-path passes.
    *(Structural passes do not count here; `componentPresent` is true for a dead button.)*
-7. **Pixel/design** parity last (see CLAUDE.md §Pixel-perfect). Seed before pixels.
+7. **Pixel/design** parity last (see CLAUDE.md §Pixel-perfect). Seed before pixels. Machine check:
+   `harness-capture <spec> --base-url <clone-url> --pixel <reference>` where `<reference>` is a
+   directory of `shot_<screenId>.png` (a prior capture or a `/design-layer` mockup export) OR a URL
+   to capture the original from same-session/same-viewport. It screenshots every spec screen, emits a
+   per-screen match% + an overall **fidelity score**, writes a `heat_<screen>.png` per screen, and
+   **exits nonzero when any screen falls below `--pixel-threshold`** (default 99.0; `--pixel-tol` for
+   anti-alias slack, `--pixel-mask` to zero out extension overlays). A restyle regression fails it.
 
 Between phases, verify at runtime; never advance on "publish succeeded" alone.
 
@@ -115,7 +121,9 @@ regardless of how many structural assertions pass.
   pre-corrected prompts incl. `create-form` (`prompt_recipes`/`harness-prompt-step`), structural
   verification (`harness-capture --assert` + `harness-verify --phase live`), the **behavioral gate**
   (`harness-capture --behavioral` — drives each spec'd create and asserts a row persists on reload),
-  and §Recovery above.
+  the **role gate** (`--role` — anon-blocked + member-allowed), the **render gate** (`--render` —
+  chart paints + theme applied), the **pixel/fidelity gate** (`--pixel <reference>` — per-screen
+  match% + fidelity score, exits nonzero on a restyle regression), and §Recovery above.
 - **Run the behavioral gate as Phase 6's machine check:** `harness-capture <spec> --base-url <url>
   --login-config <json> --behavioral`. It is EXACT when the build emits the contract (`data-entity`
   on list containers, `data-spec-id="<field>input"`/`save<entity>btn"` on the form — the `create-form`

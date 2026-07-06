@@ -705,6 +705,110 @@ def run_role(spec: dict, base_url: str, login: dict) -> list[dict]:
     return results
 
 
+def _pixel_compare(ref_path, clone_path, tol: int, mask_rects: list[tuple]) -> dict:
+    """Pure-PIL pixel diff of two PNGs (ported from scripts/pixel_diff.py, but exact + fast:
+    per-pixel max-channel delta counted with a C-speed histogram, no Python double-loop).
+    A pixel matches when its largest channel delta <= tol (kills anti-alias/compression noise).
+    Returns match_pct, mean_delta, diff bbox, and a size note when the two shots differ in size
+    (cropped to the common top-left region — reported, since a size delta itself is a fidelity miss)."""
+    from PIL import Image, ImageChops, ImageDraw
+    a = Image.open(ref_path).convert("RGB")
+    b = Image.open(clone_path).convert("RGB")
+    size_note = None
+    if a.size != b.size:
+        w, h = min(a.size[0], b.size[0]), min(a.size[1], b.size[1])
+        size_note = f"size ref={a.size} clone={b.size} -> compared common {w}x{h}"
+        a = a.crop((0, 0, w, h)); b = b.crop((0, 0, w, h))
+    for (x1, y1, x2, y2) in mask_rects:
+        for im in (a, b):
+            ImageDraw.Draw(im).rectangle([x1, y1, x2, y2], fill=(0, 0, 0))
+    diff = ImageChops.difference(a, b)
+    r, g, bl = diff.split()
+    maxch = ImageChops.lighter(ImageChops.lighter(r, g), bl)  # per-pixel max channel delta as an L image
+    hist = maxch.histogram()
+    total = sum(hist) or 1
+    mismatched = sum(hist[tol + 1:])
+    mean_delta = sum(i * c for i, c in enumerate(hist)) / total
+    match_pct = 100.0 * (1 - mismatched / total)
+    return {"match_pct": match_pct, "mean_delta": mean_delta, "bbox": diff.getbbox(), "size_note": size_note}
+
+
+def _write_heatmap(ref_path, clone_path, out_path) -> None:
+    """Amplified diff heatmap (differing regions glow) so a DRIFT screen shows WHERE it drifted."""
+    from PIL import Image, ImageChops
+    a = Image.open(ref_path).convert("RGB"); b = Image.open(clone_path).convert("RGB")
+    if a.size != b.size:
+        w, h = min(a.size[0], b.size[0]), min(a.size[1], b.size[1])
+        a = a.crop((0, 0, w, h)); b = b.crop((0, 0, w, h))
+    ImageChops.difference(a, b).point(lambda v: min(255, v * 6)).save(str(out_path))
+
+
+def _capture_screens_to_dir(spec: dict, base_url: str, login: dict, out_dir: Path,
+                            viewport=(1440, 900)) -> dict:
+    """Screenshot every spec screen full-page to out_dir/shot_<id>.png, using the SAME login +
+    viewport contract as the render/role gates (so a clone shot and its reference are captured
+    identically — same-session auth, same masked viewport, per the clone-parity method). Returns
+    {screen_id: Path|None}."""
+    sync_playwright = _lazy_playwright()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    shots: dict = {}
+    base = base_url.rstrip("/")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_context(viewport={"width": viewport[0], "height": viewport[1]}).new_page()
+        _apply_login(page, base_url, login)
+        for s in spec.get("screens", []):
+            route = _route_of(spec, s["id"]).lstrip("/")
+            path = out_dir / f"shot_{s['id']}.png"
+            try:
+                page.goto(base + "/" + route, wait_until="networkidle", timeout=45000)
+                page.wait_for_timeout(2500)
+                page.screenshot(path=str(path), full_page=True)
+                shots[s["id"]] = path
+            except Exception:
+                shots[s["id"]] = None
+        browser.close()
+    return shots
+
+
+def run_pixel(spec: dict, base_url: str, login: dict, reference: str, out_dir: Path | None,
+              tol: int, threshold: float, mask_rects: list[tuple]) -> list[dict]:
+    """Phase 3 pixel-fidelity gate: screenshot each spec screen on the clone and pixel-diff it against
+    a reference, which is EITHER a directory of shot_<screenId>.png (e.g. a prior capture / a
+    /design-layer mockup export) OR a base URL to capture the original from, same-session/same-viewport.
+    Emits per-screen match% + verdict (MATCH/DRIFT) and writes a heatmap per screen; the caller gates
+    (any screen below threshold FAILS) and reports the overall fidelity score."""
+    out_dir = out_dir or Path("pixel_out")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if isinstance(reference, str) and reference.startswith("http"):
+        ref_shots = _capture_screens_to_dir(spec, reference, login, out_dir / "reference")
+    else:
+        rp = Path(reference)
+        ref_shots = {s["id"]: (rp / f"shot_{s['id']}.png") for s in spec.get("screens", [])}
+    clone_shots = _capture_screens_to_dir(spec, base_url, login, out_dir / "clone")
+
+    results = []
+    for s in spec.get("screens", []):
+        sid = s["id"]
+        ref, clone = ref_shots.get(sid), clone_shots.get(sid)
+        if not ref or not Path(ref).exists():
+            results.append({"kind": "pixel", "screen": sid, "match_pct": None, "verdict": "NO_REFERENCE"})
+            continue
+        if not clone or not Path(clone).exists():
+            results.append({"kind": "pixel", "screen": sid, "match_pct": None, "verdict": "NO_CLONE_SHOT"})
+            continue
+        cmp = _pixel_compare(ref, clone, tol, mask_rects)
+        try:
+            _write_heatmap(ref, clone, out_dir / f"heat_{sid}.png")
+        except Exception:
+            pass
+        ok = cmp["match_pct"] >= threshold
+        results.append({"kind": "pixel", "screen": sid, "match_pct": round(cmp["match_pct"], 2),
+                        "mean_delta": round(cmp["mean_delta"], 2), "bbox": cmp["bbox"],
+                        "size_note": cmp["size_note"], "verdict": "MATCH" if ok else "DRIFT"})
+    return results
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="harness-capture",
@@ -729,6 +833,15 @@ def main(argv: list[str] | None = None) -> int:
                     help="question to send the agent (with --agent-url)")
     ap.add_argument("--role", action="store_true",
                     help="Phase 2 role gate: assert each access-gated screen blocks anon + allows a logged-in member")
+    ap.add_argument("--pixel", default=None,
+                    help="Phase 3 pixel gate: reference to diff the clone against — a directory of "
+                         "shot_<screenId>.png, OR a URL to capture the original from (same-session/viewport)")
+    ap.add_argument("--pixel-threshold", type=float, default=99.0,
+                    help="min per-screen match%% to PASS the pixel gate (default 99.0)")
+    ap.add_argument("--pixel-tol", type=int, default=16,
+                    help="per-channel tolerance for a pixel match, 0-255 (default 16; kills anti-alias noise)")
+    ap.add_argument("--pixel-mask", default=None,
+                    help="'x1,y1,x2,y2;...' rectangles zeroed in BOTH images before diffing (ignore overlays)")
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON to stdout")
     args = ap.parse_args(argv)
 
@@ -798,6 +911,34 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  [{mark}] {r['screen']} · {r['check']} — {r['verdict']}")
             if not results:
                 print("  (no access-gated screens in spec — nothing to role-verify)")
+        return 1 if n_fail else 0
+
+    if args.pixel:
+        mask_rects = []
+        if args.pixel_mask:
+            for rect in args.pixel_mask.split(";"):
+                rect = rect.strip()
+                if rect:
+                    mask_rects.append(tuple(int(v) for v in rect.split(",")))
+        results = run_pixel(spec, args.base_url, login, args.pixel, args.out,
+                            args.pixel_tol, args.pixel_threshold, mask_rects)
+        scored = [r["match_pct"] for r in results if r.get("match_pct") is not None]
+        fidelity = round(sum(scored) / len(scored), 2) if scored else 0.0
+        n_ok = sum(1 for r in results if r["verdict"] == "MATCH")
+        n_fail = len(results) - n_ok
+        if args.json:
+            print(json.dumps({"pixel": results, "fidelity_score": fidelity,
+                              "pass": n_ok, "fail": n_fail}, indent=2))
+        else:
+            print(f"pixel gate — {len(results)} screen(s): {n_ok} match, {n_fail} drift  |  "
+                  f"fidelity score {fidelity}% (threshold {args.pixel_threshold}%)")
+            for r in results:
+                mark = "ok " if r["verdict"] == "MATCH" else "FAIL"
+                mp = f"{r['match_pct']}%" if r.get("match_pct") is not None else "—"
+                extra = f"  {r['size_note']}" if r.get("size_note") else ""
+                print(f"  [{mark}] {r['screen']} — {r['verdict']} (match {mp}){extra}")
+            if not results:
+                print("  (no screens in spec — nothing to pixel-verify)")
         return 1 if n_fail else 0
 
     if args.render:

@@ -611,11 +611,20 @@ def _sample_rows(spec: dict, entity: str, n: int = 3) -> list:
 
 
 def _theme_css(t: dict) -> str:
-    """Compile design.theme tokens (palette + raw css) into a stylesheet string for the theme recipe."""
+    """Compile design.theme tokens (palette/typography/spacing + raw css) into a stylesheet string
+    for the theme recipe. Each token group becomes deterministic :root custom properties so the same
+    token set always renders byte-identical CSS. Palette keys stay UNPREFIXED (--primary), so the
+    --<paletteKey> runtime theme-applied check keeps working; typography -> --font-<k>, spacing ->
+    --space-<k>. fontFaces flows separately via the recipe's font_faces param."""
+    root_vars = []
+    for prefix, group in (("", t.get("palette") or {}),
+                          ("font-", t.get("typography") or {}),
+                          ("space-", t.get("spacing") or {})):
+        for k, v in group.items():
+            root_vars.append(f"--{prefix}{k}: {v}")
     parts = []
-    palette = t.get("palette") or {}
-    if palette:
-        parts.append(":root { " + "; ".join(f"--{k}: {v}" for k, v in palette.items()) + " }")
+    if root_vars:
+        parts.append(":root { " + "; ".join(root_vars) + " }")
     if t.get("css"):
         parts.append(t["css"])
     return "\n".join(parts) or "/* theme */"

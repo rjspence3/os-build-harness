@@ -21,6 +21,7 @@ FILES=(
   harness/reference/BANKING_MINED.md
   tests/test_prompt_step.py
   tests/test_capture.py
+  tests/test_pixel_gate.py
 )
 
 # Default targets: the private lab, and a clean clone if present.
@@ -45,7 +46,7 @@ for T in "${TARGETS[@]}"; do
   # Parity check: run the prompt/capture tests in the target's own venv if it has one.
   if [ -x "$T/.venv/bin/python" ]; then
     echo "   pytest (target venv):"
-    ( cd "$T" && .venv/bin/python -m pytest tests/test_prompt_step.py tests/test_capture.py -q 2>&1 | tail -1 )
+    ( cd "$T" && .venv/bin/python -m pytest tests/test_prompt_step.py tests/test_capture.py tests/test_pixel_gate.py -q 2>&1 | tail -1 )
   fi
 done
 echo "== done. Review + commit each target repo."

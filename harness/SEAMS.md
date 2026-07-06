@@ -185,3 +185,25 @@ build — data-model → screens → seed(OnReady bootstrap) → login → role-
 Phase 2's last verification dimension (role-gate member-allow) is closed. The remaining honest caveat is
 Mentor per-app authoring reliability (auth_app was flaky where auth_app3 was clean) — a Mentor property,
 not a harness-logic gap; the tight-poll driver + corrected recipes are what made auth_app3 deterministic.
+
+### Phase 3 CLOSED — pixel/design fidelity gate (2026-07-06)
+The last missing verification pillar ("fool the head of product") is now a harness gate.
+- **`harness-capture --pixel <reference>`** ports `scripts/pixel_diff.py` into the harness as
+  `_pixel_compare` (pure-PIL, exact + fast: per-pixel max-channel delta via a C-speed histogram, no
+  Python double-loop) + `run_pixel`. `<reference>` is EITHER a dir of `shot_<screenId>.png` (a prior
+  capture / a `/design-layer` mockup export) OR a URL to capture the original from same-session/
+  same-viewport (the clone-parity method: same `_apply_login`, 1440×900, full-page). Per-screen match%,
+  overall **fidelity score**, `heat_<screen>.png` per screen, `--pixel-tol` (anti-alias slack),
+  `--pixel-mask` (zero extension overlays), `--pixel-threshold` (default 99.0). Exits nonzero on drift.
+- **`_theme_css`** now compiles the full token set — palette (unprefixed, so the `--<paletteKey>`
+  runtime theme-applied check still works) + typography (`--font-*`) + spacing (`--space-*`) + fontFaces
+  — deterministically (byte-identical CSS for a given token set).
+- **Live proof (auth_app3):** self-vs-self → 3/3 MATCH, fidelity 100.0%, exit 0. A darkened-reference
+  restyle regression → home DRIFT 0.0%, fidelity 66.67%, **exit 1** + heatmap. Both halves of the exit
+  criterion demonstrated end-to-end against a deployed app.
+- **Finding (not a seam — a correct null result):** a +60/channel tint of a white-dominated reference
+  did NOT trip the gate, because white clamps at 255 so the visible pixels barely moved — the gate
+  rightly reported no drift. A real restyle (x0.6 darken, which moves the white background too) tripped
+  it. Lesson for reference authoring: a fidelity reference must differ in RENDERED pixels, not in
+  clamped/no-op transforms.
+- 8 browser-free unit tests (`tests/test_pixel_gate.py`) pin the discriminating core.
