@@ -380,6 +380,11 @@ def test_data_model_recipe_authors_all_entities_one_turn_with_fks():
     assert "IsDone: Boolean, mandatory, default False" in p
     assert "ListId: a mandatory foreign-key reference to TaskList" in p
     assert "- TaskList: Title: Text" in p and "- Task: IsDone: Boolean" in p   # auto-number Id skipped (not re-authored)
+    # R9 / gate_demo2: the identifier must be settled + CONFIRMED this turn (a data-model turn can
+    # report success yet silently drop the Id, detonating only at the first write-path).
+    assert "CONFIRM it has an Id identifier" in p
+    assert "OS-DPL-RDBS-40020" in p
+    assert "report each entity's identifier attribute by name" in p
 
 
 def test_screen_recipe_bakes_anonymous_and_input_params():

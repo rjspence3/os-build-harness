@@ -316,12 +316,21 @@ def data_model(params: dict) -> str:
         attrs = [a for a in e.get("attributes", []) if not a.get("isIdentifier")]
         lines.append(f"- {e['name']}: " + "; ".join(_attr_line(a) for a in attrs))
     body = "\n".join(lines)
+    enames = ", ".join(e["name"] for e in entities)
     return (
         f"{_PREAMBLE}\n\n"
         f"Create the app's data model. Author ALL of these entities in THIS ONE turn (they may reference each "
-        f"other, so they must be created together). Keep the default auto-number Id identifier on each. Do NOT "
-        f"create any screens or UI in this turn.\n{body}\n"
-        f"After authoring, run model validation and report errors. Do not publish.")
+        f"other, so they must be created together). Do NOT create any screens or UI in this turn.\n{body}\n"
+        f"IDENTIFIER — settle it in THIS turn, before any publish (this is load-bearing: the create/edit form's "
+        f"Save action later needs {entities[0]['name'] if entities else 'each entity'}.CreateAction and .Id, which "
+        f"do not exist if the entity has no identifier). Every entity MUST end this turn with exactly ONE identifier "
+        f"attribute: an auto-number Long-Integer named Id. ODC normally attaches this default Id on entity creation "
+        f"— but do NOT assume it; after authoring, READ each entity back and CONFIRM it has an Id identifier "
+        f"attribute. For ANY entity ({enames}) missing one, explicitly create an auto-number Long-Integer attribute "
+        f"named Id and set it as that entity's identifier. Never leave an entity without an identifier, and never "
+        f"CHANGE an existing identifier (post-first-publish that is irreversible, OS-DPL-RDBS-40020).\n"
+        f"After authoring, run model validation AND report each entity's identifier attribute by name (so a silent "
+        f"drop is caught now, not at the first write-path). Do not publish.")
 
 
 def screen(params: dict) -> str:

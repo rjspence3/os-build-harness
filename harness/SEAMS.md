@@ -260,3 +260,23 @@ published clean.
   Test `test_create_form_action_phase_forbids_identifier_change`; 292 pass.
 - The wedged app (harnessbuild_gatedemo, model rev 5 diverged, deploy deterministically failing) is
   unsalvageable by re-publish — the capstone re-run needs a FRESH app with the fixed recipe.
+
+### Seam (data-model identifier partial-phantom) — gate_demo2 re-run (2026-07-06)
+The create-form guard fix HELD (gate_demo2 STEP 4 hit NO OS-DPL-RDBS-40020, did not change the
+identifier). But the re-run exposed the UPSTREAM cause both runs actually shared: the `data_model`
+recipe DROPPED the isIdentifier attribute and PASSIVELY relied on "keep the default auto-number Id."
+On gate_demo2, STEP 1 reported change_applied=true + "auto-number Id (default)" yet the Task entity
+persisted with NO identifier at all (a PARTIAL phantom — Mentor confabulated the default Id). It stayed
+latent through steps 2-3 (the table renders on Title/Done) and detonated at STEP 4 where
+SaveTaskRecord needs Task.CreateAction + TaskRecord.Id → 4 validation errors. (Run 1's ''->'ID' rename
+was the same identifier instability from the other side.)
+- **Fix (root cause, not symptom):** `data_model` now SETTLES the identifier in-turn and CONFIRMS it —
+  "every entity MUST end this turn with exactly ONE auto-number Long-Integer Id; do NOT assume the
+  default — read each entity back and CONFIRM; create one explicitly for any entity missing it; report
+  each identifier by name." Plus BUILD_LOOP §Recovery **R9**: after data-model, VERIFY via
+  context_entities that every entity has an Id and re-author (fresh session) BEFORE the next publish if
+  a partial phantom dropped it. Tests updated; 292 pass.
+- notebooks/task_tracker/full_app passed this recipe only because Mentor's default Id happened to
+  materialize for them — the passive reliance was luck, now removed. This is the deeper closure the two
+  capstone runs were worth: the create-form guard AND the data-model identifier settlement together
+  make the write-path deterministic.

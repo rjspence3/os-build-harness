@@ -99,6 +99,14 @@ Between phases, verify at runtime; never advance on "publish succeeded" alone.
   published rev. Don't wait on a wedged session.
 - **R8 Big-table screens** (many rows) cascade on any edit ⇒ instruct "do NOT touch the table/rows/
   aggregate, only add X"; expect ~15–25 min even so.
+- **R9 Entity has no identifier (partial phantom).** After the data-model step, VERIFY via
+  `context_entities` that every entity actually persisted an `Id` identifier attribute — a data-model
+  turn can report `change_applied=true` + "auto-number Id (default)" yet silently drop the identifier
+  (gate_demo2, 2026-07-06). It stays LATENT (list screens render fine on other columns) and only
+  detonates at the first write-path, where `Save<Entity>Record` needs `<Entity>.CreateAction` + `.Id`
+  (Invalid Expression × N). ⇒ re-author data-model in a FRESH session to settle the identifier BEFORE
+  the next publish — never after (changing an identifier post-publish is the irreversible
+  OS-DPL-RDBS-40020). Do this check between data-model and the first create-form step, not later.
 
 ---
 
