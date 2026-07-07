@@ -409,3 +409,29 @@ Encoded: the `workflow` recipe now owns the combined refs+process turn (producer
 §Workflow is the create→author→publish orchestration; schema process.producerApp required; matrix BPT row
 → ✓/✓/✓ runtime-proven. The landmine is avoided STRUCTURALLY by the order, never a bare publish between
 create and process-authoring. Throwaway proof app: harnessbuild_wfprobe (da11fae3), producer batchb.
+
+### Batch C close-out — app-reference entity-import + external-library (2026-07-07)
+Closing Batch C. Results:
+- **workflow (BPT): fully runtime-proven** (wfprobe, above).
+- **app-reference — event + PUBLIC service action: deploy-proven** (wfprobe referenced batchb's OrderPlaced +
+  GetOrderCount cross-app and PUBLISHED clean).
+- **app-reference — static entity + FK: AUTHORS clean, DEPLOY-WALLS (open finding).** Fresh consumer app
+  referenced batcha's PUBLIC static entity ContactStatus and FK'd a local Item.StatusId to it. In-model:
+  0 errors, ContactStatus fully imported (IStaticEntitySignature, 2 records, non-null IdentifierType — NOT
+  a hidden Id-only stub), Item.StatusId FK authored cleanly. BUT publish FAILED `OS-DPL-50205` "Model
+  features validation failed" (3 server retries). Ruled OUT: (a) app-shape — adding a MainFlow + a screen
+  over Item (0 errors) still failed OS-DPL-50205; (b) hidden-stub OS-APPS-40028 — the static was fully
+  imported. Root cause OPEN — hypotheses: the producer batcha was a messy build (create-form phantom
+  rev 9) so cross-app validation of its model may fail, OR a CrossDevice app referencing a STATIC entity
+  hits a deploy-time model-features constraint. NOT crackable from the API post-build-failure (operation
+  ids 404 on publish_logs/deploy_messages). Decisive next test (deferred): reference a CLEAN producer's
+  PUBLIC regular entity (e.g. make batchb.Customer public + reference it) — isolates producer-state vs
+  static-specific. The `app-reference` recipe is CORRECT (full-import + hidden-stub recovery validated
+  in-model); the OS-DPL-50205 deploy wall is the open item.
+- **external-library: recipe/doctrine-complete, runtime-BLOCKED on a prerequisite** — needs a real .NET 8
+  assembly to upload (extlib_upload); none available in-session. The recipe encodes the proven extlib_*
+  lifecycle (upload→poll→publish; GenerationError terminal; non-ReadyForReview publish = HTTP 500).
+Net: Batch C recipes all shipped + tested; workflow proven; app-reference core (event/SA) proven + entity
+variant authors-clean with an open deploy wall; external-library ready + prereq-blocked. globalKey note:
+Mentor's ParseGlobalKey rejected "moduleGuid:objectGuid" (colon); addReferenceToElements does the
+dependency wiring itself — the recipe's producerKey*elementKey (asterisk) form is the correct global key.
