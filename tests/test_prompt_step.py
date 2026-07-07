@@ -718,3 +718,52 @@ def test_unknown_logic_kind_is_skipped_not_crashed():
                          "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
     recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
     assert "service-action" not in recipes and recipes == ["data-model", "screen"]
+
+
+# ── Phase 4 Batch C: workflow (BPT), app-reference (multi-app), external-library ──
+
+def test_workflow_recipe_bakes_one_turn_and_public_service_action():
+    p = pr.render("workflow", {"name": "Fulfillment", "trigger_event": "OrderPlaced",
+                               "activities": [{"name": "Notify", "calls_service_action": "SendNotice"}]})
+    assert "CreateBusinessProcess" in p
+    assert "corrupts its verify cache" in p and "before that publish" in p   # the 0-process landmine
+    assert "StartProcessOn = the Global Event OrderPlaced" in p and "TriggerMode = Event" in p
+    assert "ActionToTrigger is the PUBLIC Service Action SendNotice" in p
+    assert "orchestrator publishes the process together with its references" in p
+
+
+def test_app_reference_recipe_imports_static_and_handles_hidden_stub():
+    p = pr.render("app-reference", {"producer_app": "CoreData",
+                                    "elements": [{"kind": "Entity", "name": "Customer"},
+                                                 {"kind": "StaticEntity", "name": "Status"}]})
+    assert "addReferenceToElements" in p and "AddDependency(ParseGlobalKey" in p and "RefreshDependencies" in p
+    assert "INCLUDING any STATIC entity" in p                # the hidden-stub cause
+    assert "OS-APPS-40028" in p and "TryParseGlobalKey" in p  # the in-session recovery
+    assert "Customer (Entity)" in p and "Status (StaticEntity)" in p
+
+
+def test_external_library_recipe_is_lifecycle_not_a_mentor_turn():
+    p = pr.render("external-library", {"name": "PdfUtils", "source": "a .NET 8 helper"})
+    assert "NOT a mentor_start turn" in p and "extlib_upload" in p
+    assert "GenerationError is TERMINAL" in p and ".NET 8" in p
+    assert "ReadyForReview" in p and "HTTP 500" in p          # publish-status gotcha
+
+
+def test_plan_emits_batch_c_in_order():
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "externalLibraries": [{"name": "PdfUtils"}],
+            "appReferences": [{"producerApp": "CoreData", "elements": [{"name": "Customer"}]}],
+            "logic": [{"kind": "serviceAction", "name": "SendNotice", "outputs": [{"name": "Ok", "dataType": "Boolean"}]},
+                      {"kind": "globalEvent", "name": "OrderPlaced", "payload": []}],
+            "processes": [{"name": "Fulfillment", "triggerEvent": "OrderPlaced",
+                           "activities": [{"name": "Notify", "callsServiceAction": "SendNotice"}]}],
+            "dataModel": {"entities": [{"name": "Order", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
+            "screens": [{"id": "s", "name": "S", "components": [{"id": "c", "type": "Container"}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
+    recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
+    # foundational plumbing FIRST, the process LAST (after its event + service action)
+    assert recipes[0] == "external-library" and recipes[1] == "app-reference"
+    assert recipes[-1] == "workflow"
+    assert recipes.index("workflow") > recipes.index("service-action")
+    assert recipes.index("workflow") > recipes.index("global-event")

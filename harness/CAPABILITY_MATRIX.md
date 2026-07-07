@@ -68,14 +68,14 @@
 |---|---|---|---|---|
 | REST expose (endpoint) | ○ | ✗ | ✓ (live 200) | `CreateIntegration<IRestService>`+CreateAction+HTTPMethod/URLPath; method auto-creates its Start node. Live-proven (memory `odc_mcp_rest_endpoint_authoring`). |
 | REST consume | ✗ | ✗ | ✗ | — |
-| External library (.NET) | ○ | ✗ | ~ | extlib_upload→status; needs .NET 8; GenerationError terminal (memory). |
-| App reference (multi-app) | ○ | ✗ | ~ | `addReferenceToElements` then `applyModelApiCode AddDependency(ParseGlobalKey)`; globalKey computable (memory cluster). |
+| External library (.NET) | ✓ (external-library) | ✓ (spec.externalLibraries) | ~ (extlib_status) | NOT a Mentor turn — the recipe emits the extlib_* lifecycle (upload→poll→publish). Needs .NET 8; GenerationError TERMINAL; publish on non-ReadyForReview = HTTP 500. *(runtime pending — needs a real .NET 8 assembly)* |
+| App reference (multi-app) | ✓ (app-reference) | ✓ (spec.appReferences) | ~ | `addReferenceToElements` then `AddDependency(ParseGlobalKey(producerKey*elementKey))` + RefreshDependencies. **Import EVERY touched entity incl. STATIC — a hidden Id-only stub trips OS-APPS-40028 (in-session recovery: TryParseGlobalKey+AddDependency+RefreshDependencies).** globalKey computable. *(runtime pending — needs a producer app)* |
 
 ## Process / automation / AI
 | Construct | Recipe | Plan | Verify | Thrash-free note |
 |---|---|---|---|---|
 | Timer (WhenPublished / scheduled) | ~ (seed-entity) | ~ | ✓ (runtime rows) | `CreateTimer`, `Schedule="WhenPublished"`, `Action=<serverAction>`. Proven (BootstrapData). |
-| Business Process / BPT | ○ | ✗ | ✗ | `CreateBusinessProcess`+`CreateNode<IStartNode/IAutomaticActivityNode/IHumanActivityNode/IDecisionNode>`; auto-activity calls a PUBLIC Service Action (memory). **Publishing a Workflow app with 0 processes corrupts the verify cache — author refs+process in ONE turn.** |
+| Business Process / BPT | ✓ (workflow) | ✓ (spec.processes) | ~ | `CreateBusinessProcess`+`CreateNode<IStart/IAutomaticActivity/...>`; Start.StartProcessOn=event; auto-activity ActionToTrigger = a PUBLIC Service Action. Recipe + plan (workflow emitted LAST — needs its event + service actions). **Landmine baked in: a 0-process Workflow app corrupts its verify cache — author refs+process before the first publish; driver app_creates kind=BusinessProcess.** *(runtime pending — HIGH RISK: cache-corruption is destructive)* |
 | Global event | ✓ (global-event) | ✓ (spec.logic globalEvent) | ✓ (change_applied + publish) | `CreateGlobalEvent` (THROWS in a Workflow-kind app). **Runtime-proven 2026-07-07 (batchb): OrderPlaced event, payload OrderId; did not throw (not a Workflow app).** (Events don't surface in context reads.) |
 | Sample data / bootstrap (LoadSampleData) | ✓ (seed-entity) | ~ | ✓ | Empty-guarded LoadSampleData + WhenPublished timer. Runs once — idempotent guard, not the run-once flag (R5). |
 | AI Agent (internals: CreateAgent/CallAgent/BuildMessages/AgentTask) | ~ | ✗ | ✓ (publish) | MCP authors a GOOD agent (proven); system prompt lives in BuildMessages literal. **FULLY MCP-BUILDABLE from scratch as of 2026-07-05** — see AIModel binding below. Needs an `agent` recipe + plan step. |

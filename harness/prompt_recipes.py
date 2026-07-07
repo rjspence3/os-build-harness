@@ -687,6 +687,63 @@ def entity_index(params: dict) -> str:
             f"validation and report errors. Do not publish.")
 
 
+def workflow(params: dict) -> str:
+    """Author a Business Process (BPT) in a Workflow-kind app. CRITICAL: publishing a Workflow app with ZERO
+    processes CORRUPTS its verify cache (locks all further Model API writes) — the process AND any element
+    references it needs MUST be authored in the SAME turn, BEFORE the first publish. params: name,
+    trigger_event (the Global Event that starts it), activities:[{name, calls_service_action}] (an auto
+    activity can call ONLY a PUBLIC Service Action)."""
+    name = _p(params, "name", required=True)
+    trigger = _p(params, "trigger_event", required=True)
+    activities = _p(params, "activities", [], required=True)
+    acts = "\n".join(
+        f"  - an Automatic Activity node '{a['name']}' whose ActionToTrigger is the PUBLIC Service Action "
+        f"{a['calls_service_action']} (an auto-activity can call ONLY a Public Service Action — a Server Action fails)"
+        for a in activities)
+    return (f"{_PREAMBLE}\n\n"
+            f"Author a Business Process named {name} (eSpace.CreateBusinessProcess) in THIS turn. A Workflow app "
+            f"with ZERO processes corrupts its verify cache on the first publish (locking all further Model API "
+            f"writes), so the process — and any element references it needs — MUST exist before that publish. Build "
+            f"the process flow with CreateNode<T> + .Target/ConnectedBelow:\n"
+            f"- a Start node with StartProcessOn = the Global Event {trigger} and TriggerMode = Event;\n{acts}\n"
+            f"- an End node; wire Start -> activities -> End.\n"
+            f"After authoring, run model validation and report errors. Do NOT publish — the orchestrator publishes "
+            f"the process together with its references in one shot (never a 0-process Workflow app).")
+
+
+def app_reference(params: dict) -> str:
+    """Reference another app's PUBLIC elements so this app can consume them. params: producer_app,
+    elements:[{kind, name}] (kind: Entity | ServiceAction | StaticEntity). Import EVERY touched entity
+    INCLUDING static ones — a hidden Id-only FK stub trips OS-APPS-40028 at publish."""
+    producer = _p(params, "producer_app", required=True)
+    elements = _p(params, "elements", [], required=True)
+    el = ", ".join(f"{e['name']} ({e.get('kind', 'Entity')})" for e in elements)
+    return (f"{_PREAMBLE}\n\n"
+            f"Add a dependency on the producer app '{producer}' and import these PUBLIC elements so this app can use "
+            f"them: {el}. Use addReferenceToElements, then applyModelApiCode AddDependency(ParseGlobalKey("
+            f"\"<producerKey>*<elementKey>\")) + RefreshDependencies. Import EVERY entity you touch INCLUDING any "
+            f"STATIC entity — an entity referenced only by Id (a hidden Id-only FK stub, not fully imported) makes the "
+            f"OML INVALID at publish (OS-APPS-40028); if that happens, fix it IN-SESSION via TryParseGlobalKey + "
+            f"AddDependency + RefreshDependencies for the missing element. Referenced elements live under "
+            f"References.Named(\"{producer}\").Entities. After authoring, run model validation. Do not publish.")
+
+
+def external_library(params: dict) -> str:
+    """NOT a Mentor turn — the extlib_* MCP lifecycle for an external .NET library. Emitted so the driver
+    executes the upload/publish flow (not mentor_start). params: name, source? (path/description). Needs
+    .NET 8; a GenerationError is TERMINAL; publishing on a non-ReadyForReview status returns HTTP 500."""
+    name = _p(params, "name", required=True)
+    source = _p(params, "source", "the provided .NET assembly")
+    return (f"[EXTERNAL-LIBRARY LIFECYCLE — NOT a mentor_start turn; use the extlib_* MCP tools]\n"
+            f"Publish the external .NET library '{name}' from {source}:\n"
+            f"1. extlib_upload(the .NET 8 assembly bytes) — returns an operation to poll.\n"
+            f"2. Poll extlib_status to terminal. A GenerationError is TERMINAL (do NOT retry blindly — the assembly "
+            f"is incompatible; needs .NET 8).\n"
+            f"3. Only once status is ReadyForReview, extlib_publish — publishing on any other status returns HTTP 500.\n"
+            f"Verify with extlib_status / extlib_contents that the library's actions are exposed, then reference it "
+            f"from a consumer app via the app-reference flow.")
+
+
 def json_1line(obj) -> str:
     import json
     return json.dumps(obj, separators=(", ", "="))
@@ -704,6 +761,9 @@ RECIPES = {
     "aggregate-join": aggregate_join,
     "global-event": global_event,
     "entity-index": entity_index,
+    "workflow": workflow,
+    "app-reference": app_reference,
+    "external-library": external_library,
     "screen": screen,
     "nav-block": nav_block,
     "list-screen": list_screen,
@@ -875,6 +935,14 @@ def plan_from_spec(spec: dict) -> list[dict]:
     # Scaffold FIRST (seam 3d): the data model, then all screens with Anonymous baked. list-screen
     # and create-form steps below assume the entities + screens already exist.
     all_entities = spec.get("dataModel", {}).get("entities", [])
+    # Batch C: foundational cross-app plumbing FIRST — an external .NET library (extlib lifecycle, not a
+    # Mentor turn), then references to producer apps/libraries (elements other units consume).
+    for lib in spec.get("externalLibraries", []) or []:
+        steps.append({"recipe": "external-library", "why": f"external .NET library {lib['name']}",
+                      "params": {"name": lib["name"], "source": lib.get("source", "the provided .NET assembly")}})
+    for ref in spec.get("appReferences", []) or []:
+        steps.append({"recipe": "app-reference", "why": f"reference {ref['producerApp']}",
+                      "params": {"producer_app": ref["producerApp"], "elements": ref.get("elements", [])}})
     # Batch A: structures + static entities (enums) are authored BEFORE the regular data model — a
     # regular entity may FK a static one, and structures type action signatures. Each static entity is
     # its own turn (explicit records + manual Long PK); structures one per turn.
@@ -1084,4 +1152,11 @@ def plan_from_spec(spec: dict) -> list[dict]:
             continue
         p = {k: v for k, v in unit.items() if k != "kind"}
         steps.append({"recipe": recipe, "why": f"logic {unit['kind']} {unit.get('name', '')}", "params": p})
+    # Batch C: Business Processes LAST — a process needs its trigger Global Event + the PUBLIC Service Actions
+    # its activities call to already exist. (The driver app_creates a BusinessProcess-kind app + authors the
+    # process before the FIRST publish — a 0-process Workflow app corrupts its verify cache.)
+    for proc in spec.get("processes", []) or []:
+        steps.append({"recipe": "workflow", "why": f"business process {proc['name']}",
+                      "params": {"name": proc["name"], "trigger_event": proc["triggerEvent"],
+                                 "activities": proc.get("activities", [])}})
     return steps

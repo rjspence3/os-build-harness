@@ -110,6 +110,27 @@
         "$ref": "#/$defs/logicUnit"
       },
       "description": "Batch B: standalone logic units (service/client/SQL actions + global events). plan_from_spec emits one step each, last (a service action may wrap a write-path server action)."
+    },
+    "externalLibraries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/externalLibrary"
+      },
+      "description": "Batch C: external .NET libraries (extlib_* lifecycle). plan_from_spec emits one `external-library` step each, first."
+    },
+    "appReferences": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/appReference"
+      },
+      "description": "Batch C: cross-app dependencies on producer apps' public elements. plan_from_spec emits one `app-reference` step each, early."
+    },
+    "processes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/process"
+      },
+      "description": "Batch C: Business Processes (BPT). plan_from_spec emits one `workflow` step each, last."
     }
   },
   "$defs": {
@@ -1271,6 +1292,103 @@
         },
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "externalLibrary": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "description": "Batch C: an external .NET library. NOT a Mentor turn \u2014 plan_from_spec emits an `external-library` step describing the extlib_* MCP upload/publish lifecycle (needs .NET 8).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "description": "Path/description of the .NET 8 assembly."
+        }
+      }
+    },
+    "appReference": {
+      "type": "object",
+      "required": [
+        "producerApp",
+        "elements"
+      ],
+      "additionalProperties": false,
+      "description": "Batch C: a dependency on another app's PUBLIC elements. plan_from_spec emits an `app-reference` step (early, before consumers). Import EVERY touched entity incl. static \u2014 a hidden Id-only stub trips OS-APPS-40028.",
+      "properties": {
+        "producerApp": {
+          "type": "string",
+          "description": "Producer app name or asset key."
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "Entity",
+                  "StaticEntity",
+                  "ServiceAction"
+                ],
+                "description": "Element kind (default Entity)."
+              }
+            }
+          }
+        }
+      }
+    },
+    "processActivity": {
+      "type": "object",
+      "required": [
+        "name",
+        "callsServiceAction"
+      ],
+      "additionalProperties": false,
+      "description": "An automatic activity in a business process. Its ActionToTrigger can be ONLY a PUBLIC Service Action.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "callsServiceAction": {
+          "type": "string",
+          "description": "The PUBLIC Service Action this activity triggers."
+        }
+      }
+    },
+    "process": {
+      "type": "object",
+      "required": [
+        "name",
+        "triggerEvent"
+      ],
+      "additionalProperties": false,
+      "description": "Batch C: a Business Process (BPT). plan_from_spec emits a `workflow` step LAST (its trigger event + service actions must exist first). The driver app_creates a BusinessProcess-kind app and authors the process before the FIRST publish (a 0-process Workflow app corrupts its verify cache).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "triggerEvent": {
+          "type": "string",
+          "description": "The Global Event that starts the process (StartProcessOn)."
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/processActivity"
+          }
         }
       }
     }
