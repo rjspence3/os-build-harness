@@ -389,3 +389,23 @@ harness-gate on the base app: ✅ DONE, exit 0 (structural pass; behavioral/role
 approach and authored first-try — evidence that once the seams are closed, breadth is cheap. Process note:
 the Context Service indexer lags a publish ~40-60s (reads the prior revision until it catches up) — re-poll
 to the expected rev before recording a verdict.
+
+### Workflows CRACKED — from-scratch BPT via MCP, runtime-proven (wfprobe, 2026-07-07)
+"We need to work out how to make workflows work" → worked out empirically + proven end-to-end. A BPT is the
+one inherently-MULTI-APP construct with a destructive landmine (0-process Workflow publish corrupts the
+verify cache). The proven sequence:
+- **Q1 (killer) SOLVED:** `app_create kind=BusinessProcess` registers rev 1 but does NOT auto-publish
+  (deploy_list = 0). So a fresh Workflow app is NOT bricked at birth — there is a safe window before the
+  first publish. (This is what makes from-scratch viable at all.)
+- **Producer topology:** the trigger Global Event + the PUBLIC Service Action(s) live in a NORMAL app
+  (CreateGlobalEvent throws in a Workflow app; auto-activity calls only a Public SA). Reused batchb
+  (OrderPlaced event + GetOrderCount public SA) as the producer — no new producer needed.
+- **Q2/Q3/Q4 SOLVED in ONE turn (0 errors):** referenced batchb's OrderPlaced + GetOrderCount cross-app;
+  `StartProcessOn` accepted the referenced Global Event (IGlobalEventSignature); the auto-activity accepted
+  the referenced public SA as `ActionToTrigger` (IServiceActionSignature) with its arg wired.
+- **Publish PROVEN clean:** with the process present, publish succeeded rev 2, `no_changes_detected:false`
+  (a REAL deploy — the session's first), NO cache corruption.
+Encoded: the `workflow` recipe now owns the combined refs+process turn (producer_app param); BUILD_LOOP
+§Workflow is the create→author→publish orchestration; schema process.producerApp required; matrix BPT row
+→ ✓/✓/✓ runtime-proven. The landmine is avoided STRUCTURALLY by the order, never a bare publish between
+create and process-authoring. Throwaway proof app: harnessbuild_wfprobe (da11fae3), producer batchb.

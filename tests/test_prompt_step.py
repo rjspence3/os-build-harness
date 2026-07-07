@@ -722,14 +722,17 @@ def test_unknown_logic_kind_is_skipped_not_crashed():
 
 # ── Phase 4 Batch C: workflow (BPT), app-reference (multi-app), external-library ──
 
-def test_workflow_recipe_bakes_one_turn_and_public_service_action():
-    p = pr.render("workflow", {"name": "Fulfillment", "trigger_event": "OrderPlaced",
+def test_workflow_recipe_refs_and_process_in_one_turn():
+    # runtime-proven (wfprobe): reference the producer's event + PUBLIC SA AND author the process in ONE turn
+    p = pr.render("workflow", {"name": "Fulfillment", "producer_app": "batchb",
+                               "trigger_event": "OrderPlaced",
                                "activities": [{"name": "Notify", "calls_service_action": "SendNotice"}]})
     assert "CreateBusinessProcess" in p
-    assert "corrupts its verify cache" in p and "before that publish" in p   # the 0-process landmine
-    assert "StartProcessOn = the Global Event OrderPlaced" in p and "TriggerMode = Event" in p
-    assert "ActionToTrigger is the PUBLIC Service Action SendNotice" in p
-    assert "orchestrator publishes the process together with its references" in p
+    assert "corrupts its verify cache" in p and "NEVER been published" in p   # the 0-process landmine
+    assert "Reference the producer app 'batchb'" in p                         # cross-app refs in this turn
+    assert "Global Event OrderPlaced" in p and "Service Action(s) SendNotice" in p
+    assert "StartProcessOn = the referenced OrderPlaced Global Event" in p and "TriggerMode = Event" in p
+    assert "ActionToTrigger is the referenced PUBLIC Service Action SendNotice" in p
 
 
 def test_app_reference_recipe_imports_static_and_handles_hidden_stub():
@@ -755,7 +758,7 @@ def test_plan_emits_batch_c_in_order():
             "appReferences": [{"producerApp": "CoreData", "elements": [{"name": "Customer"}]}],
             "logic": [{"kind": "serviceAction", "name": "SendNotice", "outputs": [{"name": "Ok", "dataType": "Boolean"}]},
                       {"kind": "globalEvent", "name": "OrderPlaced", "payload": []}],
-            "processes": [{"name": "Fulfillment", "triggerEvent": "OrderPlaced",
+            "processes": [{"name": "Fulfillment", "producerApp": "batchb", "triggerEvent": "OrderPlaced",
                            "activities": [{"name": "Notify", "callsServiceAction": "SendNotice"}]}],
             "dataModel": {"entities": [{"name": "Order", "attributes": [
                 {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},

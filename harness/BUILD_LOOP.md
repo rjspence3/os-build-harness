@@ -127,6 +127,32 @@ Between phases, verify at runtime; never advance on "publish succeeded" alone.
 
 ---
 
+## §Workflow — building a Business Process (BPT) from scratch (RUNTIME-PROVEN, wfprobe 2026-07-07)
+
+A workflow is the one construct that is **inherently multi-app** and has a **destructive landmine**, so it
+does NOT build like a normal app. Follow this sequence exactly — it is proven end-to-end:
+
+1. **Producer app (a NORMAL, non-Workflow app)** holds the trigger **Global Event** and the **PUBLIC Service
+   Action(s)** the activities call. `CreateGlobalEvent` THROWS in a Workflow app, and an auto-activity can
+   call ONLY a Public Service Action — so both live in the producer and are referenced cross-app. (Any app
+   with a global event + a public SA works as the producer.)
+2. **`app_create kind=BusinessProcess`** registers the Workflow app at rev 1 but does **NOT auto-publish it**
+   (`deploy_list` = 0 deployments — verified). THIS IS THE SAFE WINDOW: the app is not yet bricked.
+3. **ONE Mentor turn** (the `workflow` recipe): reference the producer's event + PUBLIC service action(s)
+   cross-app (addReferenceToElements + AddDependency(ParseGlobalKey) + RefreshDependencies) AND author the
+   process — Start(`StartProcessOn` = the referenced event, `TriggerMode` = Event) → auto-activities
+   (`ActionToTrigger` = the referenced public SAs) → End. A referenced (cross-app) event binds to
+   `StartProcessOn` and a referenced public SA binds to `ActionToTrigger` — both confirmed. Expect **0
+   errors** (a "missing event handler" + "no User Provider" warning are benign for a consume-only workflow).
+4. **Publish ONCE, with the process present.** Never publish before step 3 lands — a **0-process Workflow app
+   publish CORRUPTS the verify cache** and bricks the app (recover only via delete/recreate). A valid
+   1-process publish is clean (proven: rev 2, `no_changes_detected:false` = real deploy, no corruption).
+
+The landmine is avoided **structurally** by the order: create (no publish) → author refs+process → publish.
+Never a bare publish in between.
+
+---
+
 ## §Done — completion criteria (all required)
 
 **One machine check enforces all of it:** `harness-gate <spec> --base-url <url>` runs every applicable

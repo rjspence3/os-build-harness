@@ -1372,13 +1372,18 @@
       "type": "object",
       "required": [
         "name",
+        "producerApp",
         "triggerEvent"
       ],
       "additionalProperties": false,
-      "description": "Batch C: a Business Process (BPT). plan_from_spec emits a `workflow` step LAST (its trigger event + service actions must exist first). The driver app_creates a BusinessProcess-kind app and authors the process before the FIRST publish (a 0-process Workflow app corrupts its verify cache).",
+      "description": "Batch C: a Business Process (BPT). RUNTIME-PROVEN from scratch (wfprobe 2026-07-07): app_create kind=BusinessProcess does NOT auto-publish (0 deployments \u2014 safe window); one turn references the producer app's event + PUBLIC service actions AND authors the process; publish ONCE with the process present (a 0-process Workflow app publish corrupts its verify cache). plan_from_spec emits a `workflow` step LAST.",
       "properties": {
         "name": {
           "type": "string"
+        },
+        "producerApp": {
+          "type": "string",
+          "description": "The NORMAL (non-Workflow) producer app that holds the trigger Global Event + the PUBLIC Service Actions the activities call (CreateGlobalEvent throws in a Workflow app, so they live cross-app and are referenced)."
         },
         "triggerEvent": {
           "type": "string",

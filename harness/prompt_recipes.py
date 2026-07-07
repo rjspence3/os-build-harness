@@ -688,27 +688,40 @@ def entity_index(params: dict) -> str:
 
 
 def workflow(params: dict) -> str:
-    """Author a Business Process (BPT) in a Workflow-kind app. CRITICAL: publishing a Workflow app with ZERO
-    processes CORRUPTS its verify cache (locks all further Model API writes) — the process AND any element
-    references it needs MUST be authored in the SAME turn, BEFORE the first publish. params: name,
-    trigger_event (the Global Event that starts it), activities:[{name, calls_service_action}] (an auto
-    activity can call ONLY a PUBLIC Service Action)."""
+    """Author a Business Process (BPT) — cross-app refs + process in ONE turn (runtime-proven, wfprobe
+    2026-07-07). The trigger Global Event + the Service Actions the activities call live in a PRODUCER app
+    (a NORMAL app — CreateGlobalEvent THROWS in a Workflow app) and are referenced cross-app. Sequence
+    (owned by the driver/plan): the producer app already holds the event + PUBLIC service action(s);
+    `app_create kind=BusinessProcess` registers the Workflow app WITHOUT auto-publishing (0 deployments —
+    the safe window); this turn references the producer's elements AND authors the process; then the
+    orchestrator publishes ONCE with the process present. A 0-process Workflow app publish corrupts its
+    verify cache, so NEVER publish before this turn lands. params: name, producer_app, trigger_event,
+    activities:[{name, calls_service_action}] (an auto-activity can call ONLY a PUBLIC Service Action)."""
     name = _p(params, "name", required=True)
+    producer = _p(params, "producer_app", required=True)
     trigger = _p(params, "trigger_event", required=True)
     activities = _p(params, "activities", [], required=True)
+    sa_names = sorted({a["calls_service_action"] for a in activities})
     acts = "\n".join(
-        f"  - an Automatic Activity node '{a['name']}' whose ActionToTrigger is the PUBLIC Service Action "
-        f"{a['calls_service_action']} (an auto-activity can call ONLY a Public Service Action — a Server Action fails)"
+        f"   - an Automatic Activity node '{a['name']}' whose ActionToTrigger is the referenced PUBLIC Service "
+        f"Action {a['calls_service_action']} (an auto-activity can call ONLY a Public Service Action; set its "
+        f"arguments — e.g. NullIdentifier() for an Identifier input when no business value is needed)"
         for a in activities)
     return (f"{_PREAMBLE}\n\n"
-            f"Author a Business Process named {name} (eSpace.CreateBusinessProcess) in THIS turn. A Workflow app "
-            f"with ZERO processes corrupts its verify cache on the first publish (locking all further Model API "
-            f"writes), so the process — and any element references it needs — MUST exist before that publish. Build "
-            f"the process flow with CreateNode<T> + .Target/ConnectedBelow:\n"
-            f"- a Start node with StartProcessOn = the Global Event {trigger} and TriggerMode = Event;\n{acts}\n"
-            f"- an End node; wire Start -> activities -> End.\n"
-            f"After authoring, run model validation and report errors. Do NOT publish — the orchestrator publishes "
-            f"the process together with its references in one shot (never a 0-process Workflow app).")
+            f"This is a Workflow (BusinessProcess-kind) app with ZERO processes; it has NEVER been published and "
+            f"must NOT be published until it has a process (a 0-process Workflow app corrupts its verify cache). "
+            f"Author BOTH of the following in THIS one turn, then STOP (do NOT publish):\n"
+            f"1. Reference the producer app '{producer}' and import (all PUBLIC): the Global Event {trigger} and the "
+            f"Service Action(s) {', '.join(sa_names)}. Use addReferenceToElements + AddDependency(ParseGlobalKey) + "
+            f"RefreshDependencies. The event resolves under the reference's GlobalEvents collection; the service "
+            f"actions under its ServiceActions collection.\n"
+            f"2. Author a Business Process named {name} (eSpace.CreateBusinessProcess) with CreateNode<T> + "
+            f".Target/ConnectedBelow:\n"
+            f"   - a Start node with StartProcessOn = the referenced {trigger} Global Event and TriggerMode = Event;\n{acts}\n"
+            f"   - an End node; wire Start -> activities -> End.\n"
+            f"After authoring, run model validation (expect 0 errors; a 'missing event handler' + a 'no User "
+            f"Provider' warning are BENIGN for a consume-only workflow app). Do NOT publish — the orchestrator "
+            f"publishes the process + refs in one shot (never a 0-process Workflow app).")
 
 
 def app_reference(params: dict) -> str:
@@ -1157,6 +1170,7 @@ def plan_from_spec(spec: dict) -> list[dict]:
     # process before the FIRST publish — a 0-process Workflow app corrupts its verify cache.)
     for proc in spec.get("processes", []) or []:
         steps.append({"recipe": "workflow", "why": f"business process {proc['name']}",
-                      "params": {"name": proc["name"], "trigger_event": proc["triggerEvent"],
+                      "params": {"name": proc["name"], "producer_app": proc["producerApp"],
+                                 "trigger_event": proc["triggerEvent"],
                                  "activities": proc.get("activities", [])}})
     return steps
