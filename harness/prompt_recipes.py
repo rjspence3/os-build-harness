@@ -248,28 +248,54 @@ def create_form(params: dict) -> str:
         f"its identifier/Id attribute (the identifier is already settled; changing an entity identifier after its "
         f"first publish is IRREVERSIBLE and blocks the deploy with OS-DPL-RDBS-40020). Only READ {entity} via its "
         f"CreateAction/UpdateAction and a typed {entity} local — author ONLY the server action, touch no entity schema.")
+    # The form's inputs live INSIDE a Form container widget. A BARE Input added directly to the screen
+    # is the shape that intermittently phantoms (change_applied=true but nothing persists — batcha,
+    # 2026-07-07, 4× fresh); the Form-wrapped build is what persisted. So every form path wraps its
+    # inputs in a Form (also the idiomatic ODC create form).
+    form_widgets = (
+        f"a screen-local variable {local} of the {entity} data type; a Form container widget "
+        f"(data-spec-id=\"{lentity}form\") whose Source record is {local}, and INSIDE that Form these editable "
+        f"inputs: {inputs} (fields: {flist}); and a Button labeled \"Add {entity}\" (data-spec-id=\"save{lentity}btn\")")
     widgets_step = (
         f"On the {screen} screen, ADD ONLY these and nothing else — do NOT modify or rebind the existing table, "
-        f"aggregate, or any existing widget: a screen-local variable {local} of the {entity} data type; editable "
-        f"inputs: {inputs} (fields: {flist}); and a Button labeled \"Add {entity}\" (data-spec-id=\"save{lentity}btn\") "
-        f"with its OnClick LEFT EMPTY for now. Keep the screen Anonymous. Do NOT add any screen action or save logic "
-        f"in this turn.")
+        f"aggregate, or any existing widget: {form_widgets} with its OnClick LEFT EMPTY for now. Keep the screen "
+        f"Anonymous. Do NOT add any screen action or save logic in this turn.")
     wire_step = (
         f"Wire the \"Add {entity}\" button (data-spec-id=\"save{lentity}btn\") you just created. Create ONE screen "
         f"action, set as that button's OnClick, that in order: Assign {local}.Id = NullIdentifier();{context_txt}"
         f"{creator_txt} calls Save{entity}Record passing {local} as {entity}Record; then RefreshData the "
         f"{screen} list aggregate so the new row appears.{ret_txt} Leave the inputs' bindings intact. The prior "
         f"\"On Click must be set\" error MUST now be resolved.")
+    # The PROVEN-persist shape (the batcha recovery): build the Form + inputs + button AND wire the OnClick
+    # in ONE turn, AFTER the server action already exists. Keeps the action separate (so this is not the
+    # action+form+wire mega-turn that cascades) while avoiding the fragile bare-widgets-only turn.
+    combined_step = (
+        f"On the {screen} screen, build a WORKING create form in ONE turn (the {entity}'s Save{entity}Record server "
+        f"action ALREADY exists — call it, do not re-author it). ADD ONLY (do NOT modify the existing table or its "
+        f"aggregate): {form_widgets}; then ONE screen action set as that Button's OnClick that in order: Assign "
+        f"{local}.Id = NullIdentifier();{context_txt}{creator_txt} calls Save{entity}Record passing {local} as "
+        f"{entity}Record; then RefreshData the {screen} list aggregate so the new row appears.{ret_txt} Keep the "
+        f"screen Anonymous.")
+
+    # PHANTOM SELF-CHECK for the widgets phase: leaving OnClick empty MUST raise the "On Click must be set"
+    # validation error. If change_applied=true but that error is ABSENT, the widgets silently did NOT persist
+    # (a phantom) — re-author in a FRESH session; do NOT proceed to wire against widgets that aren't there.
+    widgets_phantom_check = (
+        "After authoring, run model validation. The Button's \"On Click must be set\" error is EXPECTED here "
+        "(OnClick is empty) — it is resolved in the next turn, which RESUMES this session. If that error is "
+        "ABSENT, the widgets did NOT persist (a phantom despite a success summary): re-author this SAME step in a "
+        "FRESH session before continuing. Do not publish.")
 
     if phase == "action":
         return (f"{_PREAMBLE}\n\n{action_step}\nDo NOT add or modify any screen or widget in this turn — ONLY the "
                 f"server action. Do not publish.")
     if phase == "widgets":
-        return (f"{_PREAMBLE}\n\n{widgets_step}\nAfter authoring, run model validation. The button's \"On Click must "
-                f"be set\" error is EXPECTED here (you left OnClick empty) — it is resolved in the very next turn, which "
-                f"RESUMES this session. Do not publish.")
+        return f"{_PREAMBLE}\n\n{widgets_step}\n{widgets_phantom_check}"
     if phase == "wire":
         return (f"{_PREAMBLE}\n\n{wire_step}\nThe result MUST persist to the database and survive a page reload.")
+    if phase == "combined":
+        return (f"{_PREAMBLE}\n\n{combined_step}\nThe result MUST persist to the database and survive a page reload. "
+                f"Do not publish.")
 
     # phase=None: the single combined prompt (backward-compatible)
     return (
@@ -857,15 +883,15 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 ret = _list_screen_for_entity(spec, entity, exclude=s["id"])
                 if ret:
                     p["return_screen"] = ret
-                # Seam 3f: three thrash-free sub-steps. wire RESUMEs the widgets session; publish ONCE.
+                # Seam 3f (revised after batcha): action FIRST (its own turn), then Form+widgets+wire in
+                # ONE turn — the PROVEN-persist shape. The old bare-widgets-only turn phantomed 4× (batcha);
+                # keeping the action separate avoids the action+form+wire mega-cascade the split guarded against.
                 why = f"{s['id']} CreateEntity {entity}"
                 steps.append({"recipe": "create-form", "why": f"{why} — server action (fresh turn)",
                               "params": {**p, "phase": "action"}})
-                steps.append({"recipe": "create-form", "why": f"{why} — form widgets (fresh turn; publish deferred)",
-                              "params": {**p, "phase": "widgets"}})
                 steps.append({"recipe": "create-form",
-                              "why": f"{why} — wire OnClick (RESUME the widgets session; publish once after)",
-                              "params": {**p, "phase": "wire"}})
+                              "why": f"{why} — Form + inputs + wire in one turn (fresh; publish once after)",
+                              "params": {**p, "phase": "combined"}})
                 # Batch A opt-ins on the write-path: input validation + exception handling.
                 create_actions = [a for a in s.get("actions", []) if "CreateEntity" in set(a.get("does", []))]
                 if any(a.get("validate") for a in create_actions):

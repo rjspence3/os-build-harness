@@ -114,6 +114,16 @@ Between phases, verify at runtime; never advance on "publish succeeded" alone.
   (Invalid Expression × N). ⇒ re-author data-model in a FRESH session to settle the identifier BEFORE
   the next publish — never after (changing an identifier post-publish is the irreversible
   OS-DPL-RDBS-40020). Do this check between data-model and the first create-form step, not later.
+- **R10 Create-form widgets phantom.** A form's Inputs must live INSIDE a **Form container widget**; a
+  BARE Input added straight onto the screen is the shape that intermittently phantoms — the turn reports
+  `change_applied=true` but nothing persists (batcha, 2026-07-07, 4× fresh). The **positive detector**
+  is phase-specific: a widgets turn that leaves OnClick empty MUST raise the "On Click must be set"
+  validation error; if that error is ABSENT, the widgets did NOT persist ⇒ re-author FRESH; do NOT wire
+  against widgets that aren't there (proceeding drifts the `data-spec-id` contract on the recovery →
+  behavioral gate NO_CREATE_ENTRY). The plan's default create-form is now **action (own turn) → Form +
+  inputs + wire in ONE turn** (`phase="combined"`, the proven-persist shape) — the old bare-widgets-only
+  turn is retired as the plan default (still available as `phase="widgets"/"wire"` if a screen needs the
+  split).
 
 ---
 

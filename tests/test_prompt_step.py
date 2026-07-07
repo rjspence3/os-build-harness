@@ -318,8 +318,8 @@ def test_plan_emits_write_path_step_from_actions_does():
                               "does": ["CreateEntity", "UpdateEntity"]}],
                  "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "b"}]}}]}
     wp = [s for s in pr.plan_from_spec(spec) if s["recipe"] == "create-form"]
-    # seam 3f: one write-path emits three thrash-free sub-steps (action -> widgets -> wire)
-    assert [s["params"]["phase"] for s in wp] == ["action", "widgets", "wire"]
+    # seam 3f (revised): action FIRST, then Form+widgets+wire in ONE combined turn (proven-persist shape)
+    assert [s["params"]["phase"] for s in wp] == ["action", "combined"]
     p = wp[0]["params"]
     assert p["entity"] == "Doc" and "Title" in p["fields"]
     assert "CreatorId" not in p["fields"] and "CreatedAt" not in p["fields"]   # FK + audit dropped
@@ -348,17 +348,17 @@ def test_write_path_entity_is_the_data_bound_one_not_the_context_input():
                               "does": ["CreateEntity"]}],
                  "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
     wp = [s for s in pr.plan_from_spec(spec) if s["recipe"] == "create-form"]
-    assert [s["params"]["phase"] for s in wp] == ["action", "widgets", "wire"]   # seam 3f
+    assert [s["params"]["phase"] for s in wp] == ["action", "combined"]   # seam 3f (revised)
     p = wp[0]["params"]
     assert p["entity"] == "Task"                        # boundTo wins; NOT the TaskList context input
     # seam 3a: the mandatory parent FK Task.ListId must be wired from the screen's ListId input param
     assert p["context_fk"] == {"attr": "ListId", "from_param": "ListId"}
     # seam 3b: no input param references Task itself -> create-only, id_param omitted (not a phantom "TaskId")
     assert "id_param" not in p
-    # the WIRE phase instructs the mandatory parent-FK assignment; the ACTION phase the server action
-    wire = pr.render("create-form", {**p, "phase": "wire"})
-    assert "NewTask.ListId = the screen's ListId input parameter" in wire
-    assert "MANDATORY parent reference" in wire
+    # the COMBINED phase instructs the mandatory parent-FK assignment; the ACTION phase the server action
+    combined = pr.render("create-form", {**p, "phase": "combined"})
+    assert "NewTask.ListId = the screen's ListId input parameter" in combined
+    assert "MANDATORY parent reference" in combined
     action = pr.render("create-form", {**p, "phase": "action"})
     assert "SaveTaskRecord" in action and "Public=FALSE" in action
     # the combined (phase=None) prompt still carries the create-only Id instruction (backward-compatible)
@@ -576,7 +576,7 @@ def test_plan_emits_batch_a_chain_in_order():
     recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
     # structures + static entities BEFORE the data model; validation + exception AFTER the create-form
     assert recipes == ["structure", "static-entity", "data-model", "screen", "list-screen",
-                       "create-form", "create-form", "create-form", "input-validation", "exception-handler"]
+                       "create-form", "create-form", "input-validation", "exception-handler"]
 
 
 def test_static_entity_excluded_from_data_model_step():
@@ -609,3 +609,26 @@ def test_validation_and_exception_are_opt_in():
                          "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
     recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
     assert "input-validation" not in recipes and "exception-handler" not in recipes
+
+
+def test_create_form_widgets_wrap_in_form_and_carry_phantom_check():
+    """batcha wall fix: bare Inputs added directly to the screen phantomed 4×; the persisted shape
+    wraps inputs in a Form widget. The widgets phase also carries the positive phantom detector
+    (absent 'On Click must be set' error == phantom -> re-author fresh)."""
+    p = {"screen": "contacts", "entity": "Contact", "fields": ["Name", "Email"]}
+    widgets = pr.render("create-form", {**p, "phase": "widgets"})
+    assert 'data-spec-id="contactform"' in widgets            # Form container
+    assert "Form container widget" in widgets and "Source record is NewContact" in widgets
+    assert "did NOT persist (a phantom" in widgets            # phantom self-check
+    assert 'data-spec-id="nameinput"' in widgets and 'data-spec-id="savecontactbtn"' in widgets
+
+
+def test_create_form_combined_phase_builds_form_and_wires_in_one_turn():
+    """The proven-persist recovery shape: Form + inputs + button + OnClick wiring in ONE turn,
+    AFTER the server action exists. This is the plan's default second phase now."""
+    p = {"screen": "contacts", "entity": "Contact", "fields": ["Name", "Email"]}
+    combined = pr.render("create-form", {**p, "phase": "combined"})
+    assert "Save ContactRecord".replace(" ", "") in combined.replace(" ", "")  # SaveContactRecord referenced
+    assert "ALREADY exists" in combined                       # does NOT re-author the action
+    assert 'data-spec-id="contactform"' in combined and 'data-spec-id="savecontactbtn"' in combined
+    assert "NewContact.Id = NullIdentifier()" in combined and "RefreshData" in combined
