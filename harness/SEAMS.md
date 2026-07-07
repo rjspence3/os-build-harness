@@ -349,3 +349,25 @@ as an "uncovered entity hole". A static/lookup entity is reference data, not a u
 the create-form widgets phantom wall closed (Tier-1) so the data-spec-id contract survives — the next
 flywheel target. Also seen again: every publish reported no_changes_detected=true yet every rev incremented
 and every change verified in the deployed inventory (AVS false-negative on this app throughout).
+
+### Create-form widgets phantom wall — CLOSED (cfwall validation, 2026-07-07)
+Re-ran a fresh single-entity CRUD (harnessbuild_cfwall) with the revised create-form (action → combined
+Form+wire). Result: **harness-gate ✅ DONE, exit 0 — behavioral 1/1 write-path PERSISTS** (the exact
+dimension that failed NO_CREATE_ENTRY on batcha). Live DOM confirms the form widgets with the CONTRACT
+ids: taskform / titleinput / doneinput / savetaskbtn.
+
+**Honest characterization of the close:** the phantom is NOT eliminated — STEP 5 (combined) still
+phantomed on attempt #1 (change_applied=false + confabulated success). Mentor screen-widget phantoms are
+nondeterministic and no recipe shape makes them immune. What the fix does is make the phantom
+NON-BLOCKING and NON-DRIFTING:
+- **Detected**, not silently proceeded: the change_applied gate + the R10 "On Click must be set" detector
+  catch the phantom every time (batcha's real damage was PROCEEDING past an undetected phantom).
+- **Recovered on-contract**: the re-author is the SAME create-form recipe, so it rebuilds with the
+  contract data-spec-ids — unlike batcha, where the recovery happened in the input-validation step and
+  drifted to input-name/save-button → NO_CREATE_ENTRY. Keeping the form build inside the create-form
+  recipe is what preserves the contract through a phantom+retry.
+- **Fewer turns / more robust shape**: action → combined (2 turns, Form-wrapped inputs) replaces action →
+  widgets → wire (3 turns, bare inputs) — less phantom surface + the idiomatic Form shape that persists.
+Net: 1 phantom → 1 clean fresh-session re-author → behavioral green. The wall no longer blocks a build;
+it degrades to one deterministic retry. This is the right close for Mentor nondeterminism — detect +
+recover deterministically, don't pretend to eliminate it.

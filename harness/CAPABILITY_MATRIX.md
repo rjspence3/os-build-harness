@@ -42,7 +42,7 @@
 | Default/home screen | ~ | ✗ | ~ | Set at screen-create; capture wasDefault before any delete (memory). |
 | Web Block (reusable) | ✗ | ✗ | ✗ | `CreateBlock`+widgets+input params works (memory `odc_mcp_block_creation_works`). |
 | Table / List bound to aggregate | ✓ (list-screen) | ✓ | ✓ | Emit `data-entity` + `data-row-id` (exact behavioral count). |
-| Input / Checkbox / Dropdown bound to var | ~ (create-form widgets) | ✓ | ✓ | Bind to a screen-local var; `data-spec-id="<field>input"`. |
+| Input / Checkbox / Dropdown bound to var | ✓ (create-form combined) | ✓ | ✓ (behavioral) | Inputs live INSIDE a Form container widget (bare Inputs phantom — R10); bound to a screen-local var; `data-spec-id="<field>input"`. Runtime-proven (cfwall 2026-07-07). |
 | Button / Link + navigation (dest + params) | ~ (list-screen Open) | ~ | ✓ (navigates) | **list-screen must emit the spec's declared nav component label+data-spec-id (seam 3e).** Link ships a default "link" text widget — delete it (R4). |
 | Expression vs Text widget | ○ | ✗ | ~ | `ITextWidget.Text` literal-only; `IExpression`+SetValue for computed (memory). |
 | If / conditional render | ○ | ✗ | ✗ | — |
@@ -56,7 +56,7 @@
 | Construct | Recipe | Plan | Verify | Thrash-free note |
 |---|---|---|---|---|
 | Server action (Public flag) | ~ (create-form action phase) | ✓ | ~ | Public=FALSE unless exposed (Public SA fails publish OS-BLD-40409). Typed local + Assign-per-attr; NEVER inline record literal. |
-| Screen action (client) + OnClick wiring | ~ (create-form wire phase) | ✓ | ✓ (behavioral) | **Author widgets (OnClick empty) then RESUME session to wire; publish once (seam 3f).** Combined = 30-min cascade. |
+| Screen action (client) + OnClick wiring | ✓ (create-form combined) | ✓ | ✓ (behavioral) | **Revised seam 3f: action (own turn) → Form+inputs+wire in ONE turn (`combined`).** The bare-widgets-only turn phantomed (R10); the combined shape is proven-persist + keeps the contract data-spec-ids through a phantom+retry. Runtime-proven (cfwall 2026-07-07). |
 | Client action | ✗ | ✗ | ✗ | — |
 | Service action (exposed, cross-app) | ○ | ✗ | ✗ | In-app SA call needs Server Action wrapper (memory `odc_mcp_screen_action_service_action_call`). |
 | Flow nodes (If/Switch/Assign/Aggregate/RunAction/ForEach/Raise/RefreshData) | ~ | ~ | ~ | `CreateNode<T>` + `ConnectedBelow`; no `.StartNode` prop (memory). Assign iteration ≠ flow order — identify by var name. |
