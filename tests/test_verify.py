@@ -575,3 +575,17 @@ def test_binding_wrong_source_entity_still_fails() -> None:
         "navigation": [{"fromComponent": "newBtn", "event": "onClick", "toScreen": "issues"}]}]}
     results = run_live_phase(_walk_spec(), None, None, load_screens_snapshot(walk))
     assert next(r for r in results if r.kind == "binding").status == "fail"
+
+
+def test_static_entity_exempt_from_capability_coverage_hole():
+    """Batch A (ContactStatus build): a static/lookup entity is reference data, not a user-flow
+    entity — it must NOT be flagged as an uncovered-capability hole just for lacking its own flow."""
+    spec = _completed_example()
+    spec["dataModel"]["entities"].append({
+        "name": "AccountStatus", "isStatic": True,
+        "attributes": [{"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                       {"name": "Label", "dataType": "Text", "mandatory": True}],
+        "records": [{"Label": "Active"}, {"Label": "Closed"}]})
+    gaps = [f for f in validate_spec(spec) if f.severity == "spec-gap"]
+    assert not any("AccountStatus" in f.context for f in gaps), \
+        "static lookup entity should be exempt from the no-holes capability gate"

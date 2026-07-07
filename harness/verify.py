@@ -277,8 +277,12 @@ def _capability_findings(spec: dict, entities: dict, screen_ids: set, app_roles:
                 gap("capability step action not on the capability's screens",
                     f"capability '{cname}' step {i} action '{sact}' not declared on screens {cap['screens']}")
 
-    # Coverage — these ARE the no-holes gates.
-    for en in sorted(entity_names - covered_entities):
+    # Coverage — these ARE the no-holes gates. Static/lookup entities are EXEMPT: an enum/lookup
+    # is reference data backing other flows, not a user-flow entity of its own, so requiring it to
+    # have its own capability is a false hole (surfaced by the Batch-A ContactStatus build).
+    static_entity_names = {en for en in entity_names
+                           if isinstance(entities.get(en), dict) and entities[en].get("isStatic")}
+    for en in sorted(entity_names - covered_entities - static_entity_names):
         gap("entity not covered by any capability (hole)",
             f"entity '{en}' is in the data model but no capability exercises it")
     for sid in sorted(screen_ids - covered_screens):

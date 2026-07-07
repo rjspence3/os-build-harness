@@ -27,8 +27,8 @@
 |---|---|---|---|---|
 | Local entity + attributes (Text/Int/Decimal/Bool/DateTime/Identifier/Email/Phone) | ~ | ✗ | ✓ (context_entities) | All entities of an app in ONE turn; auto-number Id; length/mandatory/default inline. **Needs a `entity`/`data-model` recipe + plan step (seam 3d).** |
 | Foreign key / reference (mandatory + optional, delete rule) | ~ | ✗ | ✓ | Author the FK in the same turn as its entity; default delete rule = Protect. Proven (Task.ListId). |
-| Static entity (enum) | ✓ (static-entity) | ✓ | ~ (context_entities) | Manual Long PK + explicit record Ids (auto-number unsupported for static). Recipe emits records w/ explicit Long Ids + create-once guard; plan emits it BEFORE data-model (a regular entity may FK it). Memory: `odc_mcp_local_entity_authoring_gotchas`. *(runtime-exercised build pending)* |
-| Structure (non-persistent) | ✓ (structure) | ✓ | ~ (context_structures) | No identifier — a plain typed record shape for action/agent signatures. Plan emits top-level `structures` before data-model. *(runtime-exercised build pending)* |
+| Static entity (enum) | ✓ (static-entity) | ✓ | ✓ (context_entities) | Manual Long PK + explicit record Ids (auto-number unsupported for static). Recipe emits records w/ explicit Long Ids + create-once guard; plan emits it BEFORE data-model. **Runtime-proven 2026-07-07 (batcha): ContactStatus deployed isStatic+isPublic+Long PK+records[Active,Archived].** Memory: `odc_mcp_local_entity_authoring_gotchas`. |
+| Structure (non-persistent) | ✓ (structure) | ✓ | ✓ (context_structures) | No identifier — a plain typed record shape for action/agent signatures. Plan emits top-level `structures` before data-model. **Runtime-proven 2026-07-07 (batcha): ResultDTO deployed.** |
 | Entity index / unique | ✗ | ✗ | ✗ | — |
 | Auto entity actions (Create/Update/Get/Delete) | n/a (generated) | n/a | ✓ | Only CreateAction + DeleteAll auto-gen via Model API; Get/Update present at runtime. Memory: `odc_mcp_entity_auto_actions_incomplete`. |
 | Aggregate (filter / sort / max) | ~ | ~ (list-screen) | ✓ | SINGLE-SOURCE aggregates (no FK joins on detail screens — cascades, R2). Filter by input param proven (GetTasksByList). |
@@ -49,7 +49,7 @@
 | Layout / menu / sidebar nav | ✓ (nav-block) | ✓ | ~ | Author ONCE as a shared block; never per-screen. |
 | Theme / CSS / StyleSheet | ○ | ✗ | ✓ (runtime theme) | `theme.StyleSheet` setter; verify at RUNTIME (loaded stylesheets), not in-model (memory cluster). |
 | Charts (OutSystemsCharts / ECharts) | ○ | ✗ | ✗ | Native OutSystemsCharts work via MCP; data via ListAppend flow (memory). |
-| Input validation (mandatory/format) | ✓ (input-validation) | ✓ (opt-in `action.validate`) | ~ (behavioral: invalid submit rejected) | Validation gate SHORT-CIRCUITS the save before Save<Entity>Record — an invalid submit never writes a row; Valid/ValidationMessage + client mandatory. Plan emits it after create-form when `action.validate=true`. *(runtime-exercised build pending)* |
+| Input validation (mandatory/format) | ✓ (input-validation) | ✓ (opt-in `action.validate`) | ~ (model-authored; behavioral blocked by create-form widgets seam) | Validation gate SHORT-CIRCUITS the save before Save<Entity>Record. **Runtime 2026-07-07 (batcha): gate authored + published (Trim/EmailValidate/short-circuit/Mandatory). End-to-end behavioral drive blocked by the create-form WIDGETS phantom wall + data-spec-id drift (Tier-1 seam, not this recipe).** |
 | Client variable | ✗ | ✗ | ✗ | — |
 
 ## Logic layer
@@ -60,7 +60,7 @@
 | Client action | ✗ | ✗ | ✗ | — |
 | Service action (exposed, cross-app) | ○ | ✗ | ✗ | In-app SA call needs Server Action wrapper (memory `odc_mcp_screen_action_service_action_call`). |
 | Flow nodes (If/Switch/Assign/Aggregate/RunAction/ForEach/Raise/RefreshData) | ~ | ~ | ~ | `CreateNode<T>` + `ConnectedBelow`; no `.StartNode` prop (memory). Assign iteration ≠ flow order — identify by var name. |
-| Exception handling (OnException) | ✓ (exception-handler) | ✓ (opt-in `action.guardExceptions`) | ~ (structural: warning cleared) | AllExceptions handler → graceful failure (server: Success=False output; screen: feedback msg). Resolves the flow's "No Exception Handling" warning. Plan emits it after the create-form action when `action.guardExceptions=true`. *(runtime-exercised build pending)* |
+| Exception handling (OnException) | ✓ (exception-handler) | ✓ (opt-in `action.guardExceptions`) | ✓ (authored + published) | AllExceptions handler → graceful failure (server: Success=False output; screen: feedback msg). **Runtime-proven 2026-07-07 (batcha): handler authored change_applied=true, published rev 9, happy path intact.** |
 | ServerRequestTimeout on LLM calls | ○ | ✗ | ✗ | Default 10s; set 60+ on ExecuteServerAction nodes calling an LLM (memory). |
 
 ## Integration

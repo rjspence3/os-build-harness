@@ -320,3 +320,32 @@ preflights `OUTSYSTEMS_MCP_TOKEN`, and uses `--permission-mode bypassPermissions
 it still prompts on Bash/MCP calls). Also proven: bypassPermissions + `mcp__*` allowedTools is what makes
 an unattended run not hang. Phase 5 is complete: plan → autonomous drive → machine-checked done, with the
 run-model + auth boundary documented so a stranger can reproduce it.
+
+### Phase 4 Batch A — runtime-exercised (batcha build, 2026-07-07): recipes proven, 2 Tier-1 seams found
+Built harnessbuild_batcha (10-step spec exercising all four Batch-A constructs) autonomously.
+**Batch-A recipes PROVEN — all four authored correct, DEPLOYED constructs (independently verified):**
+- `structure` → ResultDTO (context_structures: Ok Boolean mand + Message Text/200). ✓
+- `static-entity` → ContactStatus (context_entities: isStatic, isPublic, Long PK, records ["Active","Archived"]). ✓
+- `input-validation` → validation gate landed change_applied=true, published rev 8 (Trim<>"" + EmailAddressValidate + short-circuit If + Mandatory). ✓
+- `exception-handler` → AllExceptions handler landed change_applied=true, published rev 9 (Success/ErrorMessage, happy path intact). ✓
+Also fixed a false spec-gap the build surfaced: the no-holes coverage gate flagged the STATIC ContactStatus
+as an "uncovered entity hole". A static/lookup entity is reference data, not a user-flow entity — now EXEMPT
+(`_capability_findings`; test added). Without this, harness-gate short-circuited at the spec phase.
+
+**Two Tier-1 seams surfaced (NOT Batch-A — they are pre-existing create-form robustness gaps):**
+- **create-form WIDGETS phantom wall.** STEP 7 (isolated widget-add onto the Contacts screen) returned
+  change_applied=false across 4 FRESH sessions — confabulated success, and the expected "On Click must be
+  set" validation error never surfaced. The server action (STEP 6) persisted fine; only screen-widget adds
+  phantomed. gate_demo3 authored the identical phase in 0 thrash — so this is per-app/per-screen Mentor
+  nondeterminism that tight-poll + R7 fresh-retry did NOT overcome (a harder wall than the data-model
+  partial phantom).
+- **data-spec-id drift on rebuild-recovery.** STEP 9 (input-validation) recovered the form functionally —
+  finding no OnClick action to edit, Mentor rebuilt the whole form + the validation gate in one turn, and it
+  PERSISTED — but with drifted ids (`input-name`/`input-email`/`save-button` vs the contract's
+  `nameinput`/`emailinput`/`savecontactbtn`). Runtime result: harness-gate spec ✓ + structural 2/2 ✓, but
+  behavioral = NO_CREATE_ENTRY (the driver can't find the contract create button). The app WORKS (validated
+  create-form persists); the automated write-path gate can't drive it because the contract broke.
+**Net:** Batch-A recipes are proven at the model level (4/4 deployed + verified). Full behavioral green needs
+the create-form widgets phantom wall closed (Tier-1) so the data-spec-id contract survives — the next
+flywheel target. Also seen again: every publish reported no_changes_detected=true yet every rev incremented
+and every change verified in the deployed inventory (AVS false-negative on this app throughout).
