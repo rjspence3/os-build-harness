@@ -14,8 +14,15 @@ the orchestrator. This is not incidental; it is what makes the loop work:
   the same loop stalls: its background-sleep→re-wake handshake is unreliable and parks it. If you ever
   MUST drive from a subagent, never `sleep`/yield — TIGHT-POLL the status tool to terminal, cap ~500.)
 - Launched in the build root, it **loads that root's `.claude/settings.json`**, which allowlists the
-  harness venv CLIs (`harness-verify`/`-prompt-step`/`-capture`) — without that, Bash denies them
-  (closes SEAM-001).
+  harness venv CLIs (`harness-verify`/`-prompt-step`/`-capture`/`-gate`) — without that, Bash denies
+  them (closes SEAM-001). Verified headless too (2026-07-07): a `claude -p` build-root session runs the
+  CLIs and certifies `harness-gate` unattended.
+- **Interactive vs headless — the auth boundary (2026-07-07).** The OutSystems MCP's OAuth is
+  INTERACTIVE. An interactive `RUN_MODE=session` inherits the live `/mcp` token, so it can drive Mentor
+  — this is THE drive vehicle. A COLD `RUN_MODE=headless` (`claude -p`) session sees `outsystems` as
+  UNAUTHENTICATED (only authenticate/complete_authentication exposed; Mentor/build tools uncallable), so
+  it can drive Mentor ONLY with a pre-provisioned tenant JWT. Headless still runs the whole
+  verification/gate half unattended; the Mentor DRIVE half needs interactive auth (or a provisioned token).
 Mission-control (the hub repo) **DISPATCHES** a build to such a session (`/dispatch-build <app>`); it
 does NOT hand-drive Mentor turns from the hub, nor orchestrate the build via subagents.
 

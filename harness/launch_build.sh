@@ -43,21 +43,31 @@ cd "$BUILD"
 # 2. Start the build per RUN_MODE.
 case "$RUN_MODE" in
   session)
-    # Clone-style: a normal CC session in the build root. Under Kernel this is whatever spawns a
-    # worker session in this dir; standalone it's an interactive `claude` session.
+    # THE DRIVE VEHICLE (default). A normal interactive CC session in the build root — a MAIN LOOP,
+    # so its fire→poll cadence across long Mentor turns is deterministic (proven end-to-end). It is
+    # interactive-AUTHENTICATED: the OutSystems MCP's OAuth token (from `/mcp`) is live, so it can drive
+    # Mentor. This is the vehicle for the actual build. Under Kernel, whatever spawns a worker session
+    # in this dir; standalone, an interactive `claude`.
     exec claude
     ;;
   headless)
-    # Future: fully unattended. ANTHROPIC_API_KEY (+ MCP tenant creds) must be in the environment.
+    # Fully unattended (`claude -p`). PROVEN (2026-07-07 smoke) for the CLI + doctrine + gate half: a
+    # headless build-root session runs harness-prompt-step/-gate (build-root settings.json allowlist
+    # inherits) and certifies the definition of done. BUT the OutSystems MCP OAuth is INTERACTIVE — a
+    # COLD headless session sees `outsystems` as UNAUTHENTICATED (only authenticate/complete_authentication
+    # exposed; Mentor/build tools uncallable). So headless can drive Mentor ONLY with a PRE-PROVISIONED
+    # MCP token (a tenant-signed Bearer JWT the MCP client can use without an interactive OAuth round-trip).
+    # Without that, use RUN_MODE=session for the drive; headless still runs the verification/gate half.
     : "${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY before a headless launch}"
-    # The DEFINITION OF DONE is machine-checked, not self-declared: the build is complete only when
-    # `harness-gate ./spec/app_spec.json --base-url <deployed-url>` exits 0 (spec + structural +
-    # behavioral + role + render green for every dimension the spec declares). The session must not
-    # stop on a green publish — a no-op publish (no_changes_detected) is NOT progress. It loops
-    # build → publish → verify-at-runtime until the gate is DONE or the wall cap halts it.
+    : "${OUTSYSTEMS_MCP_TOKEN:?headless Mentor drive needs a pre-provisioned OutSystems MCP token — a cold headless session is UNAUTHENTICATED (OAuth is interactive). Use RUN_MODE=session, or provision a tenant JWT.}"
+    # DEFINITION OF DONE is machine-checked, not self-declared: complete only when
+    # `harness-gate ./spec/app_spec.json --base-url <deployed-url>` exits 0. Never stop on a green
+    # publish — a no-op publish (no_changes_detected) is NOT progress. Loop build→publish→verify-at-
+    # runtime until the gate is DONE or the wall cap halts. bypassPermissions (not acceptEdits) is
+    # required unattended: acceptEdits auto-approves edits but still PROMPTS on Bash/MCP calls and hangs.
     exec claude -p "Build this app from ./spec per your CLAUDE.md and THE BUILD LOOP (harness/BUILD_LOOP.md). Drive ONLY the auto-emitted plan ('harness-prompt-step --plan ./spec/app_spec.json'), firing each rendered prompt VERBATIM through the OutSystems MCP; use §Turn to drive a turn and §Recovery for symptoms. After each publish, VERIFY AT RUNTIME — never trust the Mentor summary or a no_changes_detected publish. You are DONE only when 'harness-gate ./spec/app_spec.json --base-url <deployed-url>' exits 0; keep iterating until it does. Log blockers to ./WALLS.md in the required format. If the wall cap halts you, write ./HANDOFF.md and stop." \
       --output-format stream-json \
-      --permission-mode acceptEdits \
+      --permission-mode bypassPermissions \
       --allowedTools "Read,Write,Edit,Bash,mcp__*"
     ;;
   *)
