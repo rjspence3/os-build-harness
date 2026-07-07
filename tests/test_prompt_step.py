@@ -739,7 +739,10 @@ def test_app_reference_recipe_imports_static_and_handles_hidden_stub():
     p = pr.render("app-reference", {"producer_app": "CoreData",
                                     "elements": [{"kind": "Entity", "name": "Customer"},
                                                  {"kind": "StaticEntity", "name": "Status"}]})
-    assert "addReferenceToElements" in p and "AddDependency(ParseGlobalKey" in p and "RefreshDependencies" in p
+    assert "addReferenceToElements" in p and "RefreshDependencies" in p
+    assert "producerKey*elementKey with an ASTERISK" in p    # ParseGlobalKey colon form is rejected
+    assert "do NOT create a local entity with a FOREIGN KEY to a cross-app referenced entity" in p  # OS-DPL-50205 cause
+    assert "OS-DPL-50205" in p
     assert "INCLUDING any STATIC entity" in p                # the hidden-stub cause
     assert "OS-APPS-40028" in p and "TryParseGlobalKey" in p  # the in-session recovery
     assert "Customer (Entity)" in p and "Status (StaticEntity)" in p

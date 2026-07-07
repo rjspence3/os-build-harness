@@ -435,3 +435,22 @@ Net: Batch C recipes all shipped + tested; workflow proven; app-reference core (
 variant authors-clean with an open deploy wall; external-library ready + prereq-blocked. globalKey note:
 Mentor's ParseGlobalKey rejected "moduleGuid:objectGuid" (colon); addReferenceToElements does the
 dependency wiring itself — the recipe's producerKey*elementKey (asterisk) form is the correct global key.
+
+### OS-DPL-50205 root-caused — NOT an MCP wall (2026-07-07, "make sure it's not the MCP")
+Corrected the earlier "open wall". Root cause of the app-reference deploy failure, traced empirically:
+a LOCAL entity with a FOREIGN KEY to a CROSS-APP (referenced) entity is not deployable (the FK constraint
+can't be materialized across app DB boundaries) → OS-DPL-50205 "Model features validation failed". Proven
+by isolation: consumer referencing batchb.Customer (a CLEAN producer, PUBLIC REGULAR entity) with a local
+FK → OS-DPL-50205; DROP the FK to a plain Integer (reference retained) → build state flips failed→succeeded.
+Also failed identically for batcha's static ContactStatus FK — so it's neither producer-state nor
+static-specific; it's the cross-app-entity FK itself. Mentor's read-only diagnosis (asked, per the
+walls protocol) flagged both this AND a hollow-reference-metadata hypothesis; the hollow metadata was a
+RED HERRING — the reference is hollow (Hash/Version/AsDependency zero) in the MCP session for BOTH entity
+and event/SA refs, yet wfprobe's event+SA refs DEPLOYED CLEAN (real deploy, no_changes_detected:false). So
+cross-app CALL/CONSUME targets (Service Actions, Global Events) deploy fine; only a local FK TO a cross-app
+entity is rejected — a real ODC design rule (cross-app entities are consume-only), not an MCP limitation.
+Fix: app-reference recipe now forbids cross-app-entity FKs + notes the asterisk globalKey form. This matters
+for the human+AI workflow: it uses SA refs (call) + screen refs (navigate), NO cross-app entity FKs — so it
+is NOT blocked by this. Residual (minor, deferred): entref2's no-FK build reported succeeded but
+no_changes_detected + deploy_list=0 — a deploy-dedup/tracking ambiguity, separate from the OS-DPL-50205
+diagnosis.

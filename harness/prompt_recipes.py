@@ -733,12 +733,16 @@ def app_reference(params: dict) -> str:
     el = ", ".join(f"{e['name']} ({e.get('kind', 'Entity')})" for e in elements)
     return (f"{_PREAMBLE}\n\n"
             f"Add a dependency on the producer app '{producer}' and import these PUBLIC elements so this app can use "
-            f"them: {el}. Use addReferenceToElements, then applyModelApiCode AddDependency(ParseGlobalKey("
-            f"\"<producerKey>*<elementKey>\")) + RefreshDependencies. Import EVERY entity you touch INCLUDING any "
-            f"STATIC entity — an entity referenced only by Id (a hidden Id-only FK stub, not fully imported) makes the "
-            f"OML INVALID at publish (OS-APPS-40028); if that happens, fix it IN-SESSION via TryParseGlobalKey + "
-            f"AddDependency + RefreshDependencies for the missing element. Referenced elements live under "
-            f"References.Named(\"{producer}\").Entities. After authoring, run model validation. Do not publish.")
+            f"them: {el}. Use addReferenceToElements (it does the dependency wiring; the globalKey is "
+            f"producerKey*elementKey with an ASTERISK — ParseGlobalKey rejects the colon form), then RefreshDependencies. "
+            f"A referenced ENTITY is CONSUME-ONLY: read it via an aggregate/read logic — do NOT create a local entity "
+            f"with a FOREIGN KEY to a cross-app referenced entity; that FK constraint cannot be materialized across app "
+            f"database boundaries and FAILS the deploy with OS-DPL-50205 'Model features validation failed' (verified "
+            f"2026-07-07, static AND regular). Referenced Service Actions + Global Events are call/consume targets and "
+            f"deploy fine (proven, wfprobe). Import EVERY entity you touch INCLUDING any STATIC entity — an entity "
+            f"referenced only by Id (a hidden Id-only stub, not fully imported) can make the OML invalid at publish "
+            f"(OS-APPS-40028); recover in-session via TryParseGlobalKey + AddDependency + RefreshDependencies. After "
+            f"authoring, run model validation. Do not publish.")
 
 
 def external_library(params: dict) -> str:
