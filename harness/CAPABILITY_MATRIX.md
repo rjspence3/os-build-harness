@@ -27,8 +27,8 @@
 |---|---|---|---|---|
 | Local entity + attributes (Text/Int/Decimal/Bool/DateTime/Identifier/Email/Phone) | ~ | ✗ | ✓ (context_entities) | All entities of an app in ONE turn; auto-number Id; length/mandatory/default inline. **Needs a `entity`/`data-model` recipe + plan step (seam 3d).** |
 | Foreign key / reference (mandatory + optional, delete rule) | ~ | ✗ | ✓ | Author the FK in the same turn as its entity; default delete rule = Protect. Proven (Task.ListId). |
-| Static entity (enum) | ✗ | ✗ | ~ | Manual Long PK + explicit record Ids (auto-number unsupported for static). Memory: `odc_mcp_local_entity_authoring_gotchas`. |
-| Structure (non-persistent) | ✗ | ✗ | ✗ | — |
+| Static entity (enum) | ✓ (static-entity) | ✓ | ~ (context_entities) | Manual Long PK + explicit record Ids (auto-number unsupported for static). Recipe emits records w/ explicit Long Ids + create-once guard; plan emits it BEFORE data-model (a regular entity may FK it). Memory: `odc_mcp_local_entity_authoring_gotchas`. *(runtime-exercised build pending)* |
+| Structure (non-persistent) | ✓ (structure) | ✓ | ~ (context_structures) | No identifier — a plain typed record shape for action/agent signatures. Plan emits top-level `structures` before data-model. *(runtime-exercised build pending)* |
 | Entity index / unique | ✗ | ✗ | ✗ | — |
 | Auto entity actions (Create/Update/Get/Delete) | n/a (generated) | n/a | ✓ | Only CreateAction + DeleteAll auto-gen via Model API; Get/Update present at runtime. Memory: `odc_mcp_entity_auto_actions_incomplete`. |
 | Aggregate (filter / sort / max) | ~ | ~ (list-screen) | ✓ | SINGLE-SOURCE aggregates (no FK joins on detail screens — cascades, R2). Filter by input param proven (GetTasksByList). |
@@ -49,7 +49,7 @@
 | Layout / menu / sidebar nav | ✓ (nav-block) | ✓ | ~ | Author ONCE as a shared block; never per-screen. |
 | Theme / CSS / StyleSheet | ○ | ✗ | ✓ (runtime theme) | `theme.StyleSheet` setter; verify at RUNTIME (loaded stylesheets), not in-model (memory cluster). |
 | Charts (OutSystemsCharts / ECharts) | ○ | ✗ | ✗ | Native OutSystemsCharts work via MCP; data via ListAppend flow (memory). |
-| Input validation (mandatory/format) | ✗ | ✗ | ✗ | — |
+| Input validation (mandatory/format) | ✓ (input-validation) | ✓ (opt-in `action.validate`) | ~ (behavioral: invalid submit rejected) | Validation gate SHORT-CIRCUITS the save before Save<Entity>Record — an invalid submit never writes a row; Valid/ValidationMessage + client mandatory. Plan emits it after create-form when `action.validate=true`. *(runtime-exercised build pending)* |
 | Client variable | ✗ | ✗ | ✗ | — |
 
 ## Logic layer
@@ -60,7 +60,7 @@
 | Client action | ✗ | ✗ | ✗ | — |
 | Service action (exposed, cross-app) | ○ | ✗ | ✗ | In-app SA call needs Server Action wrapper (memory `odc_mcp_screen_action_service_action_call`). |
 | Flow nodes (If/Switch/Assign/Aggregate/RunAction/ForEach/Raise/RefreshData) | ~ | ~ | ~ | `CreateNode<T>` + `ConnectedBelow`; no `.StartNode` prop (memory). Assign iteration ≠ flow order — identify by var name. |
-| Exception handling (OnException) | ✗ | ✗ | ✗ | Every flow warns "No Exception Handling" until added. |
+| Exception handling (OnException) | ✓ (exception-handler) | ✓ (opt-in `action.guardExceptions`) | ~ (structural: warning cleared) | AllExceptions handler → graceful failure (server: Success=False output; screen: feedback msg). Resolves the flow's "No Exception Handling" warning. Plan emits it after the create-form action when `action.guardExceptions=true`. *(runtime-exercised build pending)* |
 | ServerRequestTimeout on LLM calls | ○ | ✗ | ✗ | Default 10s; set 60+ on ExecuteServerAction nodes calling an LLM (memory). |
 
 ## Integration
@@ -95,7 +95,7 @@
 ## Roadmap to both-axes DONE (drive rows to ✓/✓/✓, thrash-note followed)
 **Tier 1 — close the proven thrash seams (make the CRUD slice 0%-thrash), then every task_tracker-shaped app is first-try:**
 - `entity`/`data-model` recipe + plan step (3d) · `screen` recipe with Anonymous baked + change_applied gate (3d/anon/phantom) · list-screen emits the spec nav component (3e) · seed step for list-bound entities lacking a create UI (3g) · create-form 3-phase — **DONE (3f)**. Tighten `_COUNT_JS` (G-count).
-**Tier 2 — breadth the common app needs:** exception handling (OnException) · input validation · REST consume · Web Blocks · static entities · charts · client variables.
+**Tier 2 — breadth the common app needs:** ~~exception handling (OnException)~~ ✓recipe · ~~input validation~~ ✓recipe · ~~static entities~~ ✓recipe · ~~structures~~ ✓recipe · REST consume · Web Blocks · charts · client variables. *(Batch A recipes+plan+tests landed 2026-07-07; each still needs a runtime-exercised build to reach ✓/✓/✓/✓.)*
 **Tier 3 — advanced:** BPT/workflows · **AI agents (NOW fully MCP-buildable incl. model bind — needs an `agent` recipe: app_create AIAgent → author agent+AgentFlow+BuildMessages+public Call service action → bind AIModel to a Trial connection → publish)** · external libraries · multi-app references · SQL nodes · SOAP.
 
 Each tier: add the recipe (with its thrash-free note), emit it from `plan_from_spec` where the spec expresses it, add a verifier assertion, and prove it on a from-scratch build whose spec exercises it. A row is DONE only when a clean-room build authors it first-try AND a verifier confirms it at runtime.

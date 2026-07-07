@@ -515,3 +515,97 @@ def test_plan_scaffolds_but_no_list_or_write_for_bare_spec():
             "screens": [{"id": "s", "name": "S", "components": [{"id": "c", "type": "Container"}],
                          "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
     assert [s["recipe"] for s in pr.plan_from_spec(bare)] == ["data-model", "screen"]
+
+
+# ── Phase 4 Batch A: static entity / structure / input validation / exception handling ──
+
+def test_static_entity_recipe_manual_pk_and_explicit_record_ids():
+    p = pr.render("static-entity", {"name": "AccountStatus",
+                                    "records": [{"Label": "Active"}, {"Label": "Closed", "SortOrder": 2}]})
+    assert "CreateStaticEntity" in p and "Public=TRUE" in p
+    assert "MANUAL identifier" in p and "auto-number is unsupported for static" in p
+    assert "Id=1, Label='Active'" in p and "Id=2, Label='Closed', SortOrder=2" in p
+    assert "already exists THROWS" in p          # create-once guard
+
+
+def test_structure_recipe_has_no_identifier():
+    p = pr.render("structure", {"name": "GeocodeResult",
+                                "attributes": [{"name": "Lat", "dataType": "Decimal"},
+                                               {"name": "Lng", "dataType": "Decimal"}]})
+    assert "non-persistent Structure" in p and "has NO identifier" in p
+    assert "Lat: Decimal" in p and "Lng: Decimal" in p
+    assert "Do NOT create an entity, screen, or UI" in p
+
+
+def test_input_validation_recipe_short_circuits_before_save():
+    p = pr.render("input-validation", {"screen": "signup", "entity": "Member",
+                                       "fields": [{"name": "Email", "mandatory": True, "format": "Email"},
+                                                  {"name": "Name", "mandatory": True}]})
+    assert "BEFORE SaveMemberRecord is called" in p
+    assert "SHORT-CIRCUITS" in p and "NEVER persists a row" in p
+    assert "NewMember.Email is non-empty" in p and "valid Email" in p
+    assert "Valid=False" in p and "mandatory flag" in p
+
+
+def test_exception_handler_recipe_resolves_warning_by_scope():
+    server = pr.render("exception-handler", {"action": "SaveOrderRecord", "scope": "server"})
+    assert "AllExceptions" in server and 'No Exception Handling' in server
+    assert "Success=False" in server                       # server scope -> output, not feedback
+    screen = pr.render("exception-handler", {"action": "DoCheckout", "scope": "screen",
+                                             "message": "Checkout failed."})
+    assert "'Checkout failed.'" in screen                  # screen scope -> feedback message
+
+
+def test_plan_emits_batch_a_chain_in_order():
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["User"]},
+            "structures": [{"name": "ResultDTO", "attributes": [{"name": "Ok", "dataType": "Boolean"}]}],
+            "dataModel": {"entities": [
+                {"name": "Status", "isStatic": True,
+                 "attributes": [{"name": "Id", "dataType": "Identifier", "isIdentifier": True},
+                                {"name": "Label", "dataType": "Text"}],
+                 "records": [{"Label": "Active"}, {"Label": "Closed"}]},
+                {"name": "Account", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Email", "dataType": "Email", "mandatory": True}]}]},
+            "screens": [{"id": "accounts", "name": "Accounts", "route": "/accounts", "isDefault": True,
+                         "components": [{"id": "tbl", "type": "Table", "boundTo": "Account"}],
+                         "actions": [{"name": "AddAccount",
+                                      "trigger": {"onComponent": "tbl", "event": "onClick"},
+                                      "does": ["CreateEntity"], "validate": True, "guardExceptions": True}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
+    recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
+    # structures + static entities BEFORE the data model; validation + exception AFTER the create-form
+    assert recipes == ["structure", "static-entity", "data-model", "screen", "list-screen",
+                       "create-form", "create-form", "create-form", "input-validation", "exception-handler"]
+
+
+def test_static_entity_excluded_from_data_model_step():
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [
+                {"name": "Status", "isStatic": True, "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True}],
+                 "records": [{"Label": "A"}]},
+                {"name": "Account", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
+            "screens": [{"id": "s", "name": "S", "components": [{"id": "c", "type": "Container"}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
+    steps = pr.plan_from_spec(spec)
+    dm = next(s for s in steps if s["recipe"] == "data-model")
+    names = [e["name"] for e in dm["params"]["entities"]]
+    assert names == ["Account"]                            # static Status is NOT in the data-model turn
+    assert any(s["recipe"] == "static-entity" and s["params"]["name"] == "Status" for s in steps)
+
+
+def test_validation_and_exception_are_opt_in():
+    # a CreateEntity action WITHOUT validate/guardExceptions emits neither extra step
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [{"name": "Task", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                {"name": "Title", "dataType": "Text"}]}]},
+            "screens": [{"id": "tasks", "name": "T", "route": "/tasks",
+                         "components": [{"id": "tbl", "type": "Table", "boundTo": "Task"}],
+                         "actions": [{"name": "Add", "trigger": {"onComponent": "tbl", "event": "onClick"},
+                                      "does": ["CreateEntity"]}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
+    recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
+    assert "input-validation" not in recipes and "exception-handler" not in recipes

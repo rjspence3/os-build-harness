@@ -31,7 +31,8 @@
     "design": { "$ref": "#/$defs/design", "description": "Design layer reference (HD D10). For a KNOWN app, the reference is the real product's captures; for a NOVEL app, generated (Figma). Per-screen visuals go in screen.mockupRef; this is the app-level theme/reference." },
     "navigation": { "$ref": "#/$defs/appNavigation", "description": "App-level SHARED navigation (sidebar/menu). First-class so the persistent nav is authored ONCE as a reusable block and referenced by every screen — NOT re-authored per screen (the per-screen path multiplies turn-cost + defect surface). Optional; when absent, nav is whatever screens declare via Sidebar/Navigation components." },
     "auth": { "$ref": "#/$defs/authSpec", "description": "App-level authentication model. First-class so access control is describable + verifiable. `app-local` = identity in an app entity bridged via browser storage (no ODC end-user IdP; the common clone pattern); `platform-idp` = ODC end-user provider; `anonymous` = no login. Optional; absent ⇒ anonymous." },
-    "agents": { "type": "array", "items": { "$ref": "#/$defs/agent" }, "description": "App-level ODC AI Agents (v0.3, additive). Each is authored FROM SCRATCH via the `agent` recipe — internals + AgentFlow + BuildMessages + public Call service action + AIModel bound to a Trial AIModelConnection (MCP-only, wall lifted 2026-07-05). plan_from_spec emits one `agent` step per entry." }
+    "agents": { "type": "array", "items": { "$ref": "#/$defs/agent" }, "description": "App-level ODC AI Agents (v0.3, additive). Each is authored FROM SCRATCH via the `agent` recipe — internals + AgentFlow + BuildMessages + public Call service action + AIModel bound to a Trial AIModelConnection (MCP-only, wall lifted 2026-07-05). plan_from_spec emits one `agent` step per entry." },
+    "structures": { "type": "array", "items": { "$ref": "#/$defs/structure" }, "description": "App-level non-persistent Structures (Batch A, additive) — typed record shapes for action/agent signatures. plan_from_spec emits one `structure` step each, before the data model." }
   },
 
   "$defs": {
@@ -239,7 +240,20 @@
           "type": "array",
           "items": { "enum": ["CreateEntity", "UpdateEntity", "DeleteEntity", "Navigate", "RunServerLogic", "ShowFeedback"] },
           "description": "Coarse step kinds. Refine against the ODC logic surface in the MCP doctrine notes as the verifier matures."
-        }
+        },
+        "validate": { "type": "boolean", "default": false, "description": "Batch A: when true on a CreateEntity action, plan_from_spec emits an `input-validation` step after the create-form — a validation gate rejects an invalid submit (empty mandatory / bad format) before Save, so no malformed row is ever written." },
+        "guardExceptions": { "type": "boolean", "default": false, "description": "Batch A: when true on a CreateEntity action, plan_from_spec emits an `exception-handler` step guarding the Save<Entity>Record server action (OnException → graceful failure), resolving the flow's 'No Exception Handling' warning." }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "required": ["name", "attributes"],
+      "additionalProperties": false,
+      "description": "A non-persistent Structure — a typed record shape for action / agent signatures (NOT a persisted entity; no identifier). Batch A: plan_from_spec emits one `structure` step each.",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "attributes": { "type": "array", "items": { "$ref": "#/$defs/attribute" }, "description": "Typed fields of the structure (same attribute shape as an entity, minus the identifier)." }
       }
     },
     "navEdge": {

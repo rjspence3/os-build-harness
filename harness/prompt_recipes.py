@@ -480,6 +480,95 @@ def row_actions(params: dict) -> str:
             f"Do not publish.")
 
 
+def static_entity(params: dict) -> str:
+    """Author a STATIC entity (enum / lookup) WITH its records. Static entities need a MANUAL
+    Long-Integer PK + EXPLICIT record Ids — auto-number is unsupported for static (memory
+    `odc_mcp_local_entity_authoring_gotchas`). params: name, records:[{label, values?}],
+    attributes?:[{name,dataType}] beyond the implicit Label."""
+    name = _p(params, "name", required=True)
+    records = _p(params, "records", [], required=True)   # flat {attr: value} per row (schema shape)
+    extra = _p(params, "attributes", []) or []
+    attr_txt = ""
+    if extra:
+        attr_txt = (" Beyond the default Label (Text) attribute, add: "
+                    + "; ".join(f"{a['name']} ({_DATATYPE_WORDS.get(a.get('dataType', 'Text'), 'Text')})"
+                                for a in extra) + ".")
+    rec_lines = []
+    for i, r in enumerate(records, 1):
+        pairs = ", ".join(f"{k}={v!r}" for k, v in r.items()) or f"Label={name}{i!r}"
+        rec_lines.append(f"  {i}. Id={i}, {pairs}")
+    body = "\n".join(rec_lines)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Author a STATIC entity named {name} (CreateStaticEntity), Public=TRUE. Give it a MANUAL identifier "
+        f"attribute Id of type Long Integer (NOT auto-number — auto-number is unsupported for static entities) "
+        f"and set it as the identifier BEFORE adding records. It has a Label (Text) attribute by default.{attr_txt}\n"
+        f"Create these records with EXPLICIT Long-Integer Ids (CreateRecord(label) then SetAttributeValue per "
+        f"attribute; creating a record whose Id already exists THROWS — create each exactly once):\n{body}\n"
+        f"Do NOT create screens or UI. After authoring, run model validation and report errors. Do not publish.")
+
+
+def structure(params: dict) -> str:
+    """Author a non-persistent Structure — a typed record shape for action / agent signatures (NOT a
+    persisted entity; it has NO identifier). params: name, attributes:[{name,dataType,mandatory?,length?}]."""
+    name = _p(params, "name", required=True)
+    attrs = _p(params, "attributes", [], required=True)
+    body = "; ".join(_attr_line(a) for a in attrs)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Author a non-persistent Structure named {name} (create it under the app's Structures — NOT an "
+        f"entity; a Structure has NO identifier, it is a plain typed record shape). Add these attributes:\n"
+        f"- {name}: {body}\n"
+        f"Do NOT create an entity, screen, or UI. After authoring, run model validation and report errors. "
+        f"Do not publish.")
+
+
+def input_validation(params: dict) -> str:
+    """Add INPUT VALIDATION to a create/edit form's save path so an invalid submit NEVER writes a row.
+    params: screen, entity, fields:[{name, mandatory?, format?(Email/PhoneNumber/Integer/Decimal)}],
+    save_action?. A recipe enhancement over create-form — insert a validation gate, don't rebuild the form."""
+    screen = _p(params, "screen", required=True)
+    entity = _p(params, "entity", required=True)
+    fields = _p(params, "fields", [], required=True)
+    save_action = _p(params, "save_action", f"Save{entity}Record")
+    local = f"New{entity}"
+    checks = []
+    for f in fields:
+        fn = f["name"]
+        if f.get("mandatory"):
+            checks.append(f"{local}.{fn} is non-empty (Trim() <> \"\")")
+        if f.get("format"):
+            checks.append(f"{local}.{fn} is a valid {f['format']}")
+    checks_txt = "; ".join(checks) or f"every input on {local} is non-empty"
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"On the {screen} screen's save OnClick screen action for {entity}, insert INPUT VALIDATION that runs "
+        f"BEFORE {save_action} is called: verify {checks_txt}. Implement it as: set each offending Input widget's "
+        f"Valid=False + a ValidationMessage, and an If that SHORT-CIRCUITS the action (does NOT call {save_action} "
+        f"and does NOT navigate) when ANY check fails — so an invalid submit NEVER persists a row. Also set the "
+        f"mandatory flag on each required Input so the client blocks empty submits too. Do NOT rebuild the form or "
+        f"the {save_action} body — only insert the validation gate ahead of the save. After authoring, run model "
+        f"validation. Do not publish.")
+
+
+def exception_handler(params: dict) -> str:
+    """Add an OnException handler to a server/screen action's flow so it stops warning "No Exception
+    Handling" and fails gracefully. params: action (the flow/action to guard), scope?(server|screen),
+    message?."""
+    action = _p(params, "action", required=True)
+    scope = _p(params, "scope", "server")
+    message = _p(params, "message", "Something went wrong. Please try again.")
+    graceful = (f"show the feedback message {message!r} and end (do not let the exception propagate)"
+                if scope == "screen"
+                else f"log the error and return a Success=False / ErrorMessage output rather than letting the "
+                     f"exception propagate")
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Add exception handling to the {action} action's flow. Create an Exception Handler branch that handles "
+        f"AllExceptions and: {graceful}. This resolves the flow's \"No Exception Handling\" warning. Do NOT change "
+        f"the action's happy path. After authoring, run model validation and report remaining warnings. Do not publish.")
+
+
 def json_1line(obj) -> str:
     import json
     return json.dumps(obj, separators=(", ", "="))
@@ -487,6 +576,10 @@ def json_1line(obj) -> str:
 
 RECIPES = {
     "data-model": data_model,
+    "static-entity": static_entity,
+    "structure": structure,
+    "input-validation": input_validation,
+    "exception-handler": exception_handler,
     "screen": screen,
     "nav-block": nav_block,
     "list-screen": list_screen,
@@ -657,7 +750,19 @@ def plan_from_spec(spec: dict) -> list[dict]:
 
     # Scaffold FIRST (seam 3d): the data model, then all screens with Anonymous baked. list-screen
     # and create-form steps below assume the entities + screens already exist.
-    entities = spec.get("dataModel", {}).get("entities", [])
+    all_entities = spec.get("dataModel", {}).get("entities", [])
+    # Batch A: structures + static entities (enums) are authored BEFORE the regular data model — a
+    # regular entity may FK a static one, and structures type action signatures. Each static entity is
+    # its own turn (explicit records + manual Long PK); structures one per turn.
+    for st in spec.get("structures", []) or []:
+        steps.append({"recipe": "structure", "why": f"spec.structures {st['name']}",
+                      "params": {"name": st["name"], "attributes": st.get("attributes", [])}})
+    for e in [e for e in all_entities if e.get("isStatic")]:
+        steps.append({"recipe": "static-entity", "why": f"static entity {e['name']} + records",
+                      "params": {"name": e["name"], "records": e.get("records", []),
+                                 "attributes": [a for a in e.get("attributes", [])
+                                                if not a.get("isIdentifier") and a.get("name") != "Label"]}})
+    entities = [e for e in all_entities if not e.get("isStatic")]
     if entities:
         steps.append({"recipe": "data-model", "why": "spec.dataModel.entities (all in one turn)",
                       "params": {"entities": entities}})
@@ -761,6 +866,21 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 steps.append({"recipe": "create-form",
                               "why": f"{why} — wire OnClick (RESUME the widgets session; publish once after)",
                               "params": {**p, "phase": "wire"}})
+                # Batch A opt-ins on the write-path: input validation + exception handling.
+                create_actions = [a for a in s.get("actions", []) if "CreateEntity" in set(a.get("does", []))]
+                if any(a.get("validate") for a in create_actions):
+                    attrs = {a["name"]: a for a in _entities_map(spec).get(entity, {}).get("attributes", [])}
+                    vfields = [{"name": fld,
+                                "mandatory": bool(attrs.get(fld, {}).get("mandatory")),
+                                "format": (attrs.get(fld, {}).get("dataType")
+                                           if attrs.get(fld, {}).get("dataType") in
+                                           {"Email", "PhoneNumber", "Integer", "Decimal"} else None)}
+                               for fld in p["fields"]]
+                    steps.append({"recipe": "input-validation", "why": f"{s['id']} validate {entity} inputs",
+                                  "params": {"screen": s["id"], "entity": entity, "fields": vfields}})
+                if any(a.get("guardExceptions") for a in create_actions):
+                    steps.append({"recipe": "exception-handler", "why": f"{s['id']} guard Save{entity}Record",
+                                  "params": {"action": f"Save{entity}Record", "scope": "server"}})
             # Update/Delete: per-row affordances on a LIST, each its own turn (avoid the combined-edit
             # cascade). Skip on a detail screen with an id_param — its create-form already updates in place.
             has_list = any(c.get("type") in _DATA_COMPONENT_TYPES
