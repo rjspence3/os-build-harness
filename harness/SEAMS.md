@@ -371,3 +371,21 @@ NON-BLOCKING and NON-DRIFTING:
 Net: 1 phantom → 1 clean fresh-session re-author → behavioral green. The wall no longer blocks a build;
 it degrades to one deterministic retry. This is the right close for Mentor nondeterminism — detect +
 recover deterministically, don't pretend to eliminate it.
+
+### Phase 4 Batch B — runtime-exercised (batchb build, 2026-07-07): 0 thrash, all 6 constructs proven
+Built harnessbuild_batchb (10-step spec exercising all six Batch-B constructs) autonomously — **0 cancels,
+0 phantoms, 0 re-authors, 0 hand-steps, 0 failed publishes** (every step change_applied=true / err=0 on the
+first turn; the cleanest build of the session). The create-form wall was not exercised here (no write-path),
+but the discipline held across index/join/logic authoring.
+All six independently verified:
+- **service-action** GetOrderCount — context_actions: ServiceAction, isPublic=TRUE, in CustomerId/out Count. ✓
+- **client-action** FormatCode — context_actions: ClientAction, in Code/out Display. ✓
+- **sql-action** RecentOrders — context_actions: ServerAction w/ single ISQLNode, out Order List. ✓
+- **aggregate-join** — GetOrders LEFT JOIN Order.CustomerId=Customer.Id, Customer→Public, +Customer.Name. ✓
+- **entity-index** CustomerId_Idx on Order (context_entities omits index metadata; mentor read-back authoritative). ✓
+- **global-event** OrderPlaced (payload OrderId); CreateGlobalEvent did NOT throw (not a Workflow app). ✓
+harness-gate on the base app: ✅ DONE, exit 0 (structural pass; behavioral/role/render correctly OMITted).
+**Net:** Batch B is runtime-proven end-to-end. Every construct rode a proven BANKING_MINED Model-API
+approach and authored first-try — evidence that once the seams are closed, breadth is cheap. Process note:
+the Context Service indexer lags a publish ~40-60s (reads the prior revision until it catches up) — re-poll
+to the expected rev before recording a verdict.
