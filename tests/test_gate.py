@@ -44,11 +44,18 @@ def _spec_full() -> dict:
 # ── stub the live gates so composition is deterministic ─────────────────────
 def _stub_live(monkeypatch, *, structural_fail=0, behavioral_ok=True, role_ok=True,
                render_ok=True, pixel_ok=True):
+    from harness.verify import LiveResult
     monkeypatch.setattr(verify, "validate_spec", lambda spec: [])
     monkeypatch.setattr(capture, "build_runtime_snapshot",
                         lambda *a, **k: {"screens": []})
-    monkeypatch.setattr(capture, "_assert_capture_channel",
-                        lambda spec, snap: ([], 3, structural_fail))
+
+    def _fake_assert(spec, snap):
+        res = [("list", LiveResult("componentPresent", "mcp", "pass", "ok")) for _ in range(3)]
+        for i in range(structural_fail):
+            res.append(("list", LiveResult("componentPresent", "mcp", "fail", f"missing{i}")))
+        return res, 3, structural_fail
+
+    monkeypatch.setattr(capture, "_assert_capture_channel", _fake_assert)
     monkeypatch.setattr(capture, "run_behavioral", lambda *a, **k: [
         {"screen": "list", "entity": "Item", "op": "create",
          "verdict": "PERSISTS" if behavioral_ok else "NO_PERSIST (row absent after reload)"}])
@@ -138,3 +145,43 @@ def test_pixel_gate_runs_when_reference_supplied(monkeypatch, tmp_path):
     _stub_live(monkeypatch, pixel_ok=False)
     rc = _exit_code(monkeypatch, tmp_path, _spec_full(), ("--pixel", "/some/ref"))
     assert rc == 1   # pixel DRIFT now counts against done
+
+
+def test_empty_bound_table_binding_is_inconclusive_not_fail(monkeypatch):
+    """gate_demo3 finding: a present-but-empty list hard-failed its binding on a cold run then
+    passed once behavioral left a row — an enforcement tool must not flip on the same app state.
+    A binding fail on a boundTo_unrendered component is downgraded to inconclusive (structural PASS)."""
+    from harness.verify import LiveResult
+    _stub_live(monkeypatch)   # everything green by default; override structural below
+    # snapshot: tasksTable is PRESENT but rendered no rows (boundTo_unrendered)
+    snap = {"screens": [{"id": "tasks", "components": [
+        {"id": "tasksTable", "type": "Table", "boundTo_unrendered": "Task"}]}]}
+    monkeypatch.setattr(capture, "build_runtime_snapshot", lambda *a, **k: snap)
+    # _assert reports the binding as a FAIL (no live boundTo) + a passing componentPresent
+    monkeypatch.setattr(capture, "_assert_capture_channel", lambda spec, s: (
+        [("tasks", LiveResult("componentPresent", "mcp", "pass", "present")),
+         ("tasks", LiveResult("binding", "mcp", "fail",
+                              "screen 'tasks' 'tasksTable' spec='Task' live boundTo=None sourceEntity=None"))],
+        1, 1))
+    rows = {r["gate"]: r for r in gate.run_all_gates(
+        _spec_full(), "http://x", {}, pixel_ref=None, pixel_threshold=99.0, pixel_tol=16,
+        pixel_mask=[], nav_mode="href", out_dir=None)}
+    assert rows["structural"]["status"] == "PASS"        # empty binding did NOT hard-fail
+    assert "inconclusive" in rows["structural"]["detail"]
+
+
+def test_empty_check_ignores_rendered_binding_failures(monkeypatch):
+    """A binding fail on a component that DID render rows (not boundTo_unrendered) still hard-fails —
+    the inconclusive downgrade is strictly for present-but-empty tables."""
+    from harness.verify import LiveResult
+    _stub_live(monkeypatch)   # everything green by default; override structural below
+    snap = {"screens": [{"id": "tasks", "components": [
+        {"id": "tasksTable", "type": "Table", "boundTo": "WrongEntity"}]}]}   # rendered, but mis-bound
+    monkeypatch.setattr(capture, "build_runtime_snapshot", lambda *a, **k: snap)
+    monkeypatch.setattr(capture, "_assert_capture_channel", lambda spec, s: (
+        [("tasks", LiveResult("binding", "mcp", "fail",
+                              "screen 'tasks' 'tasksTable' spec='Task' live boundTo='WrongEntity'"))], 0, 1))
+    rows = {r["gate"]: r for r in gate.run_all_gates(
+        _spec_full(), "http://x", {}, pixel_ref=None, pixel_threshold=99.0, pixel_tol=16,
+        pixel_mask=[], nav_mode="href", out_dir=None)}
+    assert rows["structural"]["status"] == "FAIL"        # a real mis-binding on a rendered table still fails

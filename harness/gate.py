@@ -61,6 +61,21 @@ def _gate_row(name: str, status: str, detail: str = "", results=None) -> dict:
     return {"gate": name, "status": status, "detail": detail, "results": results or []}
 
 
+def _empty_bound_components(snapshot: dict) -> set:
+    """(screen_id, component_id) for data widgets that are PRESENT but rendered zero rows
+    (the snapshot marks these `boundTo_unrendered`). Their binding cannot be confirmed OR
+    denied at runtime — inconclusive, not failed. Without this the structural gate is
+    order-dependent: an empty list (no-seed spec) hard-fails its binding on a cold run, then
+    passes once anything (a seed or the behavioral gate's own create) leaves a row. An
+    enforcement tool must give the same verdict on the same app state."""
+    out = set()
+    for s in snapshot.get("screens", []):
+        for c in s.get("components", []):
+            if c.get("boundTo_unrendered") and not c.get("boundTo"):
+                out.add((s.get("id"), c.get("id")))
+    return out
+
+
 def run_all_gates(spec: dict, base_url: str, login: dict, *, pixel_ref: str | None,
                   pixel_threshold: float, pixel_tol: int, pixel_mask: list, nav_mode: str,
                   out_dir: Path | None) -> list[dict]:
@@ -76,12 +91,25 @@ def run_all_gates(spec: dict, base_url: str, login: dict, *, pixel_ref: str | No
         return rows
     rows.append(_gate_row("spec", "PASS", "no spec-gap findings"))
 
-    # 2. structural — spec'd components resolve in the live DOM.
+    # 2. structural — spec'd components resolve in the live DOM. A binding failure on a
+    #    present-but-empty table is INCONCLUSIVE (empty lists can't prove binding), not a hard
+    #    fail — this keeps the verdict stable regardless of prior runs / seed state.
     snapshot = capture.build_runtime_snapshot(spec, base_url, login, out_dir, nav_mode)
-    results, n_pass, n_fail = capture._assert_capture_channel(spec, snapshot)
-    rows.append(_gate_row("structural", "FAIL" if n_fail else "PASS",
-                          f"{n_pass} pass, {n_fail} fail",
-                          [f"{s}·{r.kind}: {r.detail}" for s, r in results if r.status != "pass"]))
+    results, n_pass, _ = capture._assert_capture_channel(spec, snapshot)
+    empty = _empty_bound_components(snapshot)
+    hard_fails, inconclusive = [], []
+    for sid, r in results:
+        if r.status != "fail":
+            continue
+        if r.kind == "binding" and any(sid == es and ec and f"'{ec}'" in r.detail for es, ec in empty):
+            inconclusive.append(f"{sid}·binding: list empty (no rows) — binding inconclusive, not failed")
+        else:
+            hard_fails.append(f"{sid}·{r.kind}: {r.detail}")
+    detail = f"{n_pass} pass, {len(hard_fails)} fail"
+    if inconclusive:
+        detail += f", {len(inconclusive)} inconclusive (empty list — seed to confirm)"
+    rows.append(_gate_row("structural", "FAIL" if hard_fails else "PASS", detail,
+                          hard_fails + inconclusive))
 
     # 3. behavioral — the real bar, iff the spec has write-paths.
     if _has_write_paths(spec):

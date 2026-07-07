@@ -280,3 +280,23 @@ was the same identifier instability from the other side.)
   materialize for them — the passive reliance was luck, now removed. This is the deeper closure the two
   capstone runs were worth: the create-form guard AND the data-model identifier settlement together
   make the write-path deterministic.
+
+### Phase 5 LOOP PROVEN + gate order-dependence finding (2026-07-06, gate_demo3)
+**The full autonomous loop is certified end-to-end:** harnessbuild_gatedemo3 was built with ZERO human
+Mentor turns (tight-poll driver firing the auto-emitted 6-step plan verbatim, 0 thrash — 0 cancels/
+phantoms/re-authors/hand-steps/failed-publishes; R9 confirmed Task's Id after step 1), then
+`harness-gate` certified it **✅ DONE, exit 0** (spec ok, structural 2/2, behavioral 1/1 write-path
+PERSISTS; role/render/pixel correctly OMITted). This closes the two identifier seams AND proves
+plan → autonomous drive → machine-checked done.
+
+**FINDING (real wart, worth a fix): harness-gate is order-dependent on a no-seed spec.** The FIRST
+gate run returned NOT DONE — structural's *binding* sub-check hard-failed because the Tasks list was
+EMPTY (gate_demo's spec has no sampleData → the plan emits no seed step → cold list has 0 rows, and the
+binding resolver marks an empty data-table `boundTo_unrendered`). The SECOND run passed only because the
+first run's behavioral step had created a persisted row. So two identical invocations gave NOT DONE →
+DONE — an enforcement tool must not do that. Two fixes on the table (neither spun yet, to respect
+thrash): (a) a proper exemplar spec includes `sampleData` so the plan emits a seed step and lists render
+on cold load (BUILD_LOOP §Done already requires "every list renders real seeded rows" — gate_demo's
+omission is a spec-completeness gap); (b) harness-gate's structural binding check should treat a
+present-but-empty bound table as INCONCLUSIVE (soft), not a hard FAIL, so the verdict is state-stable.
+The app itself is correct — behavioral (the real bar) passed on both runs.
