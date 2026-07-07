@@ -595,6 +595,98 @@ def exception_handler(params: dict) -> str:
         f"the action's happy path. After authoring, run model validation and report remaining warnings. Do not publish.")
 
 
+def _sig(items) -> str:
+    return ", ".join(f"{i['name']} ({_DATATYPE_WORDS.get(i.get('dataType', 'Text'), i.get('dataType', 'Text'))})"
+                     for i in (items or [])) or "none"
+
+
+def service_action(params: dict) -> str:
+    """Author a PUBLIC Service Action — the cross-app-callable API unit. A Server Action CANNOT be Public
+    in an app (OS-BLD-40409); a Service Action IS the exposed operation. params: name, inputs, outputs,
+    wraps?(existing server action the flow calls)."""
+    name = _p(params, "name", required=True)
+    wraps = _p(params, "wraps")
+    body = (f"Its flow calls the existing Server Action {wraps} and maps its result to the output(s)."
+            if wraps else "Its flow performs the operation and sets the output(s) (typed local + Assign per "
+                          "attribute; never an inline record literal).")
+    return (f"{_PREAMBLE}\n\n"
+            f"Author a Service Action named {name} with Public=TRUE (a Service Action IS cross-app callable; a "
+            f"Server Action can NOT be Public — OS-BLD-40409). Input parameter(s): {_sig(_p(params, 'inputs', []))}. "
+            f"Output parameter(s): {_sig(_p(params, 'outputs', []))}. {body} Build the flow with Start + End nodes "
+            f"and the operation between. After authoring, run model validation and report errors. Do not publish.")
+
+
+def client_action(params: dict) -> str:
+    """Author a Client Action — reusable CLIENT-side logic (runs in the browser, no DB round-trip; NOT a
+    server/service action). params: name, inputs, outputs, purpose."""
+    name = _p(params, "name", required=True)
+    purpose = _p(params, "purpose", "perform the client-side computation and set the outputs")
+    return (f"{_PREAMBLE}\n\n"
+            f"Author a Client Action named {name} — reusable CLIENT-side logic that runs in the browser (NOT a "
+            f"Server or Service Action; do not touch the database). Input parameter(s): {_sig(_p(params, 'inputs', []))}. "
+            f"Output parameter(s): {_sig(_p(params, 'outputs', []))}. The flow should: {purpose}. Build Start + End "
+            f"nodes with the logic between (Assign nodes; identify each by its Variable name, not flow order). After "
+            f"authoring, run model validation and report errors. Do not publish.")
+
+
+def sql_action(params: dict) -> str:
+    """Author a Server Action whose body is a SQL query node. params: name, statement (use {Entity} braces,
+    [Attr] brackets, @Param placeholders), inputs:[{name,dataType}], returns?(a Structure/entity the rows map to)."""
+    name = _p(params, "name", required=True)
+    statement = _p(params, "statement", required=True)
+    inputs = _p(params, "inputs", []) or []
+    returns = _p(params, "returns")
+    in_txt = "; ".join(f"@{i['name']} ({_DATATYPE_WORDS.get(i.get('dataType', 'Text'), 'Text')})" for i in inputs) or "none"
+    ret_txt = (f" Map the result set to an output List of {returns}." if returns else "")
+    return (f"{_PREAMBLE}\n\n"
+            f"Author a Server Action named {name} (Public=FALSE) whose body is a single SQL query node "
+            f"(CreateNode<ISQLNode>). Set its Statement VERBATIM to (in the OutSystems SQL dialect: an entity is "
+            f"written {{EntityName}} in braces, an attribute [AttrName] in brackets, a query parameter @Name):\n"
+            f"{statement}\n"
+            f"Declare each @parameter as a node input (CreateInputParameter named without the @) and BIND it: {in_txt} "
+            f"(cast a Long to an Id arg with LongIntegerToIdentifier where an identifier is compared).{ret_txt} Wire "
+            f"Start -> SQL node -> End. After authoring, run model validation and report errors. Do not publish.")
+
+
+def aggregate_join(params: dict) -> str:
+    """Add a JOIN to a LIST screen's aggregate so it shows a related entity's display field(s) instead of a
+    raw FK Id. params: screen, primary_entity, join_entity, join_attr (the FK on primary), display_fields:
+    [{entity, field}]. NOT for detail screens (R2 cascade) — a list screen only."""
+    screen = _p(params, "screen", required=True)
+    primary = _p(params, "primary_entity", required=True)
+    join_entity = _p(params, "join_entity", required=True)
+    join_attr = _p(params, "join_attr", required=True)
+    cols = ", ".join(f"{d['entity']}.{d['field']}" for d in _p(params, "display_fields", []) or []) or f"{join_entity}.Label"
+    return (f"{_PREAMBLE}\n\n"
+            f"On the {screen} screen's EXISTING list aggregate over {primary}, ADD ONE join to {join_entity} "
+            f"(matching {primary}.{join_attr} = {join_entity}.Id) and surface these columns in the table: {cols}. "
+            f"Use the OutSystems.Model.Logic.Aggregates API (CreateJoin) — the WRONG namespace is a CS0234 compile "
+            f"error. {join_entity} must be Public + fully imported. Do NOT rebuild the aggregate or the table — only "
+            f"add the join + the display column(s). Keep the screen Anonymous. After authoring, run model validation. "
+            f"Do not publish.")
+
+
+def global_event(params: dict) -> str:
+    """Author a Global Event (+ payload). params: name, payload:[{name,dataType}]. CreateGlobalEvent THROWS in a
+    BusinessProcess/Workflow-kind app — this must be a normal app."""
+    name = _p(params, "name", required=True)
+    return (f"{_PREAMBLE}\n\n"
+            f"Author a Global Event named {name} (CreateGlobalEvent). This app must NOT be a BusinessProcess/Workflow "
+            f"app — CreateGlobalEvent THROWS there. Payload parameter(s): {_sig(_p(params, 'payload', []))}. Do NOT add "
+            f"a screen or entity in this turn. After authoring, run model validation and report errors. Do not publish.")
+
+
+def entity_index(params: dict) -> str:
+    """Add an index (optionally UNIQUE) over an entity's attribute(s). params: entity, attributes:[name], unique."""
+    entity = _p(params, "entity", required=True)
+    attrs = ", ".join(_p(params, "attributes", [], required=True))
+    unique_txt = " as a UNIQUE index (reject duplicate values)" if _p(params, "unique") else ""
+    return (f"{_PREAMBLE}\n\n"
+            f"On the {entity} entity, add an index over attribute(s) {attrs}{unique_txt}. Do NOT change the entity's "
+            f"identifier or any attribute, and do NOT add a screen/UI — ONLY add the index. After authoring, run model "
+            f"validation and report errors. Do not publish.")
+
+
 def json_1line(obj) -> str:
     import json
     return json.dumps(obj, separators=(", ", "="))
@@ -606,6 +698,12 @@ RECIPES = {
     "structure": structure,
     "input-validation": input_validation,
     "exception-handler": exception_handler,
+    "service-action": service_action,
+    "client-action": client_action,
+    "sql-action": sql_action,
+    "aggregate-join": aggregate_join,
+    "global-event": global_event,
+    "entity-index": entity_index,
     "screen": screen,
     "nav-block": nav_block,
     "list-screen": list_screen,
@@ -792,6 +890,13 @@ def plan_from_spec(spec: dict) -> list[dict]:
     if entities:
         steps.append({"recipe": "data-model", "why": "spec.dataModel.entities (all in one turn)",
                       "params": {"entities": entities}})
+    # Batch B: entity indexes (after the entities exist).
+    for e in all_entities:
+        for idx in e.get("indexes", []) or []:
+            steps.append({"recipe": "entity-index",
+                          "why": f"index on {e['name']}.{'+'.join(idx.get('attributes', []))}",
+                          "params": {"entity": e["name"], "attributes": idx.get("attributes", []),
+                                     "unique": bool(idx.get("unique"))}})
     if screens:
         scaffold = []
         for i, s in enumerate(screens):
@@ -851,6 +956,14 @@ def plan_from_spec(spec: dict) -> list[dict]:
                         params["nav_component_id"] = comp["id"]
                 steps.append({"recipe": "list-screen",
                               "why": f"{c['id']} ({c['type']}) bound to {entity}", "params": params})
+                # Batch B: an aggregate JOIN on this list to show a related entity's display fields.
+                aj = s.get("aggregateJoin")
+                if aj:
+                    steps.append({"recipe": "aggregate-join",
+                                  "why": f"{s['id']} join {entity} -> {aj['joinEntity']}",
+                                  "params": {"screen": s["id"], "primary_entity": entity,
+                                             "join_entity": aj["joinEntity"], "join_attr": aj["joinAttr"],
+                                             "display_fields": aj.get("displayFields", [])}})
                 break  # one primary data list per screen
         acc = s.get("access") or {}
         if acc.get("adminOnly") or acc.get("requiresRole"):
@@ -962,4 +1075,13 @@ def plan_from_spec(spec: dict) -> list[dict]:
                       "params": {"agent_name": ag["name"], "system_prompt": ag["systemPrompt"],
                                  "model_connection": ag.get("modelConnection", "TrialClaudeHaiku4_5"),
                                  "tools": ag.get("tools", [])}})
+    # Batch B: standalone logic units (emitted last — a service action may wrap a write-path server action).
+    _LOGIC_KIND = {"serviceAction": "service-action", "clientAction": "client-action",
+                   "sqlAction": "sql-action", "globalEvent": "global-event"}
+    for unit in spec.get("logic", []) or []:
+        recipe = _LOGIC_KIND.get(unit.get("kind"))
+        if not recipe:
+            continue
+        p = {k: v for k, v in unit.items() if k != "kind"}
+        steps.append({"recipe": recipe, "why": f"logic {unit['kind']} {unit.get('name', '')}", "params": p})
     return steps

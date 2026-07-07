@@ -2,216 +2,652 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://nomouthlabs.dev/schemas/app_spec.v0.json",
   "title": "App Build Spec (v0.2)",
-  "$comment": "v0.2 (specVersion 0.2) extends v0.1 from the P1.5 live calibration of home_banking (Core rev 6): attributes gain length/decimals/description/references(FK); entities gain isStatic/records/description; screens gain inputParameters/uiFlow; a minimal optional `integrations` block is added. NOTE: dataType enum stays camelCase (LongInteger etc.) while live ODC reports space-form ('Long Integer') — harness-verify's mcp executor normalizes; the spec's authored form is camel. The embedded example (examples[0]) is an ILLUSTRATIVE EXCERPT, not a complete spec: a single-screen excerpt whose navigation/navigates reference a 'transfer' screen it never defines, so it passes JSON-Schema validation but FAILS full harness-verify cross-ref. EXPECTED, not a bug. Do NOT 'complete' the example by adding the transfer screen. v0.2 ALSO gained (additive, backward-compatible — all optional): app-level `navigation` (shared nav authored ONCE as a block, not per screen), app-level `auth` (anonymous | app-local | platform-idp, with userEntity/adminAttribute/testUsers), per-screen `access` (adminOnly/requiresRole/redirectTo), and product-UI component types Modal/Tabs/Avatar/Badge/CommandPalette. Existing specs stay valid.",
-  "description": "Contract between the spec factory and the build harness. The spec factory EMITS a document conforming to this. harness-verify VALIDATES a spec against this schema BEFORE building (validate-before-assert) — a spec that fails validation is a spec-gap wall up front, not a mid-build failure — then checks the built ODC app against each screen's acceptance assertions. Only describe what the ODC MCP can actually build: the dataType and componentType enums ARE the buildable surface.",
+  "$comment": "v0.2 (specVersion 0.2) extends v0.1 from the P1.5 live calibration of home_banking (Core rev 6): attributes gain length/decimals/description/references(FK); entities gain isStatic/records/description; screens gain inputParameters/uiFlow; a minimal optional `integrations` block is added. NOTE: dataType enum stays camelCase (LongInteger etc.) while live ODC reports space-form ('Long Integer') \u2014 harness-verify's mcp executor normalizes; the spec's authored form is camel. The embedded example (examples[0]) is an ILLUSTRATIVE EXCERPT, not a complete spec: a single-screen excerpt whose navigation/navigates reference a 'transfer' screen it never defines, so it passes JSON-Schema validation but FAILS full harness-verify cross-ref. EXPECTED, not a bug. Do NOT 'complete' the example by adding the transfer screen. v0.2 ALSO gained (additive, backward-compatible \u2014 all optional): app-level `navigation` (shared nav authored ONCE as a block, not per screen), app-level `auth` (anonymous | app-local | platform-idp, with userEntity/adminAttribute/testUsers), per-screen `access` (adminOnly/requiresRole/redirectTo), and product-UI component types Modal/Tabs/Avatar/Badge/CommandPalette. Existing specs stay valid.",
+  "description": "Contract between the spec factory and the build harness. The spec factory EMITS a document conforming to this. harness-verify VALIDATES a spec against this schema BEFORE building (validate-before-assert) \u2014 a spec that fails validation is a spec-gap wall up front, not a mid-build failure \u2014 then checks the built ODC app against each screen's acceptance assertions. Only describe what the ODC MCP can actually build: the dataType and componentType enums ARE the buildable surface.",
   "type": "object",
-  "required": ["specVersion", "app", "dataModel", "screens"],
+  "required": [
+    "specVersion",
+    "app",
+    "dataModel",
+    "screens"
+  ],
   "additionalProperties": false,
   "properties": {
-    "specVersion": { "const": "0.2", "description": "Schema version this spec targets." },
+    "specVersion": {
+      "const": "0.2",
+      "description": "Schema version this spec targets."
+    },
     "app": {
       "type": "object",
-      "required": ["name", "roles"],
+      "required": [
+        "name",
+        "roles"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "roles": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "ODC end-user roles; screens reference these for access." }
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "ODC end-user roles; screens reference these for access."
+        }
       }
     },
     "dataModel": {
       "type": "object",
-      "required": ["entities"],
+      "required": [
+        "entities"
+      ],
       "additionalProperties": false,
-      "properties": { "entities": { "type": "array", "items": { "$ref": "#/$defs/entity" }, "minItems": 1 } }
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entity"
+          },
+          "minItems": 1
+        }
+      }
     },
-    "screens": { "type": "array", "items": { "$ref": "#/$defs/screen" }, "minItems": 1 },
-    "integrations": { "type": "array", "items": { "$ref": "#/$defs/integration" }, "description": "External systems/connectors. Optional. v1 is MINIMAL (REST only) per HD D3; home_banking uses none (context_connections is AI-model-only and returns empty). Widen as real apps need." },
-    "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" }, "description": "The various ways and things a user can do (HD D11) — the user-flow layer. Each capability connects role(s) -> screen(s) -> action(s) -> entit(ies). Optional in JSON-schema, but REQUIRED for a complete spec; the harness-verify NO-HOLES check (--phase spec) enforces that every entity/screen/role is covered by a capability and every capability is fully pathed." },
-    "design": { "$ref": "#/$defs/design", "description": "Design layer reference (HD D10). For a KNOWN app, the reference is the real product's captures; for a NOVEL app, generated (Figma). Per-screen visuals go in screen.mockupRef; this is the app-level theme/reference." },
-    "navigation": { "$ref": "#/$defs/appNavigation", "description": "App-level SHARED navigation (sidebar/menu). First-class so the persistent nav is authored ONCE as a reusable block and referenced by every screen — NOT re-authored per screen (the per-screen path multiplies turn-cost + defect surface). Optional; when absent, nav is whatever screens declare via Sidebar/Navigation components." },
-    "auth": { "$ref": "#/$defs/authSpec", "description": "App-level authentication model. First-class so access control is describable + verifiable. `app-local` = identity in an app entity bridged via browser storage (no ODC end-user IdP; the common clone pattern); `platform-idp` = ODC end-user provider; `anonymous` = no login. Optional; absent ⇒ anonymous." },
-    "agents": { "type": "array", "items": { "$ref": "#/$defs/agent" }, "description": "App-level ODC AI Agents (v0.3, additive). Each is authored FROM SCRATCH via the `agent` recipe — internals + AgentFlow + BuildMessages + public Call service action + AIModel bound to a Trial AIModelConnection (MCP-only, wall lifted 2026-07-05). plan_from_spec emits one `agent` step per entry." },
-    "structures": { "type": "array", "items": { "$ref": "#/$defs/structure" }, "description": "App-level non-persistent Structures (Batch A, additive) — typed record shapes for action/agent signatures. plan_from_spec emits one `structure` step each, before the data model." }
+    "screens": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/screen"
+      },
+      "minItems": 1
+    },
+    "integrations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/integration"
+      },
+      "description": "External systems/connectors. Optional. v1 is MINIMAL (REST only) per HD D3; home_banking uses none (context_connections is AI-model-only and returns empty). Widen as real apps need."
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/capability"
+      },
+      "description": "The various ways and things a user can do (HD D11) \u2014 the user-flow layer. Each capability connects role(s) -> screen(s) -> action(s) -> entit(ies). Optional in JSON-schema, but REQUIRED for a complete spec; the harness-verify NO-HOLES check (--phase spec) enforces that every entity/screen/role is covered by a capability and every capability is fully pathed."
+    },
+    "design": {
+      "$ref": "#/$defs/design",
+      "description": "Design layer reference (HD D10). For a KNOWN app, the reference is the real product's captures; for a NOVEL app, generated (Figma). Per-screen visuals go in screen.mockupRef; this is the app-level theme/reference."
+    },
+    "navigation": {
+      "$ref": "#/$defs/appNavigation",
+      "description": "App-level SHARED navigation (sidebar/menu). First-class so the persistent nav is authored ONCE as a reusable block and referenced by every screen \u2014 NOT re-authored per screen (the per-screen path multiplies turn-cost + defect surface). Optional; when absent, nav is whatever screens declare via Sidebar/Navigation components."
+    },
+    "auth": {
+      "$ref": "#/$defs/authSpec",
+      "description": "App-level authentication model. First-class so access control is describable + verifiable. `app-local` = identity in an app entity bridged via browser storage (no ODC end-user IdP; the common clone pattern); `platform-idp` = ODC end-user provider; `anonymous` = no login. Optional; absent \u21d2 anonymous."
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/agent"
+      },
+      "description": "App-level ODC AI Agents (v0.3, additive). Each is authored FROM SCRATCH via the `agent` recipe \u2014 internals + AgentFlow + BuildMessages + public Call service action + AIModel bound to a Trial AIModelConnection (MCP-only, wall lifted 2026-07-05). plan_from_spec emits one `agent` step per entry."
+    },
+    "structures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/structure"
+      },
+      "description": "App-level non-persistent Structures (Batch A, additive) \u2014 typed record shapes for action/agent signatures. plan_from_spec emits one `structure` step each, before the data model."
+    },
+    "logic": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/logicUnit"
+      },
+      "description": "Batch B: standalone logic units (service/client/SQL actions + global events). plan_from_spec emits one step each, last (a service action may wrap a write-path server action)."
+    }
   },
-
   "$defs": {
     "odcDataType": {
       "description": "ALLOW-LIST = buildable surface for attribute types. Complete/trim from the ODC catalog in the MCP doctrine notes. Anything outside this set is, by construction, a spec-gap.",
-      "enum": ["Text", "Integer", "LongInteger", "Decimal", "Currency", "Boolean", "Date", "Time", "DateTime", "Email", "PhoneNumber", "Identifier", "BinaryData"]
+      "enum": [
+        "Text",
+        "Integer",
+        "LongInteger",
+        "Decimal",
+        "Currency",
+        "Boolean",
+        "Date",
+        "Time",
+        "DateTime",
+        "Email",
+        "PhoneNumber",
+        "Identifier",
+        "BinaryData"
+      ]
     },
     "odcComponentType": {
       "description": "Buildable surface for screen widgets. Most are native ODC widgets (1:1). Board, Sidebar, Modal, Tabs, Avatar, Badge, and CommandPalette are COMPOSITE PRODUCT-UI PATTERNS (no single native widget) authored via a harness recipe and described by structured props (`board`/`nav`, or `props`). Extend from the ODC catalog + the product-UI primitive set as benchmarks demand (North Star: 100%-to-spec incl. real structure).",
-      "enum": ["Container", "Form", "Input", "Dropdown", "Checkbox", "DatePicker", "Button", "Link", "Label", "Table", "List", "Card", "Chart", "Image", "Navigation", "Board", "Sidebar", "Modal", "Tabs", "Avatar", "Badge", "CommandPalette"]
+      "enum": [
+        "Container",
+        "Form",
+        "Input",
+        "Dropdown",
+        "Checkbox",
+        "DatePicker",
+        "Button",
+        "Link",
+        "Label",
+        "Table",
+        "List",
+        "Card",
+        "Chart",
+        "Image",
+        "Navigation",
+        "Board",
+        "Sidebar",
+        "Modal",
+        "Tabs",
+        "Avatar",
+        "Badge",
+        "CommandPalette"
+      ]
     },
-
     "entity": {
       "type": "object",
-      "required": ["name", "attributes"],
+      "required": [
+        "name",
+        "attributes"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "isStatic": { "type": "boolean", "default": false, "description": "Static (lookup) entity vs database entity. Live ODC reports this as `isStatic`." },
-        "attributes": { "type": "array", "items": { "$ref": "#/$defs/attribute" }, "minItems": 1 },
-        "records": { "type": "array", "items": { "type": "object", "additionalProperties": true }, "description": "Seed records for a static entity (one object per row, attribute-name -> value). Only meaningful when isStatic=true." },
-        "sampleData": { "type": "array", "items": { "type": "object", "additionalProperties": true }, "description": "Sample rows for a DATABASE entity (v0.3, additive), seeded via a LoadSampleData + WhenPublished timer by the `seed-entity` recipe. Used when the entity is rendered in a list but has no create UI (else its list is empty). One object per row, attribute-name -> value. Absent ⇒ the plan generates deterministic placeholder rows." },
-        "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } }
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "isStatic": {
+          "type": "boolean",
+          "default": false,
+          "description": "Static (lookup) entity vs database entity. Live ODC reports this as `isStatic`."
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attribute"
+          },
+          "minItems": 1
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": "Seed records for a static entity (one object per row, attribute-name -> value). Only meaningful when isStatic=true."
+        },
+        "sampleData": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "description": "Sample rows for a DATABASE entity (v0.3, additive), seeded via a LoadSampleData + WhenPublished timer by the `seed-entity` recipe. Used when the entity is rendered in a list but has no create UI (else its list is empty). One object per row, attribute-name -> value. Absent \u21d2 the plan generates deterministic placeholder rows."
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship"
+          }
+        },
+        "indexes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entityIndex"
+          },
+          "description": "Batch B: entity indexes (plan emits one `entity-index` step each, after the data model)."
+        }
       }
     },
     "attribute": {
       "type": "object",
-      "required": ["name", "dataType"],
+      "required": [
+        "name",
+        "dataType"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "dataType": { "$ref": "#/$defs/odcDataType" },
-        "mandatory": { "type": "boolean", "default": false },
-        "isIdentifier": { "type": "boolean", "default": false },
-        "length": { "type": "integer", "description": "Max length for Text; live ODC carries this per attribute." },
-        "decimals": { "type": "integer", "description": "Decimal places for Decimal/Currency." },
-        "description": { "type": "string" },
-        "references": { "type": "string", "description": "Target entity name when this attribute is a foreign key. In live ODC, an FK is an entity-typed Identifier attribute (dataType '<Entity> Identifier') + a foreignKey object; in the spec, set dataType to 'Identifier' and `references` to the target entity. Preferred over the entity-level `relationship` block." },
-        "default": { "description": "Optional default value (any JSON scalar)." }
+        "name": {
+          "type": "string"
+        },
+        "dataType": {
+          "$ref": "#/$defs/odcDataType"
+        },
+        "mandatory": {
+          "type": "boolean",
+          "default": false
+        },
+        "isIdentifier": {
+          "type": "boolean",
+          "default": false
+        },
+        "length": {
+          "type": "integer",
+          "description": "Max length for Text; live ODC carries this per attribute."
+        },
+        "decimals": {
+          "type": "integer",
+          "description": "Decimal places for Decimal/Currency."
+        },
+        "description": {
+          "type": "string"
+        },
+        "references": {
+          "type": "string",
+          "description": "Target entity name when this attribute is a foreign key. In live ODC, an FK is an entity-typed Identifier attribute (dataType '<Entity> Identifier') + a foreignKey object; in the spec, set dataType to 'Identifier' and `references` to the target entity. Preferred over the entity-level `relationship` block."
+        },
+        "default": {
+          "description": "Optional default value (any JSON scalar)."
+        }
       }
     },
     "relationship": {
       "type": "object",
-      "required": ["to", "kind"],
+      "required": [
+        "to",
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
-        "to": { "type": "string", "description": "Target entity name (must exist in dataModel.entities)." },
-        "kind": { "enum": ["manyToOne", "oneToMany", "manyToMany"] },
-        "mandatory": { "type": "boolean", "default": false }
+        "to": {
+          "type": "string",
+          "description": "Target entity name (must exist in dataModel.entities)."
+        },
+        "kind": {
+          "enum": [
+            "manyToOne",
+            "oneToMany",
+            "manyToMany"
+          ]
+        },
+        "mandatory": {
+          "type": "boolean",
+          "default": false
+        }
       }
     },
-
     "screen": {
       "type": "object",
-      "required": ["id", "name", "components", "acceptance"],
+      "required": [
+        "id",
+        "name",
+        "components",
+        "acceptance"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "description": "Stable id; assertions and navigation reference it." },
-        "name": { "type": "string" },
-        "route": { "type": "string" },
-        "isDefault": { "type": "boolean", "description": "Marks this screen as the app's default (landing) screen. Consumed by plan_from_spec's `screen` scaffold step. At most one screen may set it; if none do, the first screen is the default." },
-        "uiFlow": { "type": "string", "description": "Owning UI flow, e.g. 'MainFlow' (role-gated) or 'Common' (Login/InvalidPermissions). Live ODC reports uiFlowName." },
-        "inputParameters": { "type": "array", "items": { "$ref": "#/$defs/screenInput" }, "description": "Typed screen input parameters (e.g. a detail screen's record Id)." },
-        "roles": { "type": "array", "items": { "type": "string" }, "description": "Subset of app.roles permitted to open this screen." },
-        "access": { "$ref": "#/$defs/screenAccess", "description": "First-class access rule for this screen (complements/refines `roles`). Expresses admin-only gating + where to redirect an unauthorized user, so the role-gate is describable and the built OnReady gate is verifiable. Optional." },
-        "mockupRef": { "type": "string", "description": "Path to the screen mockup asset. Drives ADVISORY visual diff only — NOT gating." },
-        "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
-        "charts": { "type": "array", "items": { "$ref": "#/$defs/chart" }, "description": "Native OutSystemsCharts on this screen (v0.3, additive). Each is authored via the `chart` recipe (addReferenceToElements + SourceBlock + DataPoints from an aggregate). plan_from_spec emits one `chart` step per entry." },
-        "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
-        "navigation": { "type": "array", "items": { "$ref": "#/$defs/navEdge" } },
+        "id": {
+          "type": "string",
+          "description": "Stable id; assertions and navigation reference it."
+        },
+        "name": {
+          "type": "string"
+        },
+        "route": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean",
+          "description": "Marks this screen as the app's default (landing) screen. Consumed by plan_from_spec's `screen` scaffold step. At most one screen may set it; if none do, the first screen is the default."
+        },
+        "uiFlow": {
+          "type": "string",
+          "description": "Owning UI flow, e.g. 'MainFlow' (role-gated) or 'Common' (Login/InvalidPermissions). Live ODC reports uiFlowName."
+        },
+        "inputParameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/screenInput"
+          },
+          "description": "Typed screen input parameters (e.g. a detail screen's record Id)."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Subset of app.roles permitted to open this screen."
+        },
+        "access": {
+          "$ref": "#/$defs/screenAccess",
+          "description": "First-class access rule for this screen (complements/refines `roles`). Expresses admin-only gating + where to redirect an unauthorized user, so the role-gate is describable and the built OnReady gate is verifiable. Optional."
+        },
+        "mockupRef": {
+          "type": "string",
+          "description": "Path to the screen mockup asset. Drives ADVISORY visual diff only \u2014 NOT gating."
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/component"
+          }
+        },
+        "charts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/chart"
+          },
+          "description": "Native OutSystemsCharts on this screen (v0.3, additive). Each is authored via the `chart` recipe (addReferenceToElements + SourceBlock + DataPoints from an aggregate). plan_from_spec emits one `chart` step per entry."
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "navigation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/navEdge"
+          }
+        },
         "acceptance": {
           "type": "object",
-          "required": ["assertions"],
+          "required": [
+            "assertions"
+          ],
           "additionalProperties": false,
           "description": "The machine-checkable contract harness-verify evaluates against LIVE ODC state. Structural assertions are GATING.",
-          "properties": { "assertions": { "type": "array", "items": { "$ref": "#/$defs/assertion" }, "minItems": 1 } }
+          "properties": {
+            "assertions": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/assertion"
+              },
+              "minItems": 1
+            }
+          }
+        },
+        "aggregateJoin": {
+          "$ref": "#/$defs/aggregateJoin",
+          "description": "Batch B: an aggregate join on this screen's list (see aggregateJoin def)."
         }
       }
     },
     "component": {
       "type": "object",
-      "required": ["id", "type"],
+      "required": [
+        "id",
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string" },
-        "type": { "$ref": "#/$defs/odcComponentType" },
-        "boundTo": { "type": "string", "description": "Data binding: 'Entity.Attribute', an entity name, or an aggregate name. Verifiable against live state." },
-        "label": { "type": "string" },
-        "groupBy": { "type": "string", "description": "PRODUCT-UI: attribute to group rows by (e.g. a List grouped by StateId → status section headers). The build authors group headers; the screen-walk verifier confirms it." },
-        "columns": { "type": "array", "items": { "$ref": "#/$defs/columnSpec" }, "description": "PRODUCT-UI: rendered columns for a Table/List — expresses real rows (glyph/chip/avatar/identifier cells), not just raw fields." },
-        "board": { "$ref": "#/$defs/boardSpec", "description": "PRODUCT-UI: for type Board — kanban columns + card spec (composite pattern, authored via recipe)." },
-        "nav": { "type": "array", "items": { "$ref": "#/$defs/navItem" }, "description": "PRODUCT-UI: for type Sidebar/Navigation — the app-shell nav items." },
-        "props": { "type": "object", "additionalProperties": true }
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/odcComponentType"
+        },
+        "boundTo": {
+          "type": "string",
+          "description": "Data binding: 'Entity.Attribute', an entity name, or an aggregate name. Verifiable against live state."
+        },
+        "label": {
+          "type": "string"
+        },
+        "groupBy": {
+          "type": "string",
+          "description": "PRODUCT-UI: attribute to group rows by (e.g. a List grouped by StateId \u2192 status section headers). The build authors group headers; the screen-walk verifier confirms it."
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/columnSpec"
+          },
+          "description": "PRODUCT-UI: rendered columns for a Table/List \u2014 expresses real rows (glyph/chip/avatar/identifier cells), not just raw fields."
+        },
+        "board": {
+          "$ref": "#/$defs/boardSpec",
+          "description": "PRODUCT-UI: for type Board \u2014 kanban columns + card spec (composite pattern, authored via recipe)."
+        },
+        "nav": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/navItem"
+          },
+          "description": "PRODUCT-UI: for type Sidebar/Navigation \u2014 the app-shell nav items."
+        },
+        "props": {
+          "type": "object",
+          "additionalProperties": true
+        }
       }
     },
     "columnSpec": {
       "type": "object",
-      "required": ["field", "kind"],
+      "required": [
+        "field",
+        "kind"
+      ],
       "additionalProperties": false,
       "description": "PRODUCT-UI: one rendered column/cell of a Table/List row.",
       "properties": {
-        "field": { "type": "string", "description": "Attribute or 'Entity.Attribute' the cell renders." },
-        "kind": { "enum": ["text", "identifier", "glyph", "chip", "avatar", "badge", "date", "link"], "description": "Cell render kind. glyph/chip/avatar/badge are product-UI cells needing an authoring recipe (CSS/SVG/IImage), not a raw value." },
-        "label": { "type": "string" },
-        "glyphSet": { "type": "string", "description": "For kind=glyph: glyph family (e.g. 'workflowState', 'priority') → maps to the rendering recipe." }
+        "field": {
+          "type": "string",
+          "description": "Attribute or 'Entity.Attribute' the cell renders."
+        },
+        "kind": {
+          "enum": [
+            "text",
+            "identifier",
+            "glyph",
+            "chip",
+            "avatar",
+            "badge",
+            "date",
+            "link"
+          ],
+          "description": "Cell render kind. glyph/chip/avatar/badge are product-UI cells needing an authoring recipe (CSS/SVG/IImage), not a raw value."
+        },
+        "label": {
+          "type": "string"
+        },
+        "glyphSet": {
+          "type": "string",
+          "description": "For kind=glyph: glyph family (e.g. 'workflowState', 'priority') \u2192 maps to the rendering recipe."
+        }
       }
     },
     "boardSpec": {
       "type": "object",
-      "required": ["columnsBy", "card"],
+      "required": [
+        "columnsBy",
+        "card"
+      ],
       "additionalProperties": false,
       "description": "PRODUCT-UI: a kanban board (composite pattern).",
       "properties": {
-        "columnsBy": { "type": "string", "description": "Attribute the columns group by (e.g. StateId → one column per WorkflowState)." },
-        "card": { "$ref": "#/$defs/cardSpec" }
+        "columnsBy": {
+          "type": "string",
+          "description": "Attribute the columns group by (e.g. StateId \u2192 one column per WorkflowState)."
+        },
+        "card": {
+          "$ref": "#/$defs/cardSpec"
+        }
       }
     },
     "cardSpec": {
       "type": "object",
-      "required": ["title"],
+      "required": [
+        "title"
+      ],
       "additionalProperties": false,
       "properties": {
-        "title": { "type": "string", "description": "Field rendered as the card title." },
-        "badges": { "type": "array", "items": { "type": "string" }, "description": "Fields rendered as badges/chips." },
-        "avatar": { "type": "string", "description": "Field rendered as the assignee avatar." }
+        "title": {
+          "type": "string",
+          "description": "Field rendered as the card title."
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Fields rendered as badges/chips."
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Field rendered as the assignee avatar."
+        }
       }
     },
     "navItem": {
       "type": "object",
-      "required": ["label"],
+      "required": [
+        "label"
+      ],
       "additionalProperties": false,
       "description": "PRODUCT-UI: one app-shell nav entry.",
       "properties": {
-        "label": { "type": "string" },
-        "toScreen": { "type": "string", "description": "Target screen id (must exist in screens)." },
-        "icon": { "type": "string" },
-        "section": { "type": "string", "description": "Sidebar section grouping, e.g. 'Workspace' or a team name." }
+        "label": {
+          "type": "string"
+        },
+        "toScreen": {
+          "type": "string",
+          "description": "Target screen id (must exist in screens)."
+        },
+        "icon": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string",
+          "description": "Sidebar section grouping, e.g. 'Workspace' or a team name."
+        }
       }
     },
     "appNavigation": {
       "type": "object",
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false,
       "description": "The app's SHARED persistent navigation, authored once as a reusable block.",
       "properties": {
-        "block": { "type": "string", "description": "Name of the reusable nav block to author (e.g. 'SidebarNav'). One block, referenced by every screen." },
-        "style": { "enum": ["sidebar", "topbar", "drawer"], "default": "sidebar", "description": "Nav chrome style." },
-        "workspaceLabel": { "type": "string", "description": "Header/brand label shown at the top of the nav." },
-        "items": { "type": "array", "items": { "$ref": "#/$defs/navItem" }, "minItems": 1, "description": "Nav entries; each item.toScreen must exist in screens." },
-        "showOn": { "description": "Which screens render the nav. 'all' (default) or an explicit list of screen ids (e.g. exclude the login screen).", "oneOf": [ { "const": "all" }, { "type": "array", "items": { "type": "string" } } ] }
+        "block": {
+          "type": "string",
+          "description": "Name of the reusable nav block to author (e.g. 'SidebarNav'). One block, referenced by every screen."
+        },
+        "style": {
+          "enum": [
+            "sidebar",
+            "topbar",
+            "drawer"
+          ],
+          "default": "sidebar",
+          "description": "Nav chrome style."
+        },
+        "workspaceLabel": {
+          "type": "string",
+          "description": "Header/brand label shown at the top of the nav."
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/navItem"
+          },
+          "minItems": 1,
+          "description": "Nav entries; each item.toScreen must exist in screens."
+        },
+        "showOn": {
+          "description": "Which screens render the nav. 'all' (default) or an explicit list of screen ids (e.g. exclude the login screen).",
+          "oneOf": [
+            {
+              "const": "all"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        }
       }
     },
     "authSpec": {
       "type": "object",
-      "required": ["provider"],
+      "required": [
+        "provider"
+      ],
       "additionalProperties": false,
       "description": "App authentication model.",
       "properties": {
-        "provider": { "enum": ["anonymous", "app-local", "platform-idp"], "description": "anonymous = no login; app-local = identity in an app entity, session bridged via browser storage (no ODC end-user IdP — the common clone pattern); platform-idp = ODC end-user provider." },
-        "userEntity": { "type": "string", "description": "For app-local: the entity holding users (must exist in dataModel). Its rows are the app's identities." },
-        "adminAttribute": { "type": "string", "description": "For app-local: a Boolean attribute on userEntity marking admins (e.g. 'IsAdmin'); drives admin-only screen access." },
-        "loginScreen": { "type": "string", "description": "Screen id of the login screen (must exist in screens)." },
-        "sessionKeys": {
-          "type": "object", "additionalProperties": false,
-          "description": "For app-local: the browser-storage keys the session bridge reads/writes.",
-          "properties": { "userId": { "type": "string" }, "userName": { "type": "string" } }
+        "provider": {
+          "enum": [
+            "anonymous",
+            "app-local",
+            "platform-idp"
+          ],
+          "description": "anonymous = no login; app-local = identity in an app entity, session bridged via browser storage (no ODC end-user IdP \u2014 the common clone pattern); platform-idp = ODC end-user provider."
         },
-        "testUsers": { "type": "array", "items": { "$ref": "#/$defs/authTestUser" }, "description": "Seed identities to create per role so gated flows are exercisable (e.g. one Admin + one Member)." }
+        "userEntity": {
+          "type": "string",
+          "description": "For app-local: the entity holding users (must exist in dataModel). Its rows are the app's identities."
+        },
+        "adminAttribute": {
+          "type": "string",
+          "description": "For app-local: a Boolean attribute on userEntity marking admins (e.g. 'IsAdmin'); drives admin-only screen access."
+        },
+        "loginScreen": {
+          "type": "string",
+          "description": "Screen id of the login screen (must exist in screens)."
+        },
+        "sessionKeys": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "For app-local: the browser-storage keys the session bridge reads/writes.",
+          "properties": {
+            "userId": {
+              "type": "string"
+            },
+            "userName": {
+              "type": "string"
+            }
+          }
+        },
+        "testUsers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/authTestUser"
+          },
+          "description": "Seed identities to create per role so gated flows are exercisable (e.g. one Admin + one Member)."
+        }
       }
     },
     "authTestUser": {
       "type": "object",
-      "required": ["role"],
+      "required": [
+        "role"
+      ],
       "additionalProperties": false,
       "properties": {
-        "role": { "type": "string", "description": "Role this test user holds (should be in app.roles, or 'Admin' when gated by adminAttribute)." },
-        "label": { "type": "string", "description": "Display name, e.g. 'Rob Spence'." },
-        "isAdmin": { "type": "boolean", "description": "Whether this seed user's adminAttribute is true." }
+        "role": {
+          "type": "string",
+          "description": "Role this test user holds (should be in app.roles, or 'Admin' when gated by adminAttribute)."
+        },
+        "label": {
+          "type": "string",
+          "description": "Display name, e.g. 'Rob Spence'."
+        },
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Whether this seed user's adminAttribute is true."
+        }
       }
     },
     "screenAccess": {
@@ -219,102 +655,257 @@
       "additionalProperties": false,
       "description": "First-class per-screen access rule.",
       "properties": {
-        "adminOnly": { "type": "boolean", "default": false, "description": "Only admins (auth.adminAttribute true) may open this screen." },
-        "requiresRole": { "type": "string", "description": "A single role (must be in app.roles) required to open the screen." },
-        "redirectTo": { "type": "string", "description": "Screen id an unauthorized user is sent to (must exist in screens); e.g. the app home or the login screen." }
+        "adminOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Only admins (auth.adminAttribute true) may open this screen."
+        },
+        "requiresRole": {
+          "type": "string",
+          "description": "A single role (must be in app.roles) required to open the screen."
+        },
+        "redirectTo": {
+          "type": "string",
+          "description": "Screen id an unauthorized user is sent to (must exist in screens); e.g. the app home or the login screen."
+        }
       }
     },
     "action": {
       "type": "object",
-      "required": ["name", "trigger"],
+      "required": [
+        "name",
+        "trigger"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
+        "name": {
+          "type": "string"
+        },
         "trigger": {
           "type": "object",
-          "required": ["onComponent", "event"],
+          "required": [
+            "onComponent",
+            "event"
+          ],
           "additionalProperties": false,
-          "properties": { "onComponent": { "type": "string" }, "event": { "enum": ["onClick", "onChange", "onInitialize", "onSubmit"] } }
+          "properties": {
+            "onComponent": {
+              "type": "string"
+            },
+            "event": {
+              "enum": [
+                "onClick",
+                "onChange",
+                "onInitialize",
+                "onSubmit"
+              ]
+            }
+          }
         },
         "does": {
           "type": "array",
-          "items": { "enum": ["CreateEntity", "UpdateEntity", "DeleteEntity", "Navigate", "RunServerLogic", "ShowFeedback"] },
+          "items": {
+            "enum": [
+              "CreateEntity",
+              "UpdateEntity",
+              "DeleteEntity",
+              "Navigate",
+              "RunServerLogic",
+              "ShowFeedback"
+            ]
+          },
           "description": "Coarse step kinds. Refine against the ODC logic surface in the MCP doctrine notes as the verifier matures."
         },
-        "validate": { "type": "boolean", "default": false, "description": "Batch A: when true on a CreateEntity action, plan_from_spec emits an `input-validation` step after the create-form — a validation gate rejects an invalid submit (empty mandatory / bad format) before Save, so no malformed row is ever written." },
-        "guardExceptions": { "type": "boolean", "default": false, "description": "Batch A: when true on a CreateEntity action, plan_from_spec emits an `exception-handler` step guarding the Save<Entity>Record server action (OnException → graceful failure), resolving the flow's 'No Exception Handling' warning." }
+        "validate": {
+          "type": "boolean",
+          "default": false,
+          "description": "Batch A: when true on a CreateEntity action, plan_from_spec emits an `input-validation` step after the create-form \u2014 a validation gate rejects an invalid submit (empty mandatory / bad format) before Save, so no malformed row is ever written."
+        },
+        "guardExceptions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Batch A: when true on a CreateEntity action, plan_from_spec emits an `exception-handler` step guarding the Save<Entity>Record server action (OnException \u2192 graceful failure), resolving the flow's 'No Exception Handling' warning."
+        }
       }
     },
     "structure": {
       "type": "object",
-      "required": ["name", "attributes"],
+      "required": [
+        "name",
+        "attributes"
+      ],
       "additionalProperties": false,
-      "description": "A non-persistent Structure — a typed record shape for action / agent signatures (NOT a persisted entity; no identifier). Batch A: plan_from_spec emits one `structure` step each.",
+      "description": "A non-persistent Structure \u2014 a typed record shape for action / agent signatures (NOT a persisted entity; no identifier). Batch A: plan_from_spec emits one `structure` step each.",
       "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "attributes": { "type": "array", "items": { "$ref": "#/$defs/attribute" }, "description": "Typed fields of the structure (same attribute shape as an entity, minus the identifier)." }
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attribute"
+          },
+          "description": "Typed fields of the structure (same attribute shape as an entity, minus the identifier)."
+        }
       }
     },
     "navEdge": {
       "type": "object",
-      "required": ["event", "toScreen"],
+      "required": [
+        "event",
+        "toScreen"
+      ],
       "additionalProperties": false,
       "properties": {
-        "fromComponent": { "type": "string" },
-        "event": { "enum": ["onClick", "onSubmit"] },
-        "toScreen": { "type": "string", "description": "Target screen id (must exist in screens)." },
-        "params": { "type": "array", "items": { "type": "string" } }
+        "fromComponent": {
+          "type": "string"
+        },
+        "event": {
+          "enum": [
+            "onClick",
+            "onSubmit"
+          ]
+        },
+        "toScreen": {
+          "type": "string",
+          "description": "Target screen id (must exist in screens)."
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
-
     "screenInput": {
       "type": "object",
-      "required": ["name", "dataType"],
+      "required": [
+        "name",
+        "dataType"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "dataType": { "$ref": "#/$defs/odcDataType" },
-        "isRequired": { "type": "boolean", "default": true },
-        "references": { "type": "string", "description": "Target entity name if this input is an entity Identifier." }
+        "name": {
+          "type": "string"
+        },
+        "dataType": {
+          "$ref": "#/$defs/odcDataType"
+        },
+        "isRequired": {
+          "type": "boolean",
+          "default": true
+        },
+        "references": {
+          "type": "string",
+          "description": "Target entity name if this input is an entity Identifier."
+        }
       }
     },
     "integration": {
       "type": "object",
-      "required": ["name", "kind"],
+      "required": [
+        "name",
+        "kind"
+      ],
       "additionalProperties": false,
       "description": "An external system/connector. MINIMAL v1 (HD D3).",
       "properties": {
-        "name": { "type": "string" },
-        "kind": { "enum": ["RestApi"], "description": "v1 models REST only — the only connector kind home_banking would use. Widen (SOAP, SAP, …) as real apps need." },
-        "baseUrl": { "type": "string" },
-        "description": { "type": "string" }
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "RestApi"
+          ],
+          "description": "v1 models REST only \u2014 the only connector kind home_banking would use. Widen (SOAP, SAP, \u2026) as real apps need."
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
       }
     },
-
     "capability": {
       "type": "object",
       "description": "One thing a user can do, end-to-end (HD D11). The connectivity spine: ties roles, screens, actions, and entities into a flow.",
-      "required": ["name", "roles", "screens", "entities"],
+      "required": [
+        "name",
+        "roles",
+        "screens",
+        "entities"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "roles": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Subset of app.roles who can do this." },
-        "screens": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Screen ids this flow uses (must exist in screens)." },
-        "entities": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Entity names this flow reads/writes (must exist in dataModel)." },
-        "actions": { "type": "array", "items": { "type": "string" }, "description": "Action names this flow triggers (must exist on the referenced screens)." },
-        "steps": { "type": "array", "items": { "$ref": "#/$defs/capabilityStep" }, "description": "Ordered steps of the flow." }
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Subset of app.roles who can do this."
+        },
+        "screens": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Screen ids this flow uses (must exist in screens)."
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Entity names this flow reads/writes (must exist in dataModel)."
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Action names this flow triggers (must exist on the referenced screens)."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capabilityStep"
+          },
+          "description": "Ordered steps of the flow."
+        }
       }
     },
     "capabilityStep": {
       "type": "object",
-      "required": ["description"],
+      "required": [
+        "description"
+      ],
       "additionalProperties": false,
       "properties": {
-        "description": { "type": "string" },
-        "screen": { "type": "string", "description": "Screen id this step happens on." },
-        "action": { "type": "string", "description": "Action name invoked in this step." }
+        "description": {
+          "type": "string"
+        },
+        "screen": {
+          "type": "string",
+          "description": "Screen id this step happens on."
+        },
+        "action": {
+          "type": "string",
+          "description": "Action name invoked in this step."
+        }
       }
     },
     "design": {
@@ -322,40 +913,130 @@
       "additionalProperties": false,
       "description": "App-level design reference (HD D10).",
       "properties": {
-        "source": { "enum": ["referenceApp", "figma", "screenshots", "generated"], "description": "Where the design comes from: a known product's captures, Figma, screenshots, or generated (novel app — a fresh modern design system synthesized by /design-layer)." },
-        "referenceName": { "type": "string", "description": "The product being matched (e.g. 'Linear')." },
-        "themeReference": { "type": "string", "description": "URL/path to the theme reference (palette, dark/light, typography)." },
-        "mode": { "type": "string", "description": "e.g. 'dark' | 'light'." },
-        "notes": { "type": "string" },
-        "references": { "type": "array", "items": { "type": "string" }, "description": "Reference screenshot/source URLs or paths backing the design." },
-        "theme": { "$ref": "#/$defs/themeTokens", "description": "Design tokens compiled into the app theme by the `theme` recipe (v0.3, additive). When present, plan_from_spec emits a `theme` step." }
+        "source": {
+          "enum": [
+            "referenceApp",
+            "figma",
+            "screenshots",
+            "generated"
+          ],
+          "description": "Where the design comes from: a known product's captures, Figma, screenshots, or generated (novel app \u2014 a fresh modern design system synthesized by /design-layer)."
+        },
+        "referenceName": {
+          "type": "string",
+          "description": "The product being matched (e.g. 'Linear')."
+        },
+        "themeReference": {
+          "type": "string",
+          "description": "URL/path to the theme reference (palette, dark/light, typography)."
+        },
+        "mode": {
+          "type": "string",
+          "description": "e.g. 'dark' | 'light'."
+        },
+        "notes": {
+          "type": "string"
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Reference screenshot/source URLs or paths backing the design."
+        },
+        "theme": {
+          "$ref": "#/$defs/themeTokens",
+          "description": "Design tokens compiled into the app theme by the `theme` recipe (v0.3, additive). When present, plan_from_spec emits a `theme` step."
+        }
       }
     },
-
     "agent": {
       "type": "object",
-      "required": ["name", "systemPrompt"],
+      "required": [
+        "name",
+        "systemPrompt"
+      ],
       "additionalProperties": false,
       "description": "An ODC AI Agent (v0.3). Built from a blank app_create kind=AIAgent shell entirely via MCP.",
       "properties": {
-        "name": { "type": "string", "description": "Agent name; a public Call<name> service action exposes it." },
-        "systemPrompt": { "type": "string", "description": "System prompt, authored as the BuildMessages System message ContentText." },
-        "modelConnection": { "type": "string", "default": "TrialClaudeHaiku4_5", "description": "AIModelConnection asset to bind to the agent's AIModel slot. A Trial connection binds + publishes clean via MCP." },
-        "tools": { "type": "array", "items": { "type": "string" }, "description": "Server Action names the agent may call as tools (each wired via a parameterless CreateActionHandler)." }
+        "name": {
+          "type": "string",
+          "description": "Agent name; a public Call<name> service action exposes it."
+        },
+        "systemPrompt": {
+          "type": "string",
+          "description": "System prompt, authored as the BuildMessages System message ContentText."
+        },
+        "modelConnection": {
+          "type": "string",
+          "default": "TrialClaudeHaiku4_5",
+          "description": "AIModelConnection asset to bind to the agent's AIModel slot. A Trial connection binds + publishes clean via MCP."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Server Action names the agent may call as tools (each wired via a parameterless CreateActionHandler)."
+        }
       }
     },
     "chart": {
       "type": "object",
-      "required": ["id", "chartType", "entity", "categoryField", "series"],
+      "required": [
+        "id",
+        "chartType",
+        "entity",
+        "categoryField",
+        "series"
+      ],
       "additionalProperties": false,
       "description": "A native OutSystemsCharts widget (v0.3).",
       "properties": {
-        "id": { "type": "string" },
-        "chartType": { "enum": ["Column", "Pie", "Line", "Bar", "Area"] },
-        "entity": { "type": "string", "description": "Source entity (must exist in dataModel)." },
-        "categoryField": { "type": "string", "description": "Attribute rendered on the category axis." },
-        "series": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["valueField"], "additionalProperties": false, "properties": { "name": { "type": "string" }, "valueField": { "type": "string" } } }, "description": "One entry per series; each maps a valueField (attribute) to a DataPoint list." },
-        "sourceAggregate": { "type": "string", "description": "Optional named aggregate to source DataPoints from." }
+        "id": {
+          "type": "string"
+        },
+        "chartType": {
+          "enum": [
+            "Column",
+            "Pie",
+            "Line",
+            "Bar",
+            "Area"
+          ]
+        },
+        "entity": {
+          "type": "string",
+          "description": "Source entity (must exist in dataModel)."
+        },
+        "categoryField": {
+          "type": "string",
+          "description": "Attribute rendered on the category axis."
+        },
+        "series": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "valueField"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "valueField": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "One entry per series; each maps a valueField (attribute) to a DataPoint list."
+        },
+        "sourceAggregate": {
+          "type": "string",
+          "description": "Optional named aggregate to source DataPoints from."
+        }
       }
     },
     "themeTokens": {
@@ -363,38 +1044,268 @@
       "additionalProperties": false,
       "description": "Design tokens compiled into the app theme stylesheet by the `theme` recipe (v0.3).",
       "properties": {
-        "palette": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Named colors, e.g. { \"primary\": \"#5E6AD2\", \"surface\": \"#FFFFFF\" }." },
-        "typography": { "type": "object", "additionalProperties": true, "description": "Font families / sizes / weights." },
-        "spacing": { "type": "object", "additionalProperties": true, "description": "Spacing scale tokens." },
-        "fontFaces": { "type": "string", "description": "Raw @font-face CSS for custom fonts (NOT @import — stripped at publish)." },
-        "css": { "type": "string", "description": "Additional raw CSS appended to the theme stylesheet." }
+        "palette": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Named colors, e.g. { \"primary\": \"#5E6AD2\", \"surface\": \"#FFFFFF\" }."
+        },
+        "typography": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Font families / sizes / weights."
+        },
+        "spacing": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Spacing scale tokens."
+        },
+        "fontFaces": {
+          "type": "string",
+          "description": "Raw @font-face CSS for custom fonts (NOT @import \u2014 stripped at publish)."
+        },
+        "css": {
+          "type": "string",
+          "description": "Additional raw CSS appended to the theme stylesheet."
+        }
       }
     },
     "assertion": {
       "description": "A checkable predicate over live ODC state. These kinds define exactly what harness-verify must implement.",
       "oneOf": [
-        { "type": "object", "additionalProperties": false, "required": ["kind", "entity"], "properties": { "kind": { "const": "entityExists" }, "entity": { "type": "string" } } },
-        { "type": "object", "additionalProperties": false, "required": ["kind", "entity", "attribute", "dataType"], "properties": { "kind": { "const": "attribute" }, "entity": { "type": "string" }, "attribute": { "type": "string" }, "dataType": { "$ref": "#/$defs/odcDataType" }, "mandatory": { "type": "boolean" } } },
-        { "type": "object", "additionalProperties": false, "required": ["kind", "componentId"], "properties": { "kind": { "const": "componentPresent" }, "componentId": { "type": "string" } } },
-        { "type": "object", "additionalProperties": false, "required": ["kind", "componentId", "boundTo"], "properties": { "kind": { "const": "binding" }, "componentId": { "type": "string" }, "boundTo": { "type": "string" } } },
-        { "type": "object", "additionalProperties": false, "required": ["kind", "event", "toScreen"], "properties": { "kind": { "const": "navigates" }, "fromComponent": { "type": "string" }, "event": { "type": "string" }, "toScreen": { "type": "string" } } },
-        { "type": "object", "additionalProperties": false, "required": ["kind", "integration"], "properties": { "kind": { "const": "integrationExists" }, "integration": { "type": "string", "description": "Integration name (must exist in top-level integrations)." } } }
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entity"
+          ],
+          "properties": {
+            "kind": {
+              "const": "entityExists"
+            },
+            "entity": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "entity",
+            "attribute",
+            "dataType"
+          ],
+          "properties": {
+            "kind": {
+              "const": "attribute"
+            },
+            "entity": {
+              "type": "string"
+            },
+            "attribute": {
+              "type": "string"
+            },
+            "dataType": {
+              "$ref": "#/$defs/odcDataType"
+            },
+            "mandatory": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "componentId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "componentPresent"
+            },
+            "componentId": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "componentId",
+            "boundTo"
+          ],
+          "properties": {
+            "kind": {
+              "const": "binding"
+            },
+            "componentId": {
+              "type": "string"
+            },
+            "boundTo": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "event",
+            "toScreen"
+          ],
+          "properties": {
+            "kind": {
+              "const": "navigates"
+            },
+            "fromComponent": {
+              "type": "string"
+            },
+            "event": {
+              "type": "string"
+            },
+            "toScreen": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "integration"
+          ],
+          "properties": {
+            "kind": {
+              "const": "integrationExists"
+            },
+            "integration": {
+              "type": "string",
+              "description": "Integration name (must exist in top-level integrations)."
+            }
+          }
+        }
       ]
+    },
+    "entityIndex": {
+      "type": "object",
+      "required": [
+        "attributes"
+      ],
+      "additionalProperties": false,
+      "description": "Batch B: an index over one or more entity attributes; unique rejects duplicates.",
+      "properties": {
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Attribute name(s) the index covers."
+        },
+        "unique": {
+          "type": "boolean",
+          "default": false,
+          "description": "UNIQUE index (reject duplicate values)."
+        }
+      }
+    },
+    "aggregateJoin": {
+      "type": "object",
+      "required": [
+        "joinEntity",
+        "joinAttr"
+      ],
+      "additionalProperties": false,
+      "description": "Batch B: a JOIN on a LIST screen's aggregate so it shows a related entity's display fields instead of a raw FK Id (NOT for detail screens \u2014 R2 cascade). plan_from_spec emits one `aggregate-join` step after the list-screen.",
+      "properties": {
+        "joinEntity": {
+          "type": "string",
+          "description": "The related entity to join in."
+        },
+        "joinAttr": {
+          "type": "string",
+          "description": "The FK attribute on the list's primary entity that references joinEntity."
+        },
+        "displayFields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Columns to surface, each {entity, field}."
+        }
+      }
+    },
+    "logicUnit": {
+      "type": "object",
+      "required": [
+        "kind",
+        "name"
+      ],
+      "additionalProperties": true,
+      "description": "Batch B: a standalone logic unit. `kind` selects the recipe: serviceAction (public API) / clientAction (browser-side) / sqlAction (SQL node) / globalEvent. Kind-specific fields (inputs/outputs/wraps/statement/returns/purpose/payload) map directly to the recipe params.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "serviceAction",
+            "clientAction",
+            "sqlAction",
+            "globalEvent"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      }
     }
   },
-
   "examples": [
     {
       "specVersion": "0.2",
-      "app": { "name": "home_banking", "description": "Reference build #0.", "roles": ["Customer"] },
+      "app": {
+        "name": "home_banking",
+        "description": "Reference build #0.",
+        "roles": [
+          "Customer"
+        ]
+      },
       "dataModel": {
         "entities": [
           {
             "name": "Account",
             "attributes": [
-              { "name": "Id", "dataType": "Identifier", "isIdentifier": true, "mandatory": true },
-              { "name": "Nickname", "dataType": "Text", "mandatory": true },
-              { "name": "Balance", "dataType": "Currency", "mandatory": true }
+              {
+                "name": "Id",
+                "dataType": "Identifier",
+                "isIdentifier": true,
+                "mandatory": true
+              },
+              {
+                "name": "Nickname",
+                "dataType": "Text",
+                "mandatory": true
+              },
+              {
+                "name": "Balance",
+                "dataType": "Currency",
+                "mandatory": true
+              }
             ]
           }
         ]
@@ -404,20 +1315,57 @@
           "id": "dashboard",
           "name": "Dashboard",
           "route": "/dashboard",
-          "roles": ["Customer"],
+          "roles": [
+            "Customer"
+          ],
           "mockupRef": "spec/mockups/dashboard.png",
           "components": [
-            { "id": "accountsTable", "type": "Table", "boundTo": "Account" },
-            { "id": "toTransferBtn", "type": "Button", "label": "Transfer" }
+            {
+              "id": "accountsTable",
+              "type": "Table",
+              "boundTo": "Account"
+            },
+            {
+              "id": "toTransferBtn",
+              "type": "Button",
+              "label": "Transfer"
+            }
           ],
-          "navigation": [ { "fromComponent": "toTransferBtn", "event": "onClick", "toScreen": "transfer" } ],
+          "navigation": [
+            {
+              "fromComponent": "toTransferBtn",
+              "event": "onClick",
+              "toScreen": "transfer"
+            }
+          ],
           "acceptance": {
             "assertions": [
-              { "kind": "entityExists", "entity": "Account" },
-              { "kind": "attribute", "entity": "Account", "attribute": "Balance", "dataType": "Currency", "mandatory": true },
-              { "kind": "componentPresent", "componentId": "accountsTable" },
-              { "kind": "binding", "componentId": "accountsTable", "boundTo": "Account" },
-              { "kind": "navigates", "fromComponent": "toTransferBtn", "event": "onClick", "toScreen": "transfer" }
+              {
+                "kind": "entityExists",
+                "entity": "Account"
+              },
+              {
+                "kind": "attribute",
+                "entity": "Account",
+                "attribute": "Balance",
+                "dataType": "Currency",
+                "mandatory": true
+              },
+              {
+                "kind": "componentPresent",
+                "componentId": "accountsTable"
+              },
+              {
+                "kind": "binding",
+                "componentId": "accountsTable",
+                "boundTo": "Account"
+              },
+              {
+                "kind": "navigates",
+                "fromComponent": "toTransferBtn",
+                "event": "onClick",
+                "toScreen": "transfer"
+              }
             ]
           }
         }

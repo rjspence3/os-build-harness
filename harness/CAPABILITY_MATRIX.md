@@ -29,11 +29,11 @@
 | Foreign key / reference (mandatory + optional, delete rule) | ~ | ✗ | ✓ | Author the FK in the same turn as its entity; default delete rule = Protect. Proven (Task.ListId). |
 | Static entity (enum) | ✓ (static-entity) | ✓ | ✓ (context_entities) | Manual Long PK + explicit record Ids (auto-number unsupported for static). Recipe emits records w/ explicit Long Ids + create-once guard; plan emits it BEFORE data-model. **Runtime-proven 2026-07-07 (batcha): ContactStatus deployed isStatic+isPublic+Long PK+records[Active,Archived].** Memory: `odc_mcp_local_entity_authoring_gotchas`. |
 | Structure (non-persistent) | ✓ (structure) | ✓ | ✓ (context_structures) | No identifier — a plain typed record shape for action/agent signatures. Plan emits top-level `structures` before data-model. **Runtime-proven 2026-07-07 (batcha): ResultDTO deployed.** |
-| Entity index / unique | ✗ | ✗ | ✗ | — |
+| Entity index / unique | ✓ (entity-index) | ✓ (entity.indexes) | ~ (context_entities) | Add-only index over attribute(s), optionally UNIQUE; do not touch the identifier. *(runtime-exercised build pending)* |
 | Auto entity actions (Create/Update/Get/Delete) | n/a (generated) | n/a | ✓ | Only CreateAction + DeleteAll auto-gen via Model API; Get/Update present at runtime. Memory: `odc_mcp_entity_auto_actions_incomplete`. |
 | Aggregate (filter / sort / max) | ~ | ~ (list-screen) | ✓ | SINGLE-SOURCE aggregates (no FK joins on detail screens — cascades, R2). Filter by input param proven (GetTasksByList). |
-| Aggregate with join | ○ | ✗ | ✗ | Avoid on detail screens (R2); resolve FK display fields separately. |
-| SQL node | ○ | ✗ | ✗ | `ISQLNode.Statement` + `@Param` inputs. Memory: `odc_mcp_sql_node_api`. |
+| Aggregate with join | ✓ (aggregate-join) | ✓ (screen.aggregateJoin) | ~ | Additive join on a LIST screen's aggregate (CreateJoin; wrong ns=CS0234); shows related display fields vs raw FK Id. Avoid on DETAIL screens (R2). *(runtime-exercised build pending)* |
+| SQL node | ✓ (sql-action) | ✓ (spec.logic sqlAction) | ~ (context_actions) | `ISQLNode.Statement` with {Entity}/[Attr]/@Param + declared+bound inputs (LongIntegerToIdentifier cast). Memory: `odc_mcp_sql_node_api`. *(runtime-exercised build pending)* |
 
 ## UI layer
 | Construct | Recipe | Plan | Verify | Thrash-free note |
@@ -57,8 +57,8 @@
 |---|---|---|---|---|
 | Server action (Public flag) | ~ (create-form action phase) | ✓ | ~ | Public=FALSE unless exposed (Public SA fails publish OS-BLD-40409). Typed local + Assign-per-attr; NEVER inline record literal. |
 | Screen action (client) + OnClick wiring | ✓ (create-form combined) | ✓ | ✓ (behavioral) | **Revised seam 3f: action (own turn) → Form+inputs+wire in ONE turn (`combined`).** The bare-widgets-only turn phantomed (R10); the combined shape is proven-persist + keeps the contract data-spec-ids through a phantom+retry. Runtime-proven (cfwall 2026-07-07). |
-| Client action | ✗ | ✗ | ✗ | — |
-| Service action (exposed, cross-app) | ○ | ✗ | ✗ | In-app SA call needs Server Action wrapper (memory `odc_mcp_screen_action_service_action_call`). |
+| Client action | ✓ (client-action) | ✓ (spec.logic clientAction) | ~ | Browser-side reusable logic (no DB round-trip). *(runtime-exercised build pending)* |
+| Service action (exposed, cross-app) | ✓ (service-action) | ✓ (spec.logic serviceAction) | ~ | Public=TRUE (a Server Action can't be Public — OS-BLD-40409); may wrap a server action. In-app SA call still needs a Server Action wrapper (memory `odc_mcp_screen_action_service_action_call`). *(runtime-exercised build pending)* |
 | Flow nodes (If/Switch/Assign/Aggregate/RunAction/ForEach/Raise/RefreshData) | ~ | ~ | ~ | `CreateNode<T>` + `ConnectedBelow`; no `.StartNode` prop (memory). Assign iteration ≠ flow order — identify by var name. |
 | Exception handling (OnException) | ✓ (exception-handler) | ✓ (opt-in `action.guardExceptions`) | ✓ (authored + published) | AllExceptions handler → graceful failure (server: Success=False output; screen: feedback msg). **Runtime-proven 2026-07-07 (batcha): handler authored change_applied=true, published rev 9, happy path intact.** |
 | ServerRequestTimeout on LLM calls | ○ | ✗ | ✗ | Default 10s; set 60+ on ExecuteServerAction nodes calling an LLM (memory). |
@@ -76,7 +76,7 @@
 |---|---|---|---|---|
 | Timer (WhenPublished / scheduled) | ~ (seed-entity) | ~ | ✓ (runtime rows) | `CreateTimer`, `Schedule="WhenPublished"`, `Action=<serverAction>`. Proven (BootstrapData). |
 | Business Process / BPT | ○ | ✗ | ✗ | `CreateBusinessProcess`+`CreateNode<IStartNode/IAutomaticActivityNode/IHumanActivityNode/IDecisionNode>`; auto-activity calls a PUBLIC Service Action (memory). **Publishing a Workflow app with 0 processes corrupts the verify cache — author refs+process in ONE turn.** |
-| Global event | ○ | ✗ | ✗ | `CreateGlobalEvent` (memory). |
+| Global event | ✓ (global-event) | ✓ (spec.logic globalEvent) | ~ | `CreateGlobalEvent` (THROWS in a Workflow-kind app). *(runtime-exercised build pending)* |
 | Sample data / bootstrap (LoadSampleData) | ✓ (seed-entity) | ~ | ✓ | Empty-guarded LoadSampleData + WhenPublished timer. Runs once — idempotent guard, not the run-once flag (R5). |
 | AI Agent (internals: CreateAgent/CallAgent/BuildMessages/AgentTask) | ~ | ✗ | ✓ (publish) | MCP authors a GOOD agent (proven); system prompt lives in BuildMessages literal. **FULLY MCP-BUILDABLE from scratch as of 2026-07-05** — see AIModel binding below. Needs an `agent` recipe + plan step. |
 | AI Model binding (agent AIModel slot ← AIModelConnection) | ~ | ✗ | ✓ (publish) | **WALL LIFTED 2026-07-05 (live-proven).** Bind the agent's AIModel to a **Trial** AIModelConnection (`TrialClaudeHaiku4_5`) in the same Mentor turn that authors the agent; publishes clean (rev 1→2, NO OS-APPS-40028). The old Portal-only step is gone. (Customer/non-Trial connection bind untested — use a Trial model.) |

@@ -632,3 +632,89 @@ def test_create_form_combined_phase_builds_form_and_wires_in_one_turn():
     assert "ALREADY exists" in combined                       # does NOT re-author the action
     assert 'data-spec-id="contactform"' in combined and 'data-spec-id="savecontactbtn"' in combined
     assert "NewContact.Id = NullIdentifier()" in combined and "RefreshData" in combined
+
+
+# ── Phase 4 Batch B: service/client/SQL actions, aggregate join, global event, index ──
+
+def test_service_action_is_public_unlike_server_action():
+    p = pr.render("service-action", {"name": "GetTotal", "wraps": "ComputeTotal",
+                                     "inputs": [{"name": "OrderId", "dataType": "Identifier"}],
+                                     "outputs": [{"name": "Total", "dataType": "Decimal"}]})
+    assert "Public=TRUE" in p and "OS-BLD-40409" in p          # service action IS the exposed unit
+    assert "calls the existing Server Action ComputeTotal" in p
+    assert "OrderId (Identifier)" in p and "Total (Decimal)" in p
+
+
+def test_client_action_is_browser_side():
+    p = pr.render("client-action", {"name": "FormatMoney", "purpose": "format a decimal as currency",
+                                    "inputs": [{"name": "Amount", "dataType": "Decimal"}]})
+    assert "CLIENT-side" in p and "do not touch the database" in p
+    assert "format a decimal as currency" in p
+
+
+def test_sql_action_uses_odc_sql_dialect_and_binds_params():
+    p = pr.render("sql-action", {"name": "Recent", "returns": "Order",
+                                 "statement": "SELECT {Order}.[Id] FROM {Order} WHERE {Order}.[CustomerId] = @Customer",
+                                 "inputs": [{"name": "Customer", "dataType": "Identifier"}]})
+    assert "ISQLNode" in p and "{Order}" in p and "[Id]" in p and "@Customer" in p
+    assert "CreateInputParameter" in p and "LongIntegerToIdentifier" in p
+    assert "output List of Order" in p
+
+
+def test_aggregate_join_uses_correct_namespace_and_is_additive():
+    p = pr.render("aggregate-join", {"screen": "orders", "primary_entity": "Order",
+                                     "join_entity": "Customer", "join_attr": "CustomerId",
+                                     "display_fields": [{"entity": "Customer", "field": "Name"}]})
+    assert "CreateJoin" in p and "CS0234" in p                 # wrong-namespace foot-gun
+    assert "Order.CustomerId = Customer.Id" in p and "Customer.Name" in p
+    assert "Do NOT rebuild the aggregate" in p
+
+
+def test_global_event_forbidden_in_workflow_app():
+    p = pr.render("global-event", {"name": "OrderPlaced", "payload": [{"name": "OrderId", "dataType": "Identifier"}]})
+    assert "CreateGlobalEvent" in p and "THROWS" in p and "OrderId (Identifier)" in p
+
+
+def test_entity_index_unique_and_add_only():
+    uniq = pr.render("entity-index", {"entity": "Order", "attributes": ["Code"], "unique": True})
+    assert "UNIQUE index" in uniq and "Order" in uniq and "Code" in uniq
+    assert "ONLY add the index" in uniq
+    plain = pr.render("entity-index", {"entity": "Order", "attributes": ["CustomerId"]})
+    assert "UNIQUE" not in plain
+
+
+def test_plan_emits_batch_b_constructs_in_order():
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "logic": [{"kind": "serviceAction", "name": "GetX", "outputs": [{"name": "X", "dataType": "Text"}]},
+                      {"kind": "sqlAction", "name": "Q1", "statement": "SELECT 1", "inputs": []},
+                      {"kind": "globalEvent", "name": "Ev1", "payload": []}],
+            "dataModel": {"entities": [
+                {"name": "Customer", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Name", "dataType": "Text"}]},
+                {"name": "Order", "indexes": [{"attributes": ["CustomerId"]}],
+                 "attributes": [
+                     {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                     {"name": "CustomerId", "dataType": "Identifier", "references": "Customer"}]}]},
+            "screens": [{"id": "orders", "name": "Orders", "route": "/orders", "isDefault": True,
+                         "components": [{"id": "tbl", "type": "Table", "boundTo": "Order"}],
+                         "aggregateJoin": {"joinEntity": "Customer", "joinAttr": "CustomerId",
+                                           "displayFields": [{"entity": "Customer", "field": "Name"}]},
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "tbl"}]}}]}
+    recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
+    # entity index emitted right after the data model; aggregate-join right after its list-screen
+    assert recipes[0] == "data-model" and recipes[1] == "entity-index"
+    assert recipes.index("aggregate-join") == recipes.index("list-screen") + 1
+    # logic units emitted last, one per unit
+    assert recipes[-3:] == ["service-action", "sql-action", "global-event"]
+
+
+def test_unknown_logic_kind_is_skipped_not_crashed():
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "logic": [{"kind": "bogusKind", "name": "X"}],
+            "dataModel": {"entities": [{"name": "E", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
+            "screens": [{"id": "s", "name": "S", "components": [{"id": "c", "type": "Container"}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
+    recipes = [s["recipe"] for s in pr.plan_from_spec(spec)]
+    assert "service-action" not in recipes and recipes == ["data-model", "screen"]
