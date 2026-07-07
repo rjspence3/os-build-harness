@@ -69,7 +69,7 @@
 | REST expose (endpoint) | ○ | ✗ | ✓ (live 200) | `CreateIntegration<IRestService>`+CreateAction+HTTPMethod/URLPath; method auto-creates its Start node. Live-proven (memory `odc_mcp_rest_endpoint_authoring`). |
 | REST consume | ✗ | ✗ | ✗ | — |
 | External library (.NET) | ✓ (external-library) | ✓ (spec.externalLibraries) | ~ (extlib_status) | NOT a Mentor turn — the recipe emits the extlib_* lifecycle (upload→poll→publish). Needs .NET 8; GenerationError TERMINAL; publish on non-ReadyForReview = HTTP 500. *(runtime pending — needs a real .NET 8 assembly)* |
-| App reference (multi-app) | ✓ (app-reference) | ✓ (spec.appReferences) | ~ | `addReferenceToElements` then `AddDependency(ParseGlobalKey(producerKey*elementKey))` + RefreshDependencies. **Import EVERY touched entity incl. STATIC — a hidden Id-only stub trips OS-APPS-40028 (in-session recovery: TryParseGlobalKey+AddDependency+RefreshDependencies).** globalKey computable. *(runtime pending — needs a producer app)* |
+| App reference (multi-app) | ✓ (app-reference) | ✓ (spec.appReferences) | ~ (event+SA proven; entity-import not) | `addReferenceToElements` then `AddDependency(ParseGlobalKey(producerKey*elementKey))` + RefreshDependencies. **Partially runtime-proven (wfprobe 2026-07-07): cross-app reference of batchb's Global Event + PUBLIC Service Action resolved cleanly.** Entity-import path (+ the hidden Id-only stub OS-APPS-40028 recovery: TryParseGlobalKey+AddDependency+RefreshDependencies) still runtime-pending. globalKey computable. |
 
 ## Process / automation / AI
 | Construct | Recipe | Plan | Verify | Thrash-free note |
