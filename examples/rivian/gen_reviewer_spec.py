@@ -192,7 +192,11 @@ SCREENS = [
              {"label": "Approval", "state": "pending"}, {"label": "Activation", "state": "pending"}],
          "reviewTeams": ["Procurement", "Quality", "Engineering", "Compliance"],
          "reviewEntity": "ReviewTask", "reviewStateField": "State",
-         "timelineEntity": "AuditEvent", "timelineFields": ["Description", "Actor", "At"]},
+         "timelineEntity": "AuditEvent", "timelineFields": ["Description", "Actor", "At"],
+         "stateActions": [
+             {"label": "Approve Case", "style": "is-primary", "set": {"Status": "APPROVED", "Stage": "Approval"}},
+             {"label": "Send Back", "set": {"Status": "IN REVIEW", "Stage": "Functional Review"}},
+             {"label": "Activate Supplier", "set": {"Status": "ACTIVATED", "Stage": "Activation"}}]},
      "components": [{"id": "caseBody", "type": "Container"}]},
     {"id": "screening", "name": "Compliance Screening",
      "components": [{"id": "scrTable", "type": "Table", "boundTo": "Supplier", "columns": [

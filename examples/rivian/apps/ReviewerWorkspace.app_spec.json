@@ -568,6 +568,30 @@
           "Description",
           "Actor",
           "At"
+        ],
+        "stateActions": [
+          {
+            "label": "Approve Case",
+            "style": "is-primary",
+            "set": {
+              "Status": "APPROVED",
+              "Stage": "Approval"
+            }
+          },
+          {
+            "label": "Send Back",
+            "set": {
+              "Status": "IN REVIEW",
+              "Stage": "Functional Review"
+            }
+          },
+          {
+            "label": "Activate Supplier",
+            "set": {
+              "Status": "ACTIVATED",
+              "Stage": "Activation"
+            }
+          }
         ]
       },
       "components": [

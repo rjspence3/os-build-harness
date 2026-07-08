@@ -536,6 +536,34 @@
             "type": "string"
           },
           "description": "Fields shown per timeline item (default: description + timestamp)."
+        },
+        "stateActions": {
+          "type": "array",
+          "description": "PRODUCT-UI: workflow state-transition buttons on the detail (approve/send-back/activate). Each runs a non-public server action that updates the case record (by the screen's id param) — authored via the `action-button` recipe.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "set"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "style": {
+                "type": "string",
+                "description": "Optional CSS class hook (e.g. 'is-primary')."
+              },
+              "set": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Field=value assignments applied to the record on click."
+              }
+            }
+          }
         }
       }
     },

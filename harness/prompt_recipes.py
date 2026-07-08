@@ -185,6 +185,38 @@ def nav_block(params: dict) -> str:
     )
 
 
+def action_button(params: dict) -> str:
+    """State-transition action buttons on a detail screen — the workflow write-paths (approve /
+    send-back / activate etc.). Each button runs a NON-PUBLIC server action that fetches the record
+    by the screen's id param, assigns the target fields, updates it, and refreshes the screen.
+    params: screen, entity, id_param, buttons:[{label, set:{field: value}, style?}]."""
+    screen = _p(params, "screen", required=True)
+    entity = _p(params, "entity", required=True)
+    id_param = _p(params, "id_param", f"{entity}Id")
+    buttons = _p(params, "buttons", [], required=True)
+    lines = []
+    for b in buttons:
+        sets = "; ".join(f'{k} = "{v}"' for k, v in (b.get("set") or {}).items())
+        style = f' (Style class "{b["style"]}")' if b.get("style") else ""
+        lines.append(
+            f'   - a Button labelled "{b["label"]}"{style} (data-spec-id="{_slug(b["label"])}btn") whose OnClick '
+            f'runs a NON-PUBLIC server action Apply{_slug(b["label"]).title().replace("-","")}: it fetches the '
+            f'{entity} whose Id = the screen\'s {id_param} input (an aggregate max 1, or Get{entity}ById), then '
+            f'Assigns {{ {sets} }} onto a typed local {entity} record and calls {entity}.UpdateAction (the local '
+            f'must carry the Id). After the server action, RefreshData on the screen\'s {entity} aggregate so the '
+            f'change shows without a reload.')
+    body = "\n".join(lines)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"On the {screen} screen, add these state-transition action buttons that mutate the {entity} identified by "
+        f"the screen's {id_param} input parameter. Place them in an action bar near the top of the content.\n{body}\n"
+        f"CRITICAL: each Apply* server action WRITES an entity, so it MUST be NON-PUBLIC (a public entity-writing "
+        f"action trips OS-DPL-50205 at publish). Use {entity}.UpdateAction with a typed local carrying the Id; do "
+        f"NOT use an inline record literal. Verify at RUNTIME that clicking a button changes the {entity}'s field(s) "
+        f"and the change survives a reload. Do not publish."
+    )
+
+
 def place_nav(params: dict) -> str:
     """Place the shared nav Web Block onto every screen — authoring the block (nav_block) is NOT
     enough; each screen must INSTANTIATE it or the sidebar never renders. params: block_name,
@@ -1134,6 +1166,7 @@ RECIPES = {
     "screen": screen,
     "nav-block": nav_block,
     "place-nav": place_nav,
+    "action-button": action_button,
     "list-screen": list_screen,
     "role-gate": role_gate,
     "login": login,
@@ -1567,6 +1600,14 @@ def plan_from_spec(spec: dict) -> list[dict]:
                     p[dst] = det[src]
             steps.append({"recipe": "detail", "why": f"{s['id']} case-detail (workflow made visual)",
                           "params": p})
+            # workflow state-transition buttons that mutate the screen's entity-typed input record
+            if det.get("stateActions"):
+                ip = next((x for x in s.get("inputParameters", []) if x.get("references")), None)
+                if ip:
+                    steps.append({"recipe": "action-button",
+                                  "why": f"{s['id']} workflow state actions",
+                                  "params": {"screen": s["id"], "entity": ip["references"],
+                                             "id_param": ip["name"], "buttons": det["stateActions"]}})
 
     # Seam 3g: an entity rendered in a list but with NO create UI can never be populated at runtime —
     # seed it so its list renders (and any parent-context create on it can be reached by the gate).
