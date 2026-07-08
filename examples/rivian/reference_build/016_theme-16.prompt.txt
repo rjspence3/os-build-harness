@@ -1,0 +1,73 @@
+You are authoring ONE build unit into an OutSystems app via the Model API. Do exactly this unit and nothing else; do not refactor unrelated screens. On every rendered widget you create, set an HTML attribute data-spec-id="<the component id below>" (OutSystems widget Attributes: Name=data-spec-id, Value=the id) so runtime verification can resolve it exactly; for a data table/list also set data-entity="<EntityName>" on the container and data-row-id on each row. Do NOT add any platform Role to a screen unless this unit is explicitly about auth — keep screens Anonymous. Author DIRECTLY and rely on the final model validation — do NOT run read-only introspection loops to enumerate or 'verify' your own work. In particular, do NOT read a `.Name` PROPERTY off Model-API node/widget/type interfaces: MANY do not expose one and it is a compile error (IMobileWidget, IActionNode, IFlowNode, ITypeSignature, IUIFlowNodeSignature, IIdentifierType, IBasicType all lack `.Name`). If you must name a type use GetInterface().Name; otherwise skip the diagnostic and just author. After authoring, run the model validation and report errors/warnings; do NOT publish (the orchestrator publishes).
+
+Apply this theme stylesheet to the app:
+1. theme = eSpace.MobileThemes.First() ?? eSpace.CreateMobileTheme("AppTheme"). Set theme.StyleSheet to the CSS below. The setter's same-call read is stale — verify the stylesheet with a SECOND applyModelApiCode call.
+2. ACTIVATE the theme (a freshly-created theme is wired to NOTHING and renders inert): set it as the app's DefaultMobileTheme and/or the MainFlow.Theme so screens actually use it.
+3. Remember: Style = the class attribute (SetStyle/SetStyleClasses with class names as STRING literals — escape \" ; a bare identifier is read as a variable), CustomStyle = the inline style attribute.
+CSS:
+:root { --bg: #0c0e0c; --panel: #131612; --line: #2a2f27; --line-soft: #20241d; --ink: #edefe8; --muted: #a3a99c; --faint: #6d7266; --yellow: #ffd329; --green: #7fce8f; --amber: #f0b657; --red: #ef7d6b; --blue: #79b0e6; --font-body: 'IBM Plex Sans'; --font-heading: 'Space Grotesk'; --font-mono: 'JetBrains Mono' }
+body,.screen-container{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;}
+h1,h2,h3,h4,h5,.kpi-value{font-family:'Space Grotesk',sans-serif;}
+/* the fixed sidebar sits in this left gutter on every screen */
+body{padding-left:248px;}
+
+/* ── app-shell sidebar (fixed left rail) ── */
+.app-sidebar{position:fixed;left:0;top:0;bottom:0;width:248px;overflow-y:auto;z-index:20;background:#0d0f0c;border-right:1px solid var(--line);padding:18px 14px;box-sizing:border-box;}
+.sidebar-brand{color:var(--yellow);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:.04em;}
+.sidebar-brand small,.sidebar-sub{display:block;color:var(--faint);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-top:4px;}
+.nav-section{color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin:18px 6px 6px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:5px;color:#c9cdc2;text-decoration:none;font-size:14px;border-left:3px solid transparent;}
+.nav-item:hover{background:#161810;}
+.nav-item.is-active{background:#1a1d13;border-left:3px solid var(--yellow);color:var(--ink);font-weight:600;}
+.nav-tag{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.08em;background:#20241d;color:var(--muted);padding:3px 5px;border-radius:3px;}
+.nav-badge{margin-left:auto;background:#20241d;color:var(--muted);border-radius:10px;padding:1px 8px;font-size:11px;}
+.sidebar-user{display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid var(--line);}
+.sidebar-user .avatar{width:32px;height:32px;}
+.online-dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:auto;}
+
+/* ── top bar ── */
+.app-topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line);}
+.breadcrumb{color:var(--faint);font-size:13px;}
+.breadcrumb b{color:var(--ink);}
+.env-chip{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);border:1px solid var(--line);border-radius:3px;padding:3px 8px;}
+
+/* ── status cells ── */
+.chip,.tag,.badge{display:inline-block;padding:3px 8px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;}
+.chip{background:#20241d;color:var(--ink);}
+.chip-approved,.chip-clear,.chip-qualified,.badge-approved,.badge-clear{background:rgba(127,206,143,.15);color:var(--green);}
+.chip-in-review,.chip-pending,.badge-in-review,.badge-pending{background:rgba(240,182,87,.15);color:var(--amber);}
+.chip-overdue,.chip-rejected,.chip-blocked,.badge-overdue,.badge-breached{background:rgba(239,125,107,.15);color:var(--red);}
+.chip-screening,.badge-screening{background:rgba(121,176,230,.15);color:var(--blue);}
+.tag-t1,.tag-critical{background:rgba(255,211,41,.15);color:var(--yellow);}
+.tag-t2,.tag-standard{background:#20241d;color:var(--muted);}
+.cell-id{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;color:var(--muted);}
+.avatar{width:28px;height:28px;border-radius:50%;background:#2a2f27;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:11px;}
+
+/* ── KPI dashboard ── */
+.kpi-row{display:flex;gap:16px;}
+.kpi-card{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:16px;}
+.kpi-icon{color:var(--yellow);font-size:16px;margin-bottom:8px;}
+.kpi-value{font-weight:600;font-size:28px;color:var(--ink);}
+.kpi-label{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+.kpi-trend{color:var(--green);font-size:12px;margin-top:6px;}
+
+/* ── case-detail: stepper + reviews + timeline ── */
+.stepper{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px;}
+.step{padding:8px 12px;border-radius:5px;border:1px solid var(--line);background:var(--panel);color:var(--faint);font-size:13px;}
+.step.is-done{border-color:var(--green);color:var(--green);}
+.step.is-active{border-color:var(--yellow);color:var(--ink);box-shadow:0 0 0 1px var(--yellow) inset;}
+.step.is-pending{opacity:.55;}
+.review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 18px;}
+.review-card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:12px;}
+.review-card h5{margin:0 0 8px;font-size:13px;color:var(--muted);}
+.timeline{border-left:2px solid var(--line);padding-left:14px;margin-top:8px;}
+.timeline-item{margin-bottom:12px;color:var(--muted);font-size:13px;}
+
+/* ── tables + content ── */
+.content{padding:20px;}
+table{border-collapse:collapse;width:100%;}
+th{text-align:left;color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:10px;border-bottom:1px solid var(--line);}
+td{padding:12px 10px;border-bottom:1px solid var(--line-soft);color:#c9cdc2;font-size:14px;}
+tr:hover td{background:#10120f;}
+.btn-primary,.is-primary{background:var(--yellow);color:#161810;border-radius:5px;font-weight:600;}
+Verify at RUNTIME (loaded stylesheets / body background), not in-model. Do not publish.

@@ -22,10 +22,16 @@ PALETTE = {
 # Component CSS painting the harness UI_CLASS_CONTRACT hooks into the Rivian dark look.
 # Palette keys are injected as :root --<key> by the theme recipe; we reference var(--key).
 THEME_CSS = """
-body,.screen-container{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;}
-h1,h2,h3,h4,h5,.kpi-value{font-family:'Space Grotesk',sans-serif;}
+body,.screen-container{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;}
+h1,h2,h3,h4,h5,.kpi-value{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em;}
 /* the fixed sidebar sits in this left gutter on every screen */
 body{padding-left:248px;}
+/* DENSITY/LAYOUT: give screen content real breathing room + a max width so it isn't bare on black */
+.screen-container,[data-screen],.content{padding:28px 34px;max-width:1180px;box-sizing:border-box;}
+h1,h2{font-size:22px;font-weight:600;margin:0 0 4px;}
+h1+*,h2+*{margin-top:0;}
+.screen-container h1,[data-screen] h1{margin-bottom:18px;}
+hr{border:none;border-top:1px solid var(--line);margin:20px 0;}
 
 /* ── app-shell sidebar (fixed left rail) ── */
 .app-sidebar{position:fixed;left:0;top:0;bottom:0;width:248px;overflow-y:auto;z-index:20;background:#0d0f0c;border-right:1px solid var(--line);padding:18px 14px;box-sizing:border-box;}
@@ -88,9 +94,22 @@ tr:hover td{background:#10120f;}
 .btn-primary,.is-primary{background:var(--yellow);color:#161810;border-radius:5px;font-weight:600;}
 """.strip()
 
-# NOTE: web fonts intentionally omitted — @import is stripped at ODC publish (known wall), and
-# JS-injecting a <link> is a later-polish step. The CSS font-family fallbacks (system-ui / monospace)
-# carry v1; the Rivian LOOK is the dark palette + layout + mono tags, which survive the fallback.
+# Real fonts via @font-face (SURVIVES ODC publish — unlike @import, which is stripped). fontsource
+# CDN has stable, predictable URLs, so the designed IBM Plex Sans / Space Grotesk / JetBrains Mono
+# actually load instead of falling back to generic system fonts (the #1 "looks generic" fix).
+def _ff(family, css_name, weights):
+    slug = css_name
+    return "\n".join(
+        f"@font-face{{font-family:'{family}';font-style:normal;font-weight:{w};font-display:swap;"
+        f"src:url('https://cdn.jsdelivr.net/fontsource/fonts/{slug}@latest/latin-{w}-normal.woff2') format('woff2');}}"
+        for w in weights)
+
+
+FONT_FACES = "\n".join([
+    _ff("IBM Plex Sans", "ibm-plex-sans", [400, 500, 600]),
+    _ff("Space Grotesk", "space-grotesk", [500, 600, 700]),
+    _ff("JetBrains Mono", "jetbrains-mono", [500, 600]),
+])
 
 
 def entity(name, attrs, natural=None, sample=None):
@@ -230,7 +249,7 @@ SPEC = {
     "design": {"source": "screenshots", "referenceName": "Rivian Supplier Onboarding",
                "theme": {"palette": PALETTE,
                          "typography": {"body": "'IBM Plex Sans'", "heading": "'Space Grotesk'", "mono": "'JetBrains Mono'"},
-                         "css": THEME_CSS}},
+                         "css": THEME_CSS, "fontFaces": FONT_FACES}},
     "dataModel": {"entities": ENTITIES},
     "navigation": NAV,
     "screens": SCREENS,
