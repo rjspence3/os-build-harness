@@ -55,6 +55,7 @@ class MentorRunResult:
     session_id: Optional[str]
     session_token: Optional[str]
     raw_events: list[dict[str, Any]]
+    error: Optional[str] = None          # terminal error code/message (e.g. per_tenant_cap_reached)
 
 
 class MentorMCP:
@@ -276,6 +277,14 @@ def _build_run_result(
     session_id = result_block.get("mentor_session_id")
     session_token = result_block.get("mentor_session_token")
 
+    # Surface the terminal `error` (e.g. per_tenant_cap_reached) — previously swallowed, so a
+    # capacity/auth failure looked like a bare "failed" and got pointlessly retried.
+    err = last_payload.get("error")
+    if isinstance(err, dict):
+        error = ": ".join(x for x in (err.get("code"), err.get("message")) if x) or None
+    else:
+        error = err or None
+
     return MentorRunResult(
         run_id=run_id,
         status=status,
@@ -285,4 +294,5 @@ def _build_run_result(
         session_id=session_id,
         session_token=session_token,
         raw_events=events,
+        error=error,
     )

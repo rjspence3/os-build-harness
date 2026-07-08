@@ -92,6 +92,16 @@ VERIFY = "verify"   # Mentor+publish say it landed ⇒ CONFIRM via an independen
 
 _DPL_50205 = "OS-DPL-50205"
 
+# Errors a RETRY cannot fix — and where a fresh-session retry makes it WORSE (each retry opens
+# another Mentor session, so retrying a session-cap failure deepens the exhaustion). Halt fast.
+_NONRETRYABLE = ("per_tenant_cap", "session cap", "session_cap", "capacity", "quota",
+                 "rate limit", "rate_limit", "too many requests", "unauthorized", "forbidden")
+
+
+def _nonretryable_reason(result) -> Optional[str]:
+    blob = f"{getattr(result, 'error', '') or ''} {result.summary or ''}".lower()
+    return next((sig for sig in _NONRETRYABLE if sig in blob), None)
+
 
 def classify_terminal(result) -> tuple[str, str]:
     """A terminal MentorRunResult ⇒ (action, reason). HALT on compile errors (deterministic — a
@@ -99,12 +109,16 @@ def classify_terminal(result) -> tuple[str, str]:
     VERIFY on a clean success (never trusted until the independent read confirms it, §Turn step 5)."""
     if result.compile_errors:
         return HALT, "compile errors: " + "; ".join(result.compile_errors[:3])
+    nr = _nonretryable_reason(result)
+    if nr:                              # session-cap / auth / quota — retrying opens MORE sessions
+        return HALT, (f"non-retryable ({nr}): {result.error or result.summary}. Stop opening turns and let "
+                      f"Mentor session slots release (or raise the tenant cap); resume from the StateDB after.")
     if result.status == "running":
         return RETRY, "hang/timeout past budget — cancel + fresh session (R1)"
     if result.status == "cancelled":
         return RETRY, "cancelled session is unpublishable — re-author fresh (R7)"
     if result.status != "succeeded":
-        return RETRY, f"non-terminal-success status={result.status}"
+        return RETRY, f"non-terminal-success status={result.status}" + (f": {result.error}" if result.error else "")
     if not result.session_id or not result.session_token:
         return RETRY, "no session credentials at terminal — cannot publish this unit"
     return VERIFY, "succeeded"

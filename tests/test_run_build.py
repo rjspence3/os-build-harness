@@ -235,6 +235,18 @@ def _result(status="succeeded", compile_errors=(), creds=True):
                            session_token="t" if creds else None, raw_events=[])
 
 
+def test_classify_terminal_halts_fast_on_session_cap():
+    # a session-cap / auth error is non-retryable — retrying opens MORE sessions, so HALT
+    r = _result(status="failed")
+    r.error = "per_tenant_cap_reached: Per-tenant session cap reached cluster-wide"
+    action, reason = classify_terminal(r)
+    assert action == HALT and "non-retryable" in reason and "per_tenant_cap" in reason
+    # a plain failure (no cap/auth signal) still retries, and now surfaces the error
+    r2 = _result(status="failed")
+    r2.error = "transient build blip"
+    assert classify_terminal(r2)[0] == RETRY
+
+
 def test_classify_terminal_actions():
     assert classify_terminal(_result(compile_errors=["OS-DPL-50205"]))[0] == HALT
     assert classify_terminal(_result(status="running"))[0] == RETRY       # hang (R1)
