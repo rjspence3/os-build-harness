@@ -1,0 +1,52 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "SLAOpsAgent",
+    "roles": [
+      "User"
+    ],
+    "description": "AI Agent (reasoning)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "agents": [
+    {
+      "name": "CallSLAOpsAgent",
+      "modelConnection": "TrialClaudeHaiku4_5",
+      "systemPrompt": "You are SLAOpsAgent. Reason over the referenced inputs and return a result."
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "SlaCore",
+      "elements": [
+        {
+          "name": "Application",
+          "kind": "Entity"
+        },
+        {
+          "name": "Requirement",
+          "kind": "Entity"
+        },
+        {
+          "name": "CaseOwner",
+          "kind": "Entity"
+        },
+        {
+          "name": "QueryPipeline",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "SearchPlaybook",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "DraftOutreach",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

@@ -26,6 +26,29 @@ the orchestrator. This is not incidental; it is what makes the loop work:
 Mission-control (the hub repo) **DISPATCHES** a build to such a session (`/dispatch-build <app>`); it
 does NOT hand-drive Mentor turns from the hub, nor orchestrate the build via subagents.
 
+### Autonomous mode — `python -m harness.run_build <spec> --create` (harness = brain AND hands)
+The build-root session above puts the harness in the *brain* seat and a Claude agent in the *hands*
+seat (firing each rendered prompt, reacting per §Recovery). `harness/run_build.py` collapses both into
+the harness: it runs `plan_from_spec`, fires each step through the harness's OWN MCP client
+(`harness/mcp_client.py`, via `mcp-remote`), publishes per unit, and — crucially — **codifies the
+§Recovery rules that only surface at terminal/publish/verify** so it self-heals reproducibly with NO
+agent in the loop (`classify_terminal`/`classify_publish` + `_verify_step`):
+- **R1 hang / R7 wedged** → cancel the hung run, re-author in a FRESH session (each attempt is a fresh
+  `mentor_start`), up to `--max-attempts` (default 3), then halt.
+- **R9 data-model phantom / missing identifier** → an independent `context_entities` read confirms every
+  entity landed WITH an identifier before the step is trusted; a phantom re-authors fresh.
+- **R11 OS-DPL-50205 at publish** → HALT with the diagnosis (deterministic build-rule — a re-publish
+  won't fix it; it's a recipe/spec gap to fix, not a transient).
+- **R12 cancel-rollback / §Turn 5** → nothing is trusted on Mentor's word or a `no_changes_detected`
+  publish; the `_verify_step` read is the truth.
+
+Division of labor (be honest about it): the **recipes PREVENT** the rules that are pre-correctable
+(R2/R3/R4/R5/R6/R8/R10 are baked into `prompt_recipes.py`), and the **driver RECOVERS** the residual
+deterministic failures that only appear after the turn (R1/R7/R9/R11/R12). What the driver canNOT do is
+invent a fix for a recipe/spec gap — those HALT with a diagnosis for a human/recipe change. Use this
+mode for unattended/reproducible builds; use the session mode when you want an agent's adaptive judgment
+on a novel failure. Both are public: a fresh clone has `pip install` (`mcp>=1.0`) + `npx mcp-remote`.
+
 You are the **executor**. The harness is the intelligence. Your job is to run the
 phases below in order, drive each step with the harness-rendered prompts, and react
 to tool output using the deterministic rules here. Every rule below exists because a
@@ -124,6 +147,28 @@ Between phases, verify at runtime; never advance on "publish succeeded" alone.
   inputs + wire in ONE turn** (`phase="combined"`, the proven-persist shape) — the old bare-widgets-only
   turn is retired as the plan default (still available as `phase="widgets"/"wire"` if a screen needs the
   split).
+- **R11 OS-DPL-50205 at publish (0 errors in-session).** "Model features validation failed" is a build-time
+  rule the TrueChange validator does NOT catch — deterministic (3 retries), so it's real, not transient.
+  It is a GENERIC bucket; diagnose the specific element read-only (ask Mentor to compare the failing
+  element to a known-good sibling). Three confirmed causes: (a) a local entity **FK to a cross-app
+  referenced entity** (cross-app entities are consume-only, never FK targets); (b) a **public/exposed
+  action that RAISES a Global Event** (raise-event actions must be non-public); (c) a **public/exposed
+  Server Action that WRITES entities** (Create/Update/Delete/DeleteAll) OR **carries an Entity Record /
+  Entity Identifier parameter in its signature** (live SLATracker 2026-07-07 — a public `SeedData` that
+  wrote, and a public Tool whose input was an Application identifier; fixes: make the writer non-public,
+  and take entity keys as Long Integer + `LongIntegerToIdentifier()` internally). An AI agent's Tools ARE
+  public Service Actions, so they must be read-only with portable signatures — keep seed/write logic in a
+  separate non-public action. **(d) a PUBLIC Web Block whose internal screen action performs a navigation**
+  (`DestinationNode`) — the platform can't guarantee the target screen exists in a consuming app (live
+  Rivian 2026-07-08 — `SidebarNav` was `Public=true` and its `DoLogout` navigated). Fix: author app-shell /
+  internal blocks **Public=false** (they are not shared cross-app). The `nav-block` recipe now bakes this
+  (Public=false + logout link only when the app has a login screen).
+- **R12 Cancel rolls back UNCOMMITTED same-session edits (not just the cancelled turn).** A `mentor_cancel`
+  (e.g. on an over-large seed turn) can discard EARLIER edits from the same session that had not yet
+  committed — even ones whose turn reported `change_applied=true` (live SLATracker: entities from turn 1
+  persisted but the Tool actions from turn 2 were gone after cancelling turn 3). Trust an INDEPENDENT
+  inventory read (context reads / a read-only Mentor walk), never the success signal. Mitigate: keep
+  turns small, publish/commit per logical unit, and re-verify the model after any cancel (ties to R7).
 
 ---
 

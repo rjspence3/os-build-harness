@@ -42,15 +42,65 @@ def test_nav_block_kills_the_link_default_text_defect():
     assert "Inbox" in prompt and "Board" in prompt
 
 
+def test_nav_block_authors_app_shell_with_tags_badges_sections():
+    prompt = pr.render("nav-block", {
+        "block_name": "SidebarNav", "brand": "RIVIAN", "subtitle": "Supplier Onboarding",
+        "user_label": "R. Spence", "user_role": "Compliance",
+        "items": [
+            {"label": "Dashboard", "toScreen": "dashboard", "tag": "DSH", "section": "OPERATIONS"},
+            {"label": "Case Queue", "toScreen": "queue", "tag": "QUE", "badge": "47", "section": "OPERATIONS"},
+            {"label": "Supplier Intake", "toScreen": "intake", "tag": "INT", "section": "SUPPLIER"},
+        ]})
+    assert '"app-sidebar"' in prompt                       # the dark shell hook
+    assert "RIVIAN" in prompt and "Supplier Onboarding" in prompt
+    assert '"nav-tag"' in prompt and '"DSH"' in prompt     # mono tag chip
+    assert '"nav-badge"' in prompt and '"47"' in prompt    # count badge
+    assert '"OPERATIONS"' in prompt and '"SUPPLIER"' in prompt   # section headers
+    assert "is-active" in prompt                           # active-item highlight
+    assert '"sidebar-user"' in prompt and "Compliance" in prompt
+
+
+def test_nav_block_is_non_public_and_logout_is_auth_conditional():
+    """R11(d): a PUBLIC block with an internal navigation trips OS-DPL-50205 at publish. The app-shell
+    nav is internal → author Public=false. A logout link (which navigates) is emitted ONLY when the app
+    has a login screen (logout_to) — a no-auth app gets no logout link (no nav to a non-existent Login)."""
+    no_auth = pr.render("nav-block", {"items": [{"label": "Home", "toScreen": "home"}]})
+    assert "Public=false" in no_auth and "OS-DPL-50205" in no_auth
+    assert "Log out" not in no_auth and "localStorage" not in no_auth   # no auth → no logout, no session read
+    with_auth = pr.render("nav-block", {"items": [{"label": "Home", "toScreen": "home"}], "logout_to": "login"})
+    assert "Log out" in with_auth and "navigates to the login screen" in with_auth
+    assert "Public=false" in with_auth                                  # still internal even with auth
+
+
 def test_list_screen_binds_entity_and_forbids_empty():
     prompt = pr.render("list-screen", {
         "screen": "documents", "entity": "Document",
         "columns": ["Title", "Author", "UpdatedAt"], "detail_screen": "documentDetail"})
     assert "aggregate over the Document entity" in prompt
     assert 'data-entity="Document"' in prompt
-    assert "Title, Author, UpdatedAt" in prompt
+    # plain string columns render as per-column text cells (back-compat)
+    for field in ("Title", "Author", "UpdatedAt"):
+        assert f"`{field}`: a plain text cell showing Document.{field}." in prompt
     assert "documentDetail" in prompt                    # row -> detail nav
     assert "do not leave an empty table" in prompt.lower()
+
+
+def test_list_screen_authors_styled_product_ui_cells():
+    prompt = pr.render("list-screen", {
+        "screen": "queue", "entity": "Case", "component_id": "caseTable",
+        "columns": [
+            {"field": "CaseId", "kind": "identifier"},
+            {"field": "Status", "kind": "chip"},
+            {"field": "Tier", "kind": "tag"},
+            {"field": "Owner", "kind": "avatar"},
+            {"field": "State", "kind": "glyph", "glyphSet": "workflow"},
+        ]})
+    # a status chip is tinted by an EXPRESSION off the row value, not a hardcoded class
+    assert '"chip chip-" + ToLower(Case.Status)' in prompt
+    assert '"tag tag-" + ToLower(Case.Tier)' in prompt
+    assert '"cell-id"' in prompt                         # mono identifier cell
+    assert "avatar" in prompt and "Substr(Case.Owner, 0, 2)" in prompt
+    assert "glyph glyph-workflow" in prompt and "data-value" in prompt
 
 
 def test_role_gate_refuses_platform_role():
@@ -78,6 +128,54 @@ def test_seed_entity_bootstrap_wires_onready(the=None):
     prompt = pr.render("seed-entity", {"entity": "Member", "rows": [{"Name": "Rob"}],
                                        "bootstrap_screens": ["login"]})
     assert "DETERMINISTIC BOOTSTRAP" in prompt and "OnReady" in prompt and "login" in prompt
+
+
+def test_seed_entity_resolves_fk_refs_by_natural_key(the=None):
+    """SEED-A: an FK-heavy child seeds by resolving each parent natural-key reference to a real Id
+    (parents seeded first), never writing a dangling FK."""
+    prompt = pr.render("seed-entity", {"entity": "Contact", "rows": [{"FullName": "Ada", "SupplierId": "acme"}],
+                                        "fk_refs": [{"attr": "SupplierId", "parent": "Supplier", "parent_key": "Code"}]})
+    assert "FOREIGN KEYS" in prompt and "PARENTS BEFORE CHILDREN" in prompt
+    assert "SupplierId → a Supplier matched on Supplier.Code" in prompt
+    assert "NATURAL-KEY reference" in prompt and "take" in prompt and "Id" in prompt
+    assert "SKIP that row" in prompt                                   # no dangling FK
+
+
+def test_plan_seeds_parents_before_children_and_passes_fk_refs():
+    """SEED-A wiring: FK-heavy display entities seed parents-first (topo) and carry fk_refs."""
+    spec = {
+        "specVersion": "0.3", "app": {"name": "fk"},
+        "dataModel": {"entities": [
+            {"name": "Supplier", "sampleData": [{"Code": "acme", "Name": "Acme"}], "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True},
+                {"name": "Code", "dataType": "Text", "naturalKey": True},
+                {"name": "Name", "dataType": "Text"}]},
+            {"name": "Part", "sampleData": [{"Sku": "p1", "SupplierId": "acme"}], "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True},
+                {"name": "Sku", "dataType": "Text"},
+                {"name": "SupplierId", "dataType": "Identifier", "references": "Supplier"}]}]},
+        "screens": [
+            {"id": "parts", "name": "Parts", "isDefault": True, "components": [
+                {"id": "partT", "type": "Table", "boundTo": "Part", "columns": [{"field": "Sku", "kind": "text"}]}]},
+            {"id": "suppliers", "name": "Suppliers", "components": [
+                {"id": "supT", "type": "Table", "boundTo": "Supplier", "columns": [{"field": "Code", "kind": "text"}]}]},
+        ]}
+    steps = pr.plan_from_spec(spec)
+    seeds = [s for s in steps if s["recipe"] == "seed-entity"]
+    order = [s["params"]["entity"] for s in seeds]
+    assert order.index("Supplier") < order.index("Part")              # parent seeded first
+    part = next(s for s in seeds if s["params"]["entity"] == "Part")
+    assert part["params"]["fk_refs"] == [{"attr": "SupplierId", "parent": "Supplier", "parent_key": "Code"}]
+    supplier = next(s for s in seeds if s["params"]["entity"] == "Supplier")
+    assert "fk_refs" not in supplier["params"]                        # no FKs -> no fk_refs
+
+
+def test_seed_topo_order_breaks_cycles_deterministically():
+    spec = {"dataModel": {"entities": [
+        {"name": "A", "attributes": [{"name": "BId", "references": "B"}]},
+        {"name": "B", "attributes": [{"name": "AId", "references": "A"}]}]}}
+    # a real FK cycle still returns both names (alphabetical remainder), never raises
+    assert pr._seed_topo_order(["B", "A"], spec) == ["A", "B"]
 
 
 def test_role_gate_looks_up_by_identity_not_id_and_forbids_identifier_change():
@@ -216,7 +314,8 @@ def test_plan_list_screen_carries_columns_and_detail_nav():
     steps = pr.plan_from_spec(_spec_with_first_class_fields())
     ls = next(s for s in steps if s["recipe"] == "list-screen")
     assert ls["params"]["entity"] == "Doc"
-    assert ls["params"]["columns"] == ["Title"]
+    # columns now carry their render `kind` (structured) so list_screen authors styled cells
+    assert ls["params"]["columns"] == [{"field": "Title", "kind": "text"}]
     assert ls["params"]["detail_screen"] == "docDetail"
 
 
@@ -269,6 +368,42 @@ def test_theme_recipe_activates_and_warns_import_stripped():
     assert "ACTIVATE" in p and "DefaultMobileTheme" in p                 # inert-until-activated
     assert "@import" in p and "stripped at publish" in p
     assert "same-call read is stale" in p and "@font-face" in p
+
+
+def test_dashboard_recipe_authors_kpi_cards_with_live_counts():
+    p = pr.render("dashboard", {"screen": "dash", "columns": 3, "cards": [
+        {"label": "Open Cases", "icon": "folder", "entity": "QualificationCase"},
+        {"label": "Overdue", "icon": "clock", "entity": "ReviewTask", "filter": "IsOverdue", "trend": "+3"},
+        {"label": "Suppliers", "value": "128"}]})
+    assert '"kpi-card"' in p and '"kpi-value"' in p and '"kpi-label"' in p
+    assert "COUNT of QualificationCase" in p                             # live count, not placeholder
+    assert "filtered where IsOverdue" in p and '"kpi-trend"' in p
+    assert '"kpi-icon glyph-folder"' in p
+
+
+def test_detail_recipe_authors_stepper_reviews_and_timeline():
+    p = pr.render("detail", {"screen": "caseDetail",
+        "stages": [{"label": "Intake", "state": "done"}, {"label": "Screening", "state": "active"}, "Approval"],
+        "review_teams": ["Procurement", "Quality", "Engineering"],
+        "review_entity": "ReviewTask", "review_state_field": "State",
+        "timeline_entity": "AuditEvent", "timeline_fields": ["Description", "CreatedAt"]})
+    assert '"stepper"' in p and "step is-done" in p and "step is-active" in p and "step is-pending" in p
+    assert '"review-grid"' in p and '"review-card"' in p and "Procurement" in p
+    assert '"review-status chip chip-" + ToLower(ReviewTask.State)' in p
+    assert '"timeline"' in p and '"timeline-item"' in p and "AuditEvent" in p
+
+
+def test_plan_emits_dashboard_and_detail_from_screen_fields():
+    spec = _spec_with_first_class_fields()
+    spec["screens"][0]["dashboard"] = {"cards": [{"label": "Docs", "entity": "Doc"}]}
+    spec["screens"][2]["detail"] = {"stages": ["Intake", "Approval"],
+                                    "timeline_entity": "AuditEvent"}
+    spec["screens"][2]["detail"] = {"stages": ["Intake", "Approval"], "timelineEntity": "AuditEvent"}
+    steps = pr.plan_from_spec(spec)
+    recipes = [s["recipe"] for s in steps]
+    assert "dashboard" in recipes and "detail" in recipes
+    det = next(s for s in steps if s["recipe"] == "detail")["params"]
+    assert det["timeline_entity"] == "AuditEvent"                        # camelCase -> snake mapping
 
 
 def test_create_form_recipe_encodes_the_write_path_corrections():

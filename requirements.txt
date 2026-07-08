@@ -1,5 +1,7 @@
 pyyaml>=6.0
-mcp>=1.0
+# >=1.28 supports MCP protocol 2025-11-25 (the OutSystems MCP server's current version); older
+# clients fail `initialize` with "Unsupported protocol version". Keep current with the server.
+mcp>=1.28
 jsonschema>=4.20
 Pillow>=10.0
 playwright>=1.49

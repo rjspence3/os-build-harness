@@ -1,0 +1,688 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "RivianReviewerWorkspace",
+    "roles": [
+      "Reviewer"
+    ]
+  },
+  "design": {
+    "source": "screenshots",
+    "referenceName": "Rivian Supplier Onboarding",
+    "theme": {
+      "palette": {
+        "bg": "#0c0e0c",
+        "panel": "#131612",
+        "line": "#2a2f27",
+        "line-soft": "#20241d",
+        "ink": "#edefe8",
+        "muted": "#a3a99c",
+        "faint": "#6d7266",
+        "yellow": "#ffd329",
+        "green": "#7fce8f",
+        "amber": "#f0b657",
+        "red": "#ef7d6b",
+        "blue": "#79b0e6"
+      },
+      "typography": {
+        "body": "'IBM Plex Sans'",
+        "heading": "'Space Grotesk'",
+        "mono": "'JetBrains Mono'"
+      },
+      "css": "body,.screen-container{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;}\nh1,h2,h3,h4,h5,.kpi-value{font-family:'Space Grotesk',sans-serif;}\n/* the fixed sidebar sits in this left gutter on every screen */\nbody{padding-left:248px;}\n\n/* \u2500\u2500 app-shell sidebar (fixed left rail) \u2500\u2500 */\n.app-sidebar{position:fixed;left:0;top:0;bottom:0;width:248px;overflow-y:auto;z-index:20;background:#0d0f0c;border-right:1px solid var(--line);padding:18px 14px;box-sizing:border-box;}\n.sidebar-brand{color:var(--yellow);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:.04em;}\n.sidebar-brand small,.sidebar-sub{display:block;color:var(--faint);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-top:4px;}\n.nav-section{color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin:18px 6px 6px;}\n.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:5px;color:#c9cdc2;text-decoration:none;font-size:14px;border-left:3px solid transparent;}\n.nav-item:hover{background:#161810;}\n.nav-item.is-active{background:#1a1d13;border-left:3px solid var(--yellow);color:var(--ink);font-weight:600;}\n.nav-tag{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.08em;background:#20241d;color:var(--muted);padding:3px 5px;border-radius:3px;}\n.nav-badge{margin-left:auto;background:#20241d;color:var(--muted);border-radius:10px;padding:1px 8px;font-size:11px;}\n.sidebar-user{display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid var(--line);}\n.sidebar-user .avatar{width:32px;height:32px;}\n.online-dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:auto;}\n\n/* \u2500\u2500 top bar \u2500\u2500 */\n.app-topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line);}\n.breadcrumb{color:var(--faint);font-size:13px;}\n.breadcrumb b{color:var(--ink);}\n.env-chip{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);border:1px solid var(--line);border-radius:3px;padding:3px 8px;}\n\n/* \u2500\u2500 status cells \u2500\u2500 */\n.chip,.tag,.badge{display:inline-block;padding:3px 8px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;}\n.chip{background:#20241d;color:var(--ink);}\n.chip-approved,.chip-clear,.chip-qualified,.badge-approved,.badge-clear{background:rgba(127,206,143,.15);color:var(--green);}\n.chip-in-review,.chip-pending,.badge-in-review,.badge-pending{background:rgba(240,182,87,.15);color:var(--amber);}\n.chip-overdue,.chip-rejected,.chip-blocked,.badge-overdue,.badge-breached{background:rgba(239,125,107,.15);color:var(--red);}\n.chip-screening,.badge-screening{background:rgba(121,176,230,.15);color:var(--blue);}\n.tag-t1,.tag-critical{background:rgba(255,211,41,.15);color:var(--yellow);}\n.tag-t2,.tag-standard{background:#20241d;color:var(--muted);}\n.cell-id{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;color:var(--muted);}\n.avatar{width:28px;height:28px;border-radius:50%;background:#2a2f27;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:11px;}\n\n/* \u2500\u2500 KPI dashboard \u2500\u2500 */\n.kpi-row{display:flex;gap:16px;}\n.kpi-card{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:16px;}\n.kpi-icon{color:var(--yellow);font-size:16px;margin-bottom:8px;}\n.kpi-value{font-weight:600;font-size:28px;color:var(--ink);}\n.kpi-label{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}\n.kpi-trend{color:var(--green);font-size:12px;margin-top:6px;}\n\n/* \u2500\u2500 case-detail: stepper + reviews + timeline \u2500\u2500 */\n.stepper{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px;}\n.step{padding:8px 12px;border-radius:5px;border:1px solid var(--line);background:var(--panel);color:var(--faint);font-size:13px;}\n.step.is-done{border-color:var(--green);color:var(--green);}\n.step.is-active{border-color:var(--yellow);color:var(--ink);box-shadow:0 0 0 1px var(--yellow) inset;}\n.step.is-pending{opacity:.55;}\n.review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 18px;}\n.review-card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:12px;}\n.review-card h5{margin:0 0 8px;font-size:13px;color:var(--muted);}\n.timeline{border-left:2px solid var(--line);padding-left:14px;margin-top:8px;}\n.timeline-item{margin-bottom:12px;color:var(--muted);font-size:13px;}\n\n/* \u2500\u2500 tables + content \u2500\u2500 */\n.content{padding:20px;}\ntable{border-collapse:collapse;width:100%;}\nth{text-align:left;color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:10px;border-bottom:1px solid var(--line);}\ntd{padding:12px 10px;border-bottom:1px solid var(--line-soft);color:#c9cdc2;font-size:14px;}\ntr:hover td{background:#10120f;}\n.btn-primary,.is-primary{background:var(--yellow);color:#161810;border-radius:5px;font-weight:600;}"
+    }
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "Supplier",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "naturalKey": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text"
+          },
+          {
+            "name": "Tier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "Country",
+            "dataType": "Text"
+          }
+        ],
+        "sampleData": [
+          {
+            "Code": "ACM",
+            "Name": "Acme Drivetrains",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "QUALIFIED",
+            "Country": "USA"
+          },
+          {
+            "Code": "NVL",
+            "Name": "Novalite Cells",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "IN REVIEW",
+            "Country": "USA"
+          },
+          {
+            "Code": "BRG",
+            "Name": "Bright Composites",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "SCREENING",
+            "Country": "MEX"
+          },
+          {
+            "Code": "TORQ",
+            "Name": "TorqWorks",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "QUALIFIED",
+            "Country": "CAN"
+          }
+        ]
+      },
+      {
+        "name": "Part",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Sku",
+            "dataType": "Text",
+            "naturalKey": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text"
+          },
+          {
+            "name": "SupplierId",
+            "dataType": "Identifier",
+            "references": "Supplier"
+          },
+          {
+            "name": "Category",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ],
+        "sampleData": [
+          {
+            "Sku": "BRK-014",
+            "Name": "Regen Brake Module",
+            "SupplierId": "ACM",
+            "Category": "Braking",
+            "Status": "PENDING"
+          },
+          {
+            "Sku": "CEL-221",
+            "Name": "4695 Cell Pack",
+            "SupplierId": "NVL",
+            "Category": "Battery",
+            "Status": "IN REVIEW"
+          },
+          {
+            "Sku": "PNL-071",
+            "Name": "Frunk Panel",
+            "SupplierId": "BRG",
+            "Category": "Body",
+            "Status": "BLOCKED"
+          }
+        ]
+      },
+      {
+        "name": "QualificationCase",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "CaseNo",
+            "dataType": "Text",
+            "naturalKey": true
+          },
+          {
+            "name": "SupplierId",
+            "dataType": "Identifier",
+            "references": "Supplier"
+          },
+          {
+            "name": "PartId",
+            "dataType": "Identifier",
+            "references": "Part"
+          },
+          {
+            "name": "Tier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "Stage",
+            "dataType": "Text"
+          },
+          {
+            "name": "Score",
+            "dataType": "Text"
+          },
+          {
+            "name": "SlaState",
+            "dataType": "Text"
+          },
+          {
+            "name": "Owner",
+            "dataType": "Text"
+          }
+        ],
+        "sampleData": [
+          {
+            "CaseNo": "Q-1041",
+            "SupplierId": "ACM",
+            "PartId": "BRK-014",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "IN REVIEW",
+            "Stage": "Functional Review",
+            "Score": "92",
+            "SlaState": "OVERDUE",
+            "Owner": "Devin Lang"
+          },
+          {
+            "CaseNo": "Q-1042",
+            "SupplierId": "NVL",
+            "PartId": "CEL-221",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "SCREENING",
+            "Stage": "Screening",
+            "Score": "\u2014",
+            "SlaState": "IN REVIEW",
+            "Owner": "Mara Vance"
+          },
+          {
+            "CaseNo": "Q-1043",
+            "SupplierId": "BRG",
+            "PartId": "PNL-071",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "APPROVED",
+            "Stage": "Activation",
+            "Score": "88",
+            "SlaState": "CLEAR",
+            "Owner": "Sanjay Rao"
+          },
+          {
+            "CaseNo": "Q-1044",
+            "SupplierId": "TORQ",
+            "PartId": "BRK-014",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "IN REVIEW",
+            "Stage": "Qualification",
+            "Score": "76",
+            "SlaState": "IN REVIEW",
+            "Owner": "Devin Lang"
+          }
+        ]
+      },
+      {
+        "name": "ReviewTask",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "CaseId",
+            "dataType": "Identifier",
+            "references": "QualificationCase"
+          },
+          {
+            "name": "Team",
+            "dataType": "Text"
+          },
+          {
+            "name": "State",
+            "dataType": "Text"
+          },
+          {
+            "name": "DueDate",
+            "dataType": "Text"
+          }
+        ],
+        "sampleData": [
+          {
+            "CaseId": "Q-1041",
+            "Team": "Procurement",
+            "State": "APPROVED",
+            "DueDate": "2026-07-02"
+          },
+          {
+            "CaseId": "Q-1041",
+            "Team": "Quality",
+            "State": "IN REVIEW",
+            "DueDate": "2026-07-09"
+          },
+          {
+            "CaseId": "Q-1041",
+            "Team": "Engineering",
+            "State": "IN REVIEW",
+            "DueDate": "2026-07-09"
+          },
+          {
+            "CaseId": "Q-1041",
+            "Team": "Compliance",
+            "State": "PENDING",
+            "DueDate": "2026-07-11"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "CaseId",
+            "dataType": "Identifier",
+            "references": "QualificationCase"
+          },
+          {
+            "name": "Description",
+            "dataType": "Text"
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "Text"
+          }
+        ],
+        "sampleData": [
+          {
+            "CaseId": "Q-1041",
+            "Description": "Case created from supplier intake",
+            "Actor": "System",
+            "At": "Jul 1"
+          },
+          {
+            "CaseId": "Q-1041",
+            "Description": "Denied-party screening cleared",
+            "Actor": "ScreeningAgent",
+            "At": "Jul 1"
+          },
+          {
+            "CaseId": "Q-1041",
+            "Description": "Qualification score 92 recorded",
+            "Actor": "Devin Lang",
+            "At": "Jul 3"
+          },
+          {
+            "CaseId": "Q-1041",
+            "Description": "Procurement review approved",
+            "Actor": "Mara Vance",
+            "At": "Jul 3"
+          }
+        ]
+      }
+    ]
+  },
+  "navigation": {
+    "block": "SidebarNav",
+    "brand": "RIVIAN",
+    "subtitle": "Supplier & Parts Onboarding",
+    "userLabel": "Devin Lang",
+    "userRole": "Tech Lead \u00b7 AIDLC",
+    "items": [
+      {
+        "label": "Dashboard",
+        "toScreen": "dashboard",
+        "tag": "DSH",
+        "section": "OPERATIONS"
+      },
+      {
+        "label": "Case Queue",
+        "toScreen": "queue",
+        "tag": "QUE",
+        "badge": "47",
+        "section": "OPERATIONS"
+      },
+      {
+        "label": "Case Detail",
+        "toScreen": "caseDetail",
+        "tag": "CSE",
+        "section": "OPERATIONS"
+      },
+      {
+        "label": "Compliance Screening",
+        "toScreen": "screening",
+        "tag": "SCR",
+        "badge": "3",
+        "section": "OPERATIONS"
+      },
+      {
+        "label": "Part Release",
+        "toScreen": "release",
+        "tag": "PRT",
+        "badge": "4",
+        "section": "OPERATIONS"
+      },
+      {
+        "label": "Supplier Intake",
+        "toScreen": "intake",
+        "tag": "INT",
+        "section": "SUPPLIER"
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard",
+      "isDefault": true,
+      "dashboard": {
+        "columns": 4,
+        "cards": [
+          {
+            "label": "Open Cases",
+            "icon": "folder",
+            "entity": "QualificationCase"
+          },
+          {
+            "label": "Overdue",
+            "icon": "clock",
+            "entity": "QualificationCase",
+            "filter": "SlaState = \"OVERDUE\"",
+            "trend": "SLA at risk"
+          },
+          {
+            "label": "Suppliers",
+            "icon": "truck",
+            "entity": "Supplier"
+          },
+          {
+            "label": "Parts",
+            "icon": "cube",
+            "entity": "Part"
+          }
+        ]
+      },
+      "components": [
+        {
+          "id": "dashHead",
+          "type": "Container",
+          "label": "Onboarding Overview"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "dashHead"
+          }
+        ]
+      }
+    },
+    {
+      "id": "queue",
+      "name": "Case Queue",
+      "components": [
+        {
+          "id": "caseTable",
+          "type": "Table",
+          "boundTo": "QualificationCase",
+          "columns": [
+            {
+              "field": "CaseNo",
+              "kind": "identifier"
+            },
+            {
+              "field": "Owner",
+              "kind": "avatar"
+            },
+            {
+              "field": "Tier",
+              "kind": "tag"
+            },
+            {
+              "field": "Stage",
+              "kind": "text"
+            },
+            {
+              "field": "Status",
+              "kind": "chip"
+            },
+            {
+              "field": "SlaState",
+              "kind": "badge"
+            }
+          ]
+        }
+      ],
+      "navigation": [
+        {
+          "fromComponent": "caseTable",
+          "event": "onClick",
+          "toScreen": "caseDetail"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "caseTable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "caseDetail",
+      "name": "Case Detail",
+      "inputParameters": [
+        {
+          "name": "CaseId",
+          "dataType": "Identifier",
+          "references": "QualificationCase"
+        }
+      ],
+      "detail": {
+        "stages": [
+          {
+            "label": "Intake",
+            "state": "done"
+          },
+          {
+            "label": "Screening",
+            "state": "done"
+          },
+          {
+            "label": "Qualification",
+            "state": "done"
+          },
+          {
+            "label": "Functional Review",
+            "state": "active"
+          },
+          {
+            "label": "Approval",
+            "state": "pending"
+          },
+          {
+            "label": "Activation",
+            "state": "pending"
+          }
+        ],
+        "reviewTeams": [
+          "Procurement",
+          "Quality",
+          "Engineering",
+          "Compliance"
+        ],
+        "reviewEntity": "ReviewTask",
+        "reviewStateField": "State",
+        "timelineEntity": "AuditEvent",
+        "timelineFields": [
+          "Description",
+          "Actor",
+          "At"
+        ]
+      },
+      "components": [
+        {
+          "id": "caseBody",
+          "type": "Container"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "caseBody"
+          }
+        ]
+      }
+    },
+    {
+      "id": "screening",
+      "name": "Compliance Screening",
+      "components": [
+        {
+          "id": "scrTable",
+          "type": "Table",
+          "boundTo": "Supplier",
+          "columns": [
+            {
+              "field": "Code",
+              "kind": "identifier"
+            },
+            {
+              "field": "Name",
+              "kind": "text"
+            },
+            {
+              "field": "Status",
+              "kind": "chip"
+            },
+            {
+              "field": "Country",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "scrTable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "release",
+      "name": "Part Release",
+      "components": [
+        {
+          "id": "relTable",
+          "type": "Table",
+          "boundTo": "Part",
+          "columns": [
+            {
+              "field": "Sku",
+              "kind": "identifier"
+            },
+            {
+              "field": "Name",
+              "kind": "text"
+            },
+            {
+              "field": "Category",
+              "kind": "text"
+            },
+            {
+              "field": "Status",
+              "kind": "chip"
+            }
+          ]
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "relTable"
+          }
+        ]
+      }
+    },
+    {
+      "id": "intake",
+      "name": "Supplier Intake",
+      "components": [
+        {
+          "id": "intakeTable",
+          "type": "Table",
+          "boundTo": "Supplier",
+          "columns": [
+            {
+              "field": "Code",
+              "kind": "identifier"
+            },
+            {
+              "field": "Name",
+              "kind": "text"
+            },
+            {
+              "field": "Tier",
+              "kind": "tag"
+            },
+            {
+              "field": "Status",
+              "kind": "chip"
+            }
+          ]
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "intakeTable"
+          }
+        ]
+      }
+    }
+  ]
+}

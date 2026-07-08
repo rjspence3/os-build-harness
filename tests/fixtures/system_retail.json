@@ -1,0 +1,119 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "retail_platform",
+    "description": "Schema pressure-test: a THREE-bounded-context system (Catalog, Ordering, Payments) with cross-Core dependencies, two end-user actors, a fulfillment workflow, and a fraud-check agent. Exercises INV5 multi-context + INV4 same-rank Core->Core edges that banking's single-context Core never did. Must be MODULAR.",
+    "apps": [
+      {
+        "name": "DesignSystem",
+        "kind": "Library",
+        "layer": "foundation",
+        "exposes": {}
+      },
+      {
+        "name": "CatalogCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "catalog",
+        "owns": ["Product", "Category", "Inventory"],
+        "exposes": {
+          "serviceActions": ["GetProduct", "AdjustInventory"],
+          "events": ["InventoryLow"],
+          "staticEntities": ["ProductStatus"]
+        },
+        "foreignKeys": [
+          {"from": "Product", "target": "Category"},
+          {"from": "Inventory", "target": "Product"}
+        ]
+      },
+      {
+        "name": "OrderingCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "ordering",
+        "owns": ["Order", "OrderLine", "Cart"],
+        "exposes": {
+          "serviceActions": ["PlaceOrder", "GetOrder"],
+          "events": ["OrderPlaced", "OrderShipped"],
+          "staticEntities": ["OrderStatus"]
+        },
+        "foreignKeys": [
+          {"from": "OrderLine", "target": "Order"}
+        ],
+        "consumes": [
+          {"app": "CatalogCore", "entities": ["Product"], "serviceActions": ["GetProduct", "AdjustInventory"], "staticEntities": ["ProductStatus"]},
+          {"app": "DesignSystem"}
+        ]
+      },
+      {
+        "name": "PaymentsCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "payments",
+        "owns": ["Payment", "Refund"],
+        "exposes": {
+          "serviceActions": ["CapturePayment", "IssueRefund"],
+          "events": ["PaymentCaptured", "PaymentFailed"]
+        },
+        "foreignKeys": [
+          {"from": "Refund", "target": "Payment"}
+        ],
+        "consumes": [
+          {"app": "OrderingCore", "serviceActions": ["GetOrder"], "events": ["OrderPlaced"]}
+        ]
+      },
+      {
+        "name": "Storefront",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "shopper",
+        "exposes": {"screens": ["Home", "ProductDetail", "Cart", "Checkout", "OrderHistory"]},
+        "consumes": [
+          {"app": "CatalogCore", "entities": ["Product", "Category"], "staticEntities": ["ProductStatus"], "serviceActions": ["GetProduct"]},
+          {"app": "OrderingCore", "entities": ["Order"], "serviceActions": ["PlaceOrder", "GetOrder"], "staticEntities": ["OrderStatus"]},
+          {"app": "PaymentsCore", "serviceActions": ["CapturePayment"]},
+          {"app": "DesignSystem"}
+        ]
+      },
+      {
+        "name": "MerchantConsole",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "merchant",
+        "exposes": {"screens": ["Products", "Inventory", "Orders", "Refunds"]},
+        "consumes": [
+          {"app": "CatalogCore", "entities": ["Product", "Category", "Inventory"], "serviceActions": ["AdjustInventory"]},
+          {"app": "OrderingCore", "entities": ["Order", "OrderLine"], "staticEntities": ["OrderStatus"]},
+          {"app": "PaymentsCore", "entities": ["Payment", "Refund"], "serviceActions": ["IssueRefund"]},
+          {"app": "DesignSystem"}
+        ]
+      },
+      {
+        "name": "FraudCheckAgent",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {"serviceActions": ["ScoreOrderRisk"]},
+        "consumes": [
+          {"app": "OrderingCore", "entities": ["Order", "OrderLine"], "serviceActions": ["GetOrder"]}
+        ]
+      },
+      {
+        "name": "FulfillmentWorkflow",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {"triggerEvent": "OrderPlaced", "startProcessOn": "OrderingCore.OrderPlaced"},
+        "activities": [
+          {"name": "FraudCheck", "callsServiceAction": "ScoreOrderRisk"},
+          {"name": "Capture", "callsServiceAction": "CapturePayment"},
+          {"name": "Reserve", "callsServiceAction": "AdjustInventory"}
+        ],
+        "consumes": [
+          {"app": "OrderingCore", "events": ["OrderPlaced"], "serviceActions": ["GetOrder"]},
+          {"app": "PaymentsCore", "serviceActions": ["CapturePayment"]},
+          {"app": "CatalogCore", "serviceActions": ["AdjustInventory"]},
+          {"app": "FraudCheckAgent", "serviceActions": ["ScoreOrderRisk"]}
+        ]
+      }
+    ]
+  }
+}

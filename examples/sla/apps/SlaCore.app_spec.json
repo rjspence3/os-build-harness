@@ -1,0 +1,152 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "SlaCore",
+    "roles": [
+      "User"
+    ],
+    "description": "Core service (sla context)"
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "CaseOwner",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Email",
+            "dataType": "Email",
+            "mandatory": true
+          },
+          {
+            "name": "Team",
+            "dataType": "Text",
+            "mandatory": true
+          }
+        ]
+      },
+      {
+        "name": "Application",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "ApplicantName",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Product",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "FaceAmount",
+            "dataType": "Decimal",
+            "mandatory": true
+          },
+          {
+            "name": "SubmittedOn",
+            "dataType": "Date",
+            "mandatory": true
+          },
+          {
+            "name": "CurrentStage",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Status",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "SLADueOn",
+            "dataType": "Date",
+            "mandatory": true
+          },
+          {
+            "name": "LastActivityOn",
+            "dataType": "Date",
+            "mandatory": true
+          },
+          {
+            "name": "CaseOwnerId",
+            "dataType": "Identifier",
+            "references": "CaseOwner",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Requirement",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "RequirementType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Status",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "RequestedOn",
+            "dataType": "Date",
+            "mandatory": true
+          },
+          {
+            "name": "ReceivedOn",
+            "dataType": "Date"
+          },
+          {
+            "name": "ApplicationId",
+            "dataType": "Identifier",
+            "references": "Application",
+            "mandatory": false
+          }
+        ]
+      }
+    ]
+  },
+  "screens": [],
+  "logic": [
+    {
+      "kind": "serviceAction",
+      "name": "QueryPipeline"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SearchPlaybook"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "DraftOutreach"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SendOutreach"
+    }
+  ]
+}

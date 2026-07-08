@@ -83,6 +83,12 @@ def _crossref_findings(spec: dict) -> list[Finding]:
     entities = {e["name"]: e for e in spec["dataModel"]["entities"]}
     screen_ids = {s["id"] for s in spec["screens"]}
     integration_names = {i["name"] for i in spec.get("integrations", [])}
+    # Entities a CONSUMER app reads from producer apps (Batch C appReferences) are legitimate binding
+    # targets even though they are not OWNED locally — the modular decomposition's consumer screens
+    # bind to referenced Cores. Their attributes aren't in this spec, so attribute-level binding to one
+    # is advisory (can't be disproved here), not a gap.
+    referenced = {el["name"] for ref in spec.get("appReferences", [])
+                  for el in ref.get("elements", []) if el.get("kind", "Entity") in ("Entity", "StaticEntity")}
 
     _check_unique([e["name"] for e in spec["dataModel"]["entities"]], "entity name", gap)
     _check_unique([s["id"] for s in spec["screens"]], "screen id", gap)
@@ -131,7 +137,7 @@ def _crossref_findings(spec: dict) -> list[Finding]:
                     f"screen '{sid}' is adminOnly but app.auth defines no adminAttribute to gate on")
 
         for comp in screen.get("components", []):
-            _check_binding(comp, sid, entities, gap, advise)
+            _check_binding(comp, sid, entities, gap, advise, referenced)
             _check_product_ui(comp, sid, entities, screen_ids, gap)
 
         for edge in screen.get("navigation", []):
@@ -308,19 +314,25 @@ def _capability_findings(spec: dict, entities: dict, screen_ids: set, app_roles:
                    f"entity '{e}' has no FK in or out — fine only if intentional (singleton/lookup)")
 
 
-def _check_binding(comp: dict, sid: str, entities: dict, gap, advise) -> None:
+def _check_binding(comp: dict, sid: str, entities: dict, gap, advise, referenced: set | None = None) -> None:
+    referenced = referenced or set()
     bound = comp.get("boundTo")
     if bound is None:
         return
     if _DOTTED(bound):
         ent, attr = bound.split(".")
-        if ent not in entities:
+        if ent in entities:
+            if attr not in {a["name"] for a in entities[ent]["attributes"]}:
+                gap("component bound to unknown attribute",
+                    f"screen '{sid}' component '{comp['id']}' boundTo '{bound}' — '{ent}' has no attribute '{attr}'")
+        elif ent in referenced:
+            advise("component bound to a referenced (cross-app) entity — attribute not locally checkable",
+                   f"screen '{sid}' component '{comp['id']}' boundTo '{bound}' — '{ent}' is an appReference; "
+                   f"confirm '{attr}' against the producer in the build")
+        else:
             gap("component bound to unknown entity",
                 f"screen '{sid}' component '{comp['id']}' boundTo '{bound}' — entity '{ent}' unknown")
-        elif attr not in {a["name"] for a in entities[ent]["attributes"]}:
-            gap("component bound to unknown attribute",
-                f"screen '{sid}' component '{comp['id']}' boundTo '{bound}' — '{ent}' has no attribute '{attr}'")
-    elif bound in entities:
+    elif bound in entities or bound in referenced:
         return
     else:
         advise("component binding not statically verifiable (assumed aggregate)",

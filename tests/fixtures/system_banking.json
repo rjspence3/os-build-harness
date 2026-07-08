@@ -1,0 +1,125 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "home_banking",
+    "description": "Golden case: the live 8-app banking system, expressed as an ODC 3-Layer topology. Must PASS all six no-monolith invariants.",
+    "apps": [
+      {
+        "name": "HomeBankingCore6",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "banking",
+        "owns": ["Customer", "Account", "LoanRequest", "Document", "Decision", "DecisionLog", "EmailLog"],
+        "exposes": {
+          "serviceActions": ["Validate", "Enrich", "Underwrite", "Communicate", "LogDecision"],
+          "events": ["LoanRequested", "LoanApproved", "LoanDenied"],
+          "staticEntities": ["LoanStatus", "DecisionType"]
+        },
+        "foreignKeys": [
+          {"from": "Account", "target": "Customer"},
+          {"from": "LoanRequest", "target": "Customer"},
+          {"from": "Document", "target": "LoanRequest"},
+          {"from": "Decision", "target": "LoanRequest"},
+          {"from": "DecisionLog", "target": "LoanRequest"},
+          {"from": "EmailLog", "target": "LoanRequest"}
+        ]
+      },
+      {
+        "name": "HomeBankingTheme",
+        "kind": "Library",
+        "layer": "foundation",
+        "exposes": {}
+      },
+      {
+        "name": "HomeBankingPortal6",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "customer",
+        "exposes": {"screens": ["Dashboard", "AccountDetails", "TransferFlow", "LoanRequestForm"]},
+        "consumes": [
+          {"app": "HomeBankingCore6", "entities": ["Customer", "Account", "LoanRequest"],
+           "staticEntities": ["LoanStatus"], "serviceActions": ["LogDecision"]},
+          {"app": "HomeBankingTheme"}
+        ]
+      },
+      {
+        "name": "Backoffice6",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "loan-officer",
+        "exposes": {"screens": ["LoanReviewQueue", "DecisionLog", "CommunicationHistory"]},
+        "consumes": [
+          {"app": "HomeBankingCore6", "entities": ["LoanRequest", "Decision", "DecisionLog", "EmailLog"],
+           "staticEntities": ["LoanStatus", "DecisionType"]},
+          {"app": "HomeBankingTheme"}
+        ]
+      },
+      {
+        "name": "HomeBankingMobile",
+        "kind": "MobileApplication",
+        "layer": "enduser",
+        "actor": "customer-mobile",
+        "exposes": {"screens": ["MobileDashboard", "MobileTransfer"]},
+        "consumes": [
+          {"app": "HomeBankingCore6", "entities": ["Customer", "Account"], "staticEntities": ["LoanStatus"]},
+          {"app": "HomeBankingTheme"}
+        ]
+      },
+      {
+        "name": "IntakeAgent6",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {"serviceActions": ["Validate"]},
+        "consumes": [
+          {"app": "HomeBankingCore6", "entities": ["LoanRequest", "Document"], "serviceActions": ["LogDecision"]}
+        ]
+      },
+      {
+        "name": "EnrichmentAgent6",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {"serviceActions": ["Enrich"]},
+        "consumes": [
+          {"app": "HomeBankingCore6", "entities": ["LoanRequest", "DecisionLog"], "serviceActions": ["LogDecision"]}
+        ]
+      },
+      {
+        "name": "UnderwriterAgent6",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {"serviceActions": ["Underwrite"]},
+        "consumes": [
+          {"app": "HomeBankingCore6", "entities": ["LoanRequest", "DecisionLog"], "serviceActions": ["LogDecision"]}
+        ]
+      },
+      {
+        "name": "CommunicationAgent6",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {"serviceActions": ["Communicate"]},
+        "consumes": [
+          {"app": "HomeBankingCore6", "entities": ["Decision"], "serviceActions": ["LogDecision"]}
+        ]
+      },
+      {
+        "name": "LoanRequestWorkflow6",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {"triggerEvent": "LoanRequested", "startProcessOn": "HomeBankingCore6.LoanRequested"},
+        "activities": [
+          {"name": "Intake", "callsServiceAction": "Validate"},
+          {"name": "Enrich", "callsServiceAction": "Enrich"},
+          {"name": "Underwrite", "callsServiceAction": "Underwrite"},
+          {"name": "Communicate", "callsServiceAction": "Communicate"}
+        ],
+        "consumes": [
+          {"app": "HomeBankingCore6", "events": ["LoanRequested"]},
+          {"app": "IntakeAgent6", "serviceActions": ["Validate"]},
+          {"app": "EnrichmentAgent6", "serviceActions": ["Enrich"]},
+          {"app": "UnderwriterAgent6", "serviceActions": ["Underwrite"]},
+          {"app": "CommunicationAgent6", "serviceActions": ["Communicate"]}
+        ]
+      }
+    ]
+  }
+}

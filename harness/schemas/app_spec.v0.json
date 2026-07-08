@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://nomouthlabs.dev/schemas/app_spec.v0.json",
   "title": "App Build Spec (v0.2)",
-  "$comment": "v0.2 (specVersion 0.2) extends v0.1 from the P1.5 live calibration of home_banking (Core rev 6): attributes gain length/decimals/description/references(FK); entities gain isStatic/records/description; screens gain inputParameters/uiFlow; a minimal optional `integrations` block is added. NOTE: dataType enum stays camelCase (LongInteger etc.) while live ODC reports space-form ('Long Integer') \u2014 harness-verify's mcp executor normalizes; the spec's authored form is camel. The embedded example (examples[0]) is an ILLUSTRATIVE EXCERPT, not a complete spec: a single-screen excerpt whose navigation/navigates reference a 'transfer' screen it never defines, so it passes JSON-Schema validation but FAILS full harness-verify cross-ref. EXPECTED, not a bug. Do NOT 'complete' the example by adding the transfer screen. v0.2 ALSO gained (additive, backward-compatible \u2014 all optional): app-level `navigation` (shared nav authored ONCE as a block, not per screen), app-level `auth` (anonymous | app-local | platform-idp, with userEntity/adminAttribute/testUsers), per-screen `access` (adminOnly/requiresRole/redirectTo), and product-UI component types Modal/Tabs/Avatar/Badge/CommandPalette. Existing specs stay valid.",
+  "$comment": "v0.2 (specVersion 0.2) extends v0.1 from the P1.5 live calibration of home_banking (Core rev 6): attributes gain length/decimals/description/references(FK); entities gain isStatic/records/description; screens gain inputParameters/uiFlow; a minimal optional `integrations` block is added. NOTE: dataType enum stays camelCase (LongInteger etc.) while live ODC reports space-form ('Long Integer') \u2014 harness-verify's mcp executor normalizes; the spec's authored form is camel. The embedded example (examples[0]) is an ILLUSTRATIVE EXCERPT, not a complete spec: a single-screen excerpt whose navigation/navigates reference a 'transfer' screen it never defines, so it passes JSON-Schema validation but FAILS full harness-verify cross-ref. EXPECTED, not a bug. Do NOT 'complete' the example by adding the transfer screen. v0.2 ALSO gained (additive, backward-compatible \u2014 all optional): app-level `navigation` (shared nav authored ONCE as a block, not per screen), app-level `auth` (anonymous | app-local | platform-idp, with userEntity/adminAttribute/testUsers), per-screen `access` (adminOnly/requiresRole/redirectTo), and product-UI component types Modal/Tabs/Avatar/Badge/CommandPalette. Existing specs stay valid. v0.2 ALSO relaxes dataModel.entities and screens to minItems 0 (was 1) so a MODULAR decomposition can emit the two legitimate non-monolith app shapes a self-contained app never needed: a Core SERVICE app (owns entities + logic, no screens) and a CONSUMER app (appReferences + screens, owns no entities). A monolith still validates too (it has both); use harness-arch-gate to reject monoliths. Emitted by harness/expand.py from a system topology; see ARCHITECTURE_DECOMPOSITION.md.",
   "description": "Contract between the spec factory and the build harness. The spec factory EMITS a document conforming to this. harness-verify VALIDATES a spec against this schema BEFORE building (validate-before-assert) \u2014 a spec that fails validation is a spec-gap wall up front, not a mid-build failure \u2014 then checks the built ODC app against each screen's acceptance assertions. Only describe what the ODC MCP can actually build: the dataType and componentType enums ARE the buildable surface.",
   "type": "object",
   "required": [
@@ -53,7 +53,7 @@
           "items": {
             "$ref": "#/$defs/entity"
           },
-          "minItems": 1
+          "minItems": 0
         }
       }
     },
@@ -62,7 +62,7 @@
       "items": {
         "$ref": "#/$defs/screen"
       },
-      "minItems": 1
+      "minItems": 0
     },
     "integrations": {
       "type": "array",
@@ -273,6 +273,10 @@
           "type": "string",
           "description": "Target entity name when this attribute is a foreign key. In live ODC, an FK is an entity-typed Identifier attribute (dataType '<Entity> Identifier') + a foreignKey object; in the spec, set dataType to 'Identifier' and `references` to the target entity. Preferred over the entity-level `relationship` block."
         },
+        "naturalKey": {
+          "type": "boolean",
+          "description": "SEED-A: mark this attribute as the entity's human-readable natural key — the value a child's sampleData row references a parent by (resolved to the real Id at seed time). Defaults to the first Text non-id non-FK attribute."
+        },
         "default": {
           "description": "Optional default value (any JSON scalar)."
         }
@@ -398,6 +402,140 @@
         "aggregateJoin": {
           "$ref": "#/$defs/aggregateJoin",
           "description": "Batch B: an aggregate join on this screen's list (see aggregateJoin def)."
+        },
+        "dashboard": {
+          "$ref": "#/$defs/dashboardSpec",
+          "description": "PRODUCT-UI: a KPI dashboard header on this screen (stat cards) — authored via the `dashboard` recipe."
+        },
+        "detail": {
+          "$ref": "#/$defs/detailSpec",
+          "description": "PRODUCT-UI: make this a rich case-detail screen (stage stepper + parallel reviews + audit timeline) — authored via the `detail` recipe."
+        }
+      }
+    },
+    "dashboardSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cards"
+      ],
+      "description": "PRODUCT-UI: a row of KPI stat cards (icon + big value + label + optional trend).",
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "cards": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string",
+                "description": "CSS-icon glyph key (theme paints .kpi-icon.glyph-<icon>)."
+              },
+              "entity": {
+                "type": "string",
+                "description": "Live COUNT of this entity's records (optionally narrowed by `filter`)."
+              },
+              "aggregate": {
+                "type": "string",
+                "description": "Alias for entity when the count comes from a named aggregate."
+              },
+              "filter": {
+                "type": "string",
+                "description": "Aggregate filter expression for the count."
+              },
+              "value_field": {
+                "type": "string",
+                "description": "Show this field's value instead of a count."
+              },
+              "value": {
+                "type": "string",
+                "description": "A literal display value (last resort; prefer a live count)."
+              },
+              "trend": {
+                "type": "string",
+                "description": "Small trend tag, e.g. '+3 this week'."
+              }
+            }
+          }
+        }
+      }
+    },
+    "detailSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stages"
+      ],
+      "description": "PRODUCT-UI: the case-detail view = the workflow made visual.",
+      "properties": {
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Horizontal stage stepper; each stage is a label or {label,state} (state: done|active|pending).",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "label"
+                ],
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "done",
+                      "active",
+                      "pending"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "reviewTeams": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Parallel-review panel: one status card per team."
+        },
+        "reviewEntity": {
+          "type": "string",
+          "description": "Entity holding per-team review rows for this case (binds the review cards' status)."
+        },
+        "reviewStateField": {
+          "type": "string",
+          "description": "Attribute on reviewEntity rendered as each team's status chip (default 'State')."
+        },
+        "timelineEntity": {
+          "type": "string",
+          "description": "Immutable audit/event entity bound to the activity timeline (newest first)."
+        },
+        "timelineFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Fields shown per timeline item (default: description + timestamp)."
         }
       }
     },
@@ -469,12 +607,13 @@
             "identifier",
             "glyph",
             "chip",
+            "tag",
             "avatar",
             "badge",
             "date",
             "link"
           ],
-          "description": "Cell render kind. glyph/chip/avatar/badge are product-UI cells needing an authoring recipe (CSS/SVG/IImage), not a raw value."
+          "description": "Cell render kind. glyph/chip/tag/avatar/badge are product-UI cells needing an authoring recipe (CSS/SVG/IImage), not a raw value. chip = status pill, tag = classification/tier pill (both value-tinted via the theme)."
         },
         "label": {
           "type": "string"
@@ -548,6 +687,14 @@
         "section": {
           "type": "string",
           "description": "Sidebar section grouping, e.g. 'Workspace' or a team name."
+        },
+        "tag": {
+          "type": "string",
+          "description": "PRODUCT-UI: a short mono tag chip (e.g. 3-letter 'QUE') shown before the label."
+        },
+        "badge": {
+          "type": "string",
+          "description": "PRODUCT-UI: a trailing count badge (e.g. '47') shown after the label."
         }
       }
     },
@@ -575,6 +722,22 @@
         "workspaceLabel": {
           "type": "string",
           "description": "Header/brand label shown at the top of the nav."
+        },
+        "brand": {
+          "type": "string",
+          "description": "PRODUCT-UI: bold brand line in the sidebar header (e.g. 'RIVIAN'); defaults to workspaceLabel."
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "PRODUCT-UI: secondary line under the brand (e.g. 'Supplier & Parts Onboarding')."
+        },
+        "userLabel": {
+          "type": "string",
+          "description": "PRODUCT-UI: user-footer display name (or bound from session)."
+        },
+        "userRole": {
+          "type": "string",
+          "description": "PRODUCT-UI: user-footer role line."
         },
         "items": {
           "type": "array",

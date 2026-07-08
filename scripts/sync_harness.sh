@@ -13,10 +13,20 @@ FILES=(
   harness/capture.py
   harness/verify.py
   harness/gate.py
+  harness/architecture.py
+  harness/decompose.py
+  harness/expand.py
+  harness/run_system.py
+  harness/system_gate.py
   harness/prompt_step.py
+  harness/mcp_client.py
+  harness/build_state.py
+  harness/run_build.py
   harness/launch_build.sh
   harness/schemas/app_spec.v0.json
+  harness/schemas/system_spec.v0.json
   harness/BUILD_LOOP.md
+  harness/ARCHITECTURE_DECOMPOSITION.md
   harness/SEAMS.md
   harness/CAPABILITY_MATRIX.md
   harness/GAP_CLOSURE_PLAN.md
@@ -25,6 +35,16 @@ FILES=(
   tests/test_capture.py
   tests/test_pixel_gate.py
   tests/test_gate.py
+  tests/test_architecture.py
+  tests/test_decompose.py
+  tests/test_expand.py
+  tests/test_run_system.py
+  tests/test_system_gate.py
+  tests/test_run_build.py
+  tests/fixtures/system_banking.json
+  tests/fixtures/system_monolith.json
+  tests/fixtures/system_retail.json
+  tests/fixtures/domain_retail.json
 )
 
 # Default targets: the private lab, and a clean clone if present.
@@ -49,7 +69,7 @@ for T in "${TARGETS[@]}"; do
   # Parity check: run the prompt/capture tests in the target's own venv if it has one.
   if [ -x "$T/.venv/bin/python" ]; then
     echo "   pytest (target venv):"
-    ( cd "$T" && .venv/bin/python -m pytest tests/test_prompt_step.py tests/test_capture.py tests/test_pixel_gate.py tests/test_gate.py -q 2>&1 | tail -1 )
+    ( cd "$T" && .venv/bin/python -m pytest tests/test_prompt_step.py tests/test_capture.py tests/test_pixel_gate.py tests/test_gate.py tests/test_architecture.py tests/test_decompose.py tests/test_expand.py tests/test_run_system.py tests/test_system_gate.py tests/test_run_build.py -q 2>&1 | tail -1 )
   fi
 done
 echo "== done. Review + commit each target repo."

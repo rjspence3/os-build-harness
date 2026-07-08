@@ -1,0 +1,123 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "CaseManagerApp",
+    "roles": [
+      "CaseManager"
+    ],
+    "description": "End-user app for case-manager"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "PipelineList",
+      "name": "PipelineList",
+      "components": [
+        {
+          "id": "PipelineList_application_table",
+          "type": "Table",
+          "boundTo": "Application",
+          "label": "PipelineList"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "PipelineList_application_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "PipelineList_application_table",
+            "boundTo": "Application"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "ApplicationDetail",
+      "name": "ApplicationDetail",
+      "components": [
+        {
+          "id": "ApplicationDetail_requirement_table",
+          "type": "Table",
+          "boundTo": "Requirement",
+          "label": "ApplicationDetail"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ApplicationDetail_requirement_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ApplicationDetail_requirement_table",
+            "boundTo": "Requirement"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SLAAssistant",
+      "name": "SLAAssistant",
+      "components": [
+        {
+          "id": "SLAAssistant_caseowner_table",
+          "type": "Table",
+          "boundTo": "CaseOwner",
+          "label": "SLAAssistant"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "SLAAssistant_caseowner_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "SLAAssistant_caseowner_table",
+            "boundTo": "CaseOwner"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "SlaCore",
+      "elements": [
+        {
+          "name": "Application",
+          "kind": "Entity"
+        },
+        {
+          "name": "Requirement",
+          "kind": "Entity"
+        },
+        {
+          "name": "CaseOwner",
+          "kind": "Entity"
+        },
+        {
+          "name": "SendOutreach",
+          "kind": "ServiceAction"
+        }
+      ]
+    },
+    {
+      "producerApp": "SLAOpsAgent",
+      "elements": [
+        {
+          "name": "CallSLAOpsAgent",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

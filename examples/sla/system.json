@@ -1,0 +1,31 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "new_business_sla",
+    "description": "Hand-tuned from the auto-proposal (hybrid loop): added the in-app agent call edge (CaseManagerApp -> SLAOpsAgent), the Core's read-only Tool service actions, and the human-approved SendOutreach. Reflects the NYL New Business SLA Tracker + Ops Agent specs as a proper Core/Agent/UI split.",
+    "apps": [
+      {"name": "SlaCore", "kind": "WebApplication", "layer": "core", "context": "sla",
+       "owns": ["CaseOwner", "Application", "Requirement"],
+       "exposes": {"serviceActions": ["QueryPipeline", "SearchPlaybook", "DraftOutreach", "SendOutreach"]},
+       "foreignKeys": [{"from": "Application", "target": "CaseOwner"},
+                       {"from": "Requirement", "target": "Application"}]},
+
+      {"name": "SLAOpsAgent", "kind": "AIAgent", "layer": "orchestration",
+       "exposes": {"serviceActions": ["CallSLAOpsAgent"]},
+       "consumes": [{"app": "SlaCore",
+                     "entities": ["Application", "Requirement", "CaseOwner"],
+                     "serviceActions": ["QueryPipeline", "SearchPlaybook", "DraftOutreach"]}]},
+
+      {"name": "CaseManagerApp", "kind": "WebApplication", "layer": "enduser", "actor": "case-manager",
+       "exposes": {"screens": ["PipelineList", "ApplicationDetail", "SLAAssistant"]},
+       "consumes": [{"app": "SlaCore",
+                     "entities": ["Application", "Requirement", "CaseOwner"],
+                     "serviceActions": ["SendOutreach"]},
+                    {"app": "SLAOpsAgent", "serviceActions": ["CallSLAOpsAgent"]}]},
+
+      {"name": "OperationsLeadApp", "kind": "WebApplication", "layer": "enduser", "actor": "operations-lead",
+       "exposes": {"screens": ["SLADashboard"]},
+       "consumes": [{"app": "SlaCore", "entities": ["Application", "Requirement", "CaseOwner"]}]}
+    ]
+  }
+}

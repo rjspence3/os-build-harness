@@ -1,0 +1,35 @@
+{
+  "specVersion": "0.1",
+  "domain": {
+    "name": "new_business_sla",
+    "entities": [
+      {"name": "CaseOwner", "context": "sla",
+       "attributes": [{"name": "Name", "dataType": "Text", "mandatory": true},
+                      {"name": "Email", "dataType": "Email", "mandatory": true},
+                      {"name": "Team", "dataType": "Text", "mandatory": true}]},
+      {"name": "Application", "context": "sla", "references": ["CaseOwner"],
+       "attributes": [{"name": "ApplicantName", "dataType": "Text", "mandatory": true},
+                      {"name": "Product", "dataType": "Text", "mandatory": true},
+                      {"name": "FaceAmount", "dataType": "Decimal", "mandatory": true},
+                      {"name": "SubmittedOn", "dataType": "Date", "mandatory": true},
+                      {"name": "CurrentStage", "dataType": "Text", "mandatory": true},
+                      {"name": "Status", "dataType": "Text", "mandatory": true},
+                      {"name": "SLADueOn", "dataType": "Date", "mandatory": true},
+                      {"name": "LastActivityOn", "dataType": "Date", "mandatory": true}]},
+      {"name": "Requirement", "context": "sla", "references": ["Application"],
+       "attributes": [{"name": "RequirementType", "dataType": "Text", "mandatory": true},
+                      {"name": "Status", "dataType": "Text", "mandatory": true},
+                      {"name": "RequestedOn", "dataType": "Date", "mandatory": true},
+                      {"name": "ReceivedOn", "dataType": "Date"}]}
+    ],
+    "actors": ["case-manager", "operations-lead"],
+    "capabilities": [
+      {"name": "ViewPipeline", "actor": "case-manager", "reads": ["Application", "Requirement", "CaseOwner"]},
+      {"name": "ApplicationDetail", "actor": "case-manager", "reads": ["Application", "Requirement", "CaseOwner"]},
+      {"name": "MonitorSLA", "actor": "operations-lead", "reads": ["Application", "Requirement", "CaseOwner"]},
+      {"name": "SLAAssistant", "actor": "case-manager", "reads": ["Application", "Requirement", "CaseOwner"],
+       "steps": [{"name": "Reason", "ai": "SLAOpsAgent", "reads": ["Application", "Requirement", "CaseOwner"]}]}
+    ],
+    "libraries": []
+  }
+}

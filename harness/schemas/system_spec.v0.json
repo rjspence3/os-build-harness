@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "system_spec.v0.json",
+  "title": "System topology (multi-app ODC architecture)",
+  "description": "One document describing how a SYSTEM decomposes into apps + libraries across the ODC 3-Layer Canvas. The architect pass PROPOSES this (from a flat domain spec); harness-arch-gate (architecture.py) DISPOSES — a monolith fails the 6 no-monolith invariants. Each app here expands into its own app_spec.v0 document for the per-app build. See ARCHITECTURE_DECOMPOSITION.md.",
+  "type": "object",
+  "required": ["specVersion", "system"],
+  "additionalProperties": false,
+  "properties": {
+    "specVersion": {"type": "string", "description": "system-spec schema version, e.g. '0.1'"},
+    "system": {
+      "type": "object",
+      "required": ["name", "apps"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "apps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/appNode"}
+        }
+      }
+    }
+  },
+  "definitions": {
+    "appNode": {
+      "type": "object",
+      "required": ["name", "layer"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "layer": {
+          "type": "string",
+          "enum": ["foundation", "core", "orchestration", "enduser"],
+          "description": "ODC 3-Layer Canvas layer. Only 'core' may own persistent entities."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["WebApplication", "Mobile", "MobileApplication", "BusinessProcess", "AIAgent",
+                   "Library", "ReactiveLibrary", "MobileLibrary", "Service", "ExternalLibrary"],
+          "description": "ODC asset kind (the app_create kind). Must be consistent with the layer."
+        },
+        "context": {
+          "type": ["string", "array"],
+          "items": {"type": "string"},
+          "description": "Bounded context this app owns (data-owning apps only). Exactly one; a context maps 1:1 to one Core app."
+        },
+        "actor": {"type": "string", "description": "For enduser apps: the persona/role this app serves."},
+        "owns": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Names of persistent entities this app OWNS. Only 'core' apps may be non-empty."
+        },
+        "exposes": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The app's public contract other apps may consume.",
+          "properties": {
+            "serviceActions": {"type": "array", "items": {"type": "string"}},
+            "events": {"type": "array", "items": {"type": "string"}},
+            "staticEntities": {"type": "array", "items": {"type": "string"}},
+            "screens": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "consumes": {
+          "type": "array",
+          "description": "Cross-app dependencies. Each entry names a producer app and the elements consumed from it (entities are READ-ONLY; writes go via serviceActions).",
+          "items": {
+            "type": "object",
+            "required": ["app"],
+            "additionalProperties": false,
+            "properties": {
+              "app": {"type": "string"},
+              "entities": {"type": "array", "items": {"type": "string"}},
+              "staticEntities": {"type": "array", "items": {"type": "string"}},
+              "serviceActions": {"type": "array", "items": {"type": "string"}},
+              "events": {"type": "array", "items": {"type": "string"}},
+              "screens": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "foreignKeys": {
+          "type": "array",
+          "description": "Declared FK edges from this app's local entities. Every target MUST be an entity this app OWNS (OS-DPL-50205: a local entity cannot FK a cross-app entity).",
+          "items": {
+            "type": "object",
+            "required": ["from", "target"],
+            "additionalProperties": false,
+            "properties": {
+              "from": {"type": "string", "description": "the local entity holding the FK"},
+              "target": {"type": "string", "description": "the referenced entity — must be owned by this app"}
+            }
+          }
+        },
+        "raisesEvents": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Events this app RAISES. enduser apps must not raise events (orchestration concern)."
+        },
+        "process": {
+          "type": "object",
+          "description": "For orchestration BusinessProcess apps: the BPT process definition (mirrors app_spec.processes).",
+          "additionalProperties": true
+        },
+        "activities": {
+          "type": "array",
+          "description": "Convenience: BPT activities, if declared inline. Presence forces layer=orchestration.",
+          "items": {"type": "object", "additionalProperties": true}
+        }
+      }
+    }
+  }
+}

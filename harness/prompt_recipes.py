@@ -40,35 +40,175 @@ def _p(params: dict, key: str, default=None, required: bool = False):
     return params.get(key, default)
 
 
+# ── product-UI CSS class contract ────────────────────────────────────────────
+# The rich recipes below author widgets that carry these STABLE class hooks; the
+# app theme stylesheet (design.theme.css, applied via the `theme` recipe) styles
+# them. This is the seam that turned "bare Table" into clone-grade UI: the recipe
+# emits the STRUCTURE + class hook, the theme paints it. Keep this list and the
+# classes the recipes emit in lockstep — a theme author targets exactly these.
+#
+#   App shell      .app-sidebar .nav-section .nav-item .nav-item.is-active
+#                  .nav-tag (mono 3-letter chip) .nav-badge (count) .sidebar-brand
+#                  .sidebar-user  .app-topbar .breadcrumb .env-chip
+#   Data cells     .cell-id (mono identifier) .chip .chip-<value> (status pill)
+#                  .badge .badge-<value> (state badge) .tag .tag-<value> (tier tag)
+#                  .avatar (round initials) .glyph .glyph-<set> (CSS-icon, data-value)
+#   Dashboard      .kpi-card .kpi-icon .kpi-value .kpi-label .kpi-trend
+#   Case detail    .stepper .step .step.is-done .step.is-active .step.is-pending
+#                  .review-grid .review-card .review-status
+#                  .timeline .timeline-item
+# Value-suffixed classes (chip-<value>, badge-<value>, glyph[data-value]) are set
+# from an EXPRESSION (Style = "chip chip-" + Lower(Entity.Attr)) so the color
+# tracks the row's data — the theme defines the per-value colors.
+UI_CLASS_CONTRACT = (
+    "app-sidebar nav-section nav-item is-active nav-tag nav-badge sidebar-brand sidebar-user "
+    "app-topbar breadcrumb env-chip cell-id chip badge tag avatar glyph "
+    "kpi-card kpi-icon kpi-value kpi-label kpi-trend "
+    "stepper step is-done is-active is-pending review-grid review-card review-status "
+    "timeline timeline-item"
+).split()
+
+
+def _slug(text: str) -> str:
+    """Lowercase a static value into a CSS-class-safe suffix (for literal chip/badge values)."""
+    return "".join(c if c.isalnum() else "-" for c in str(text).lower()).strip("-")
+
+
+def _cell_instruction(col, entity: str) -> str:
+    """One column's cell-authoring instruction for the list_screen table, keyed on the
+    columnSpec `kind`. A plain string column (back-compat) renders as a text cell.
+
+    chip/badge/tag/glyph/avatar/identifier are PRODUCT-UI cells: the recipe authors the
+    STRUCTURE + a class hook (see UI_CLASS_CONTRACT) and the theme paints it. Value-tinted
+    classes are built with an Expression so the color tracks the row value."""
+    if isinstance(col, str):
+        return f'`{col}`: a plain text cell showing {entity}.{col}.'
+    field = col.get("field", "")
+    kind = col.get("kind", "text")
+    label = col.get("label") or field
+    q = f"{entity}.{field}" if "." not in field else field
+    if kind in ("text", "date"):
+        fmt = " (format the Date/Date Time for display)" if kind == "date" else ""
+        return f'`{label}`: a plain Expression cell showing {q}{fmt}.'
+    if kind == "identifier":
+        return (f'`{label}`: a monospace id cell — an Expression showing {q} inside a Container '
+                f'whose Style class is "cell-id".')
+    if kind in ("chip", "badge", "tag"):
+        return (f'`{label}`: a status {kind} — an Expression showing {q} INSIDE a Container whose '
+                f'Style is the EXPRESSION "{kind} {kind}-" + ToLower({q}) (so ".{kind}" makes the '
+                f'rounded pill and ".{kind}-<value>" tints it per the theme). Do NOT hardcode one class.')
+    if kind == "avatar":
+        return (f'`{label}`: a round avatar cell — a Container Style class "avatar" containing an '
+                f'Expression = ToUpper(Substr({q}, 0, 2)) (the initials). The theme rounds + colors it.')
+    if kind == "glyph":
+        gset = col.get("glyphSet", "state")
+        return (f'`{label}`: a CSS-icon cell — a Container whose Style class is "glyph glyph-{gset}" '
+                f'and which carries an HTML attribute data-value = {q} (the theme renders the icon via '
+                f'.glyph-{gset}[data-value=...]::before — do NOT put raw HTML/SVG in a widget, it is '
+                f'HTML-encoded at runtime).')
+    if kind == "link":
+        return f'`{label}`: a Link cell showing {q} that navigates to the row detail passing the Id.'
+    return f'`{label}`: a plain Expression cell showing {q}.'
+
+
 # ── recipes ──────────────────────────────────────────────────────────────────
 def nav_block(params: dict) -> str:
-    """Author the app's persistent navigation ONCE as a reusable Web Block.
-    params: block_name, items:[{label,toScreen}], logout_to(login screen), workspace_label?"""
+    """Author the app's persistent app-shell navigation ONCE as a reusable Web Block — the
+    product-UI sidebar (brand header, optional section groups, per-item mono tag chip + count
+    badge, active-item highlight, user footer), not a bare link list. The theme paints the
+    .app-sidebar/.nav-item/.nav-tag/.nav-badge classes (see UI_CLASS_CONTRACT).
+    params: block_name, items:[{label,toScreen,tag?,badge?,section?}], logout_to(login screen),
+    workspace_label?, brand?, subtitle?, user_label?, user_role?"""
     block = _p(params, "block_name", "SidebarNav")
     items = _p(params, "items", [], required=True)
-    logout_to = _p(params, "logout_to", "Login")
+    logout_to = _p(params, "logout_to")          # None ⇒ no auth ⇒ no logout link (avoid a nav to a
+    #                                              non-existent Login screen; see below)
     workspace = _p(params, "workspace_label", "")
-    lines = "\n".join(f"   - a link labelled exactly \"{i['label']}\" navigating to the {i['toScreen']} screen"
-                      for i in items)
-    ws = f" a workspace header showing \"{workspace}\"," if workspace else ""
+    brand = _p(params, "brand", workspace or "App")
+    subtitle = _p(params, "subtitle", "")
+    user_label = _p(params, "user_label", "")
+    user_role = _p(params, "user_role", "")
+    # Group items by their optional `section` (preserving first-seen order); ungrouped items
+    # fall under an implicit lead section so the render loop is uniform.
+    sections: list[tuple[str, list]] = []
+    by_name: dict[str, list] = {}
+    for it in items:
+        sec = it.get("section", "") if isinstance(it, dict) else ""
+        if sec not in by_name:
+            by_name[sec] = []
+            sections.append((sec, by_name[sec]))
+        by_name[sec].append(it)
+    blocks = []
+    for sec, sec_items in sections:
+        lines = []
+        for i in sec_items:
+            tag = f' with a leading mono tag chip (Container Style class "nav-tag") showing "{i["tag"]}"' if i.get("tag") else ""
+            badge = f' and a trailing count badge (Container Style class "nav-badge") showing "{i["badge"]}"' if i.get("badge") not in (None, "") else ""
+            lines.append(
+                f'   - a nav item (Container Style class "nav-item", data-spec-id="{i["toScreen"]}") whose link is '
+                f'labelled EXACTLY "{i["label"]}" and navigates to the {i["toScreen"]} screen{tag}{badge}. When the '
+                f'current screen IS {i["toScreen"]}, add the "is-active" class to that item.')
+        header = (f'   - a section header (Style class "nav-section") "{sec}"\n' if sec else "")
+        blocks.append(header + "\n".join(lines))
+    body = "\n".join(blocks)
+    role_clause = f' and role "{user_role}"' if user_role else ""
+    user_name = user_label or "the current user"
+    # The localStorage identity read only makes sense in an app-local-auth app (logout_to set).
+    read_name = " (read the name from localStorage ln_current_name)" if logout_to else ""
+    user_txt = (
+        f'   - a footer user block (Container Style class "sidebar-user") showing '
+        f'"{user_name}"{role_clause}{read_name}, with an online dot.\n'
+        if (user_label or user_role) else "")
+    logout_txt = (
+        f'   - a "Log out" link (Style class "nav-item") that clears the session (localStorage keys '
+        f"ln_current_user + ln_current_name) and navigates to the {logout_to} screen.\n"
+        if logout_to else "")
+    sub_txt = f' and a subtitle "{subtitle}"' if subtitle else ""
     return (
         f"{_PREAMBLE}\n\n"
-        f"Create ONE reusable Web Block named {block} that renders the app's persistent left navigation, so "
-        f"every screen references this single block instead of re-authoring the nav. The block contains, in order:"
-        f"{ws}\n{lines}\n"
-        f"   - a \"Log out\" link that clears the session (localStorage keys ln_current_user + ln_current_name) "
-        f"and navigates to the {logout_to} screen.\n"
+        f"Create ONE reusable Web Block named {block} that renders the app's persistent left app-shell sidebar, so "
+        f"every screen references this single block instead of re-authoring the nav. This is an INTERNAL app-shell "
+        f"block — author it NON-PUBLIC (Public=false; a new block may default to Public=true). CRITICAL: a PUBLIC "
+        f"Web Block whose internal screen action performs a navigation (a DestinationNode, e.g. the logout) trips "
+        f"OS-DPL-50205 'Model features validation failed' at PUBLISH (0 errors in-session) — the platform can't "
+        f"guarantee the target screen exists in a consuming app. Keep this block Public=false. Give the block's root "
+        f'Container the Style class "app-sidebar" (the theme paints the dark shell). The block contains, in order:\n'
+        f'   - a brand header (Style class "sidebar-brand") showing "{brand}"{sub_txt}.\n'
+        f"{body}\n"
+        f"{user_txt}"
+        f"{logout_txt}"
         f"CRITICAL: each link must be a single link whose displayed text is EXACTLY its label and nothing else — "
         f"OutSystems gives a new Link widget a default literal \"link\" Text widget; DELETE that literal \"link\" "
         f"ITextWidget from each link so it does not render \"linkInbox\"-style prefixes (a scan of Expression "
         f"children alone looks clean and misses it — find and remove the literal-text widget). Set "
-        f"data-spec-id on each link = its toScreen id. Do not fan this nav out per screen; this block IS the nav."
+        f"data-spec-id on each item = its toScreen id. Do not fan this nav out per screen; this block IS the nav."
     )
 
 
+def place_nav(params: dict) -> str:
+    """Place the shared nav Web Block onto every screen — authoring the block (nav_block) is NOT
+    enough; each screen must INSTANTIATE it or the sidebar never renders. params: block_name,
+    screens:[screen id/name]. One block instance per screen, as the first widget."""
+    block = _p(params, "block_name", "SidebarNav")
+    screens = _p(params, "screens", [], required=True)
+    slist = ", ".join(screens)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"The reusable Web Block {block} already EXISTS but is not placed on any screen, so the app-shell "
+        f"sidebar does not render. On EACH of these screens — {slist} — add exactly ONE instance of the "
+        f"{block} block as the FIRST widget of the screen's content: CreateWidget<IMobileBlockInstanceWidget> "
+        f"with SourceBlock set to the {block} web block (resolve it via the app's Web Blocks). Do NOT "
+        f"re-author the block itself, and never add it more than once per screen. Its root Container has the "
+        f'"app-sidebar" class; the theme positions it as a fixed left rail (the screen body is padded left to '
+        f"make room). After authoring, confirm each listed screen has exactly one {block} instance, then run "
+        f"validation. Do not publish.")
+
+
 def list_screen(params: dict) -> str:
-    """Bind a screen's data list/table to an entity so it renders real rows.
-    params: screen, entity, columns:[str], sort_by?, join?, detail_screen?, component_id?"""
+    """Bind a screen's data list/table to an entity so it renders real rows — with PRODUCT-UI
+    styled cells (status chips, tier tags, avatars, CSS-icons, mono ids), not a bare grid.
+    params: screen, entity, columns:[str | {field,kind,label,glyphSet}], sort_by?, join?,
+    detail_screen?, component_id?. String columns still render as plain text cells (back-compat)."""
     screen = _p(params, "screen", required=True)
     entity = _p(params, "entity", required=True)
     columns = _p(params, "columns", [], required=True)
@@ -78,10 +218,16 @@ def list_screen(params: dict) -> str:
     detail = _p(params, "detail_screen")
     nav_label = _p(params, "nav_label")            # the spec's declared row-nav button label (seam 3e)
     nav_cid = _p(params, "nav_component_id")
-    cols = ", ".join(columns)
     sort_txt = f" sorted by {sort_by}" if sort_by else ""
     join_txt = (f" Join to {join} so its display fields resolve (use an explicit join in the aggregate, "
                 f"never a second data source).") if join else ""
+    # Rich per-column cell instructions (chip/badge/avatar/glyph/id) — the case-queue look.
+    styled = any(isinstance(c, dict) and c.get("kind") not in (None, "text") for c in columns)
+    cell_lines = "\n".join(f"   - {_cell_instruction(c, entity)}" for c in columns)
+    cells_intro = (
+        " Render EACH column as its specified product-UI cell (not a raw value grid) — the theme's "
+        "stylesheet paints the chip/badge/tag/avatar/glyph classes below into the real look:"
+        if styled else " with these columns:")
     if detail and nav_label:
         # emit the spec's explicit nav component so the runtime gate's parent-nav finds it by label
         detail_txt = (f' Each row must have a Link with the text "{nav_label}" (data-spec-id="'
@@ -95,9 +241,11 @@ def list_screen(params: dict) -> str:
         f"{_PREAMBLE}\n\n"
         f"On the {screen} screen, add a screen aggregate over the {entity} entity{sort_txt} (pin the aggregate "
         f"name so it is not auto-renamed).{join_txt} Add a Table with component id {cid} (set data-spec-id="
-        f"\"{cid}\" and data-entity=\"{entity}\" on it) bound to that aggregate, with columns: {cols}. Put it in "
-        f"the screen's content area (to the right of the nav).{detail_txt} The table must render the real rows — "
-        f"if it comes up empty, the aggregate binding is wrong; fix it, do not leave an empty table."
+        f"\"{cid}\" and data-entity=\"{entity}\" on it) bound to that aggregate. Put it in the screen's content "
+        f"area (to the right of the nav).{cells_intro}\n{cell_lines}\n"
+        f"Set data-spec-id=\"<field>cell\" on each styled cell container so runtime verification resolves it."
+        f"{detail_txt} The table must render the real rows — if it comes up empty, the aggregate binding is "
+        f"wrong; fix it, do not leave an empty table."
     )
 
 
@@ -160,14 +308,39 @@ def login(params: dict) -> str:
 
 def seed_entity(params: dict) -> str:
     """Seed sample rows for an entity via a LoadSampleData orchestrator — deterministically.
-    params: entity, rows:[{...}], fk_notes?, bootstrap_screens?:[screen] (entry screens whose OnReady
-    also calls LoadSampleData, so seeding does NOT depend on the flaky WhenPublished timer — seam B)."""
+    params: entity, rows:[{...}], fk_refs?:[{attr,parent,parent_key}] (SEED-A: FK attrs whose row
+    values are natural-key references to already-seeded parents, resolved to real Ids at seed time),
+    fk_notes?, bootstrap_screens?:[screen] (entry screens whose OnReady also calls LoadSampleData, so
+    seeding does NOT depend on the flaky WhenPublished timer — seam B).
+
+    KEEP THE ROW COUNT LEAN. Each row is authored as a CreateAction + one Assign PER attribute — a
+    node-heavy Model-API build. A single seed action with ~20+ multi-attribute rows (≈200 nodes) chokes
+    authoring: it can run 10-15+ min and risks an upstream turn failure (live SLATracker 2026-07-07: a
+    22-record seed was cancelled at 14 min; a lean 11-record set authored fine). Cap at ~10-12 rows per
+    turn; for a bigger dataset, split across per-entity turns (owners → applications → children, so FKs
+    resolve) rather than one mega-action. A seed action WRITES entities, so it must be NON-public
+    (a public entity-writing action trips OS-DPL-50205 — see service_action)."""
     entity = _p(params, "entity", required=True)
     rows = _p(params, "rows", [], required=True)
     fk_notes = _p(params, "fk_notes", "")
+    fk_refs = _p(params, "fk_refs", []) or []
     bootstrap = _p(params, "bootstrap_screens", []) or []
     rows_txt = "\n".join(f"   - {json_1line(r)}" for r in rows)
-    fk_txt = f" {fk_notes}" if fk_notes else ""
+    fk_parts = []
+    if fk_refs:
+        mapping = "; ".join(
+            f"{r['attr']} → a {r['parent']} matched on {r['parent']}.{r['parent_key']}" for r in fk_refs)
+        fk_parts.append(
+            f"FOREIGN KEYS (seed PARENTS BEFORE CHILDREN — this app's LoadSampleData seeds in dependency "
+            f"order, so {entity}'s parents are already seeded above): in each {entity} row below, the value "
+            f"under each FK attribute is a NATURAL-KEY reference to a parent row, NOT a literal Id ({mapping}). "
+            f"For every row, BEFORE calling {entity}.CreateAction, resolve each FK — fetch the parent with an "
+            f"aggregate (max 1) filtered on that natural-key attribute equal to the row's reference value, take "
+            f"the parent's Id, and Assign it to the new {entity}'s FK attribute. If a parent lookup is empty, "
+            f"SKIP that row (never write a dangling FK — it fails at runtime).")
+    if fk_notes:
+        fk_parts.append(fk_notes)
+    fk_txt = (" " + " ".join(fk_parts)) if fk_parts else ""
     bootstrap_txt = (
         f"3. DETERMINISTIC BOOTSTRAP (a WhenPublished timer is NOT reliable — it has silently failed to seed): "
         f"ALSO call LoadSampleData as the FIRST node of the OnReady screen action of {', '.join(bootstrap)} (create "
@@ -477,6 +650,97 @@ def theme(params: dict) -> str:
         f"Verify at RUNTIME (loaded stylesheets / body background), not in-model. Do not publish.")
 
 
+def dashboard(params: dict) -> str:
+    """A KPI dashboard header: a row of stat cards (icon + big value + label + optional trend
+    tag), laid out in a responsive columns grid. The theme paints .kpi-card/.kpi-icon/.kpi-value.
+    params: screen, cards:[{label, value_field?|aggregate?|value?, icon?, trend?, entity?}],
+    columns?(default 3). Each card's value is a live aggregate COUNT when `entity`/`aggregate`
+    is given, else the literal `value`."""
+    screen = _p(params, "screen", required=True)
+    cards = _p(params, "cards", [], required=True)
+    ncols = _p(params, "columns", min(len(cards), 4) or 1)
+    lines = []
+    for c in cards:
+        icon = c.get("icon", "chart-bar")
+        label = c.get("label", "")
+        trend = f' plus a trend tag (Style class "kpi-trend") "{c["trend"]}"' if c.get("trend") else ""
+        if c.get("entity") or c.get("aggregate"):
+            ent = c.get("entity") or c.get("aggregate")
+            filt = f' filtered where {c["filter"]}' if c.get("filter") else ""
+            val = (f"the TOTAL row COUNT of {ent}{filt} — add a screen aggregate over {ent} and bind the "
+                   f"Expression to that aggregate's `.Count` output (the total matching-row count). Do NOT "
+                   f"bind to `.List.Length` (that is the fetched-page length, which is 1 for a count-only "
+                   f"aggregate and shows a wrong '1') nor to `.List.Current.*`")
+        elif c.get("value_field"):
+            val = f"the value of {c['value_field']}"
+        else:
+            val = f'the literal "{c.get("value", "0")}"'
+        lines.append(
+            f'   - a KPI card (Container Style class "kpi-card", data-spec-id="kpi{_slug(label)}") containing: a '
+            f'CSS-icon (Container Style class "kpi-icon glyph-{icon}"), a big value Expression (Style class '
+            f'"kpi-value") showing {val}, a label (Style class "kpi-label") "{label}"{trend}.')
+    body = "\n".join(lines)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"On the {screen} screen, add a KPI dashboard header — a row of {len(cards)} stat cards in a "
+        f"{ncols}-column responsive grid (use the OutSystems UI Columns{ncols} layout or a flex Container with "
+        f'Style class "kpi-row"), placed at the top of the content area (right of the nav). Author each card '
+        f"structurally with its class hooks so the theme paints it (do NOT inline colors):\n{body}\n"
+        f"Where a card shows a COUNT, add the backing screen aggregate and bind the value Expression to its Count "
+        f"— it must render the REAL number at runtime, not a placeholder. Do not publish."
+    )
+
+
+def detail(params: dict) -> str:
+    """The case-detail screen = the workflow made visual: a horizontal STAGE STEPPER (each stage
+    done/active/pending), an optional PARALLEL-REVIEW panel (per-team status), and an optional
+    AUDIT TIMELINE bound to an event entity. The theme paints .stepper/.step/.review-grid/.timeline.
+    params: screen, stages:[{label, state?} | str], review_teams?:[str], review_entity?,
+    review_state_field?, timeline_entity?, timeline_fields?:[str]."""
+    screen = _p(params, "screen", required=True)
+    stages = _p(params, "stages", [], required=True)
+    teams = _p(params, "review_teams", []) or []
+    review_entity = _p(params, "review_entity")
+    review_state = _p(params, "review_state_field", "State")
+    timeline_entity = _p(params, "timeline_entity")
+    tfields = _p(params, "timeline_fields", []) or []
+
+    def _stage(s):
+        if isinstance(s, str):
+            return {"label": s, "state": "pending"}
+        return {"label": s.get("label", ""), "state": s.get("state", "pending")}
+    stage_items = [_stage(s) for s in stages]
+    steps_txt = "; ".join(
+        f'step "{s["label"]}" (class "step is-{s["state"]}")' for s in stage_items)
+    parts = [
+        f'1. A horizontal STAGE STEPPER at the top: a Container (Style class "stepper") with, left to right, '
+        f'a step per stage — {steps_txt}. Each step shows its label and a state marker; the theme colors '
+        f'is-done (check), is-active (accent ring), is-pending (muted).']
+    if teams:
+        if review_entity:
+            src = (f'bind these from the {review_entity} records for this case (each card shows the team and its '
+                   f'{review_entity}.{review_state} as a status chip — Container Style "review-status chip chip-" '
+                   f'+ ToLower({review_entity}.{review_state}))')
+        else:
+            src = "each card shows the team name and a placeholder status chip"
+        parts.append(
+            f'2. A PARALLEL-REVIEW panel (Container Style class "review-grid") with one review card '
+            f'(Style class "review-card") per team: {", ".join(teams)}; {src}.')
+    if timeline_entity:
+        fld = ", ".join(tfields) if tfields else "the event description and timestamp"
+        parts.append(
+            f'3. An AUDIT TIMELINE (Container Style class "timeline") bound to a screen aggregate over '
+            f'{timeline_entity} for this case, newest first: one timeline item (Style class "timeline-item") '
+            f"per row showing {fld}. This is the immutable activity trail — READ only, never edited here.")
+    body = "\n".join(parts)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Make the {screen} screen a rich case-detail view — the workflow made visual. Author, in order:\n{body}\n"
+        f"Author each region structurally with its class hooks so the theme paints it (stepper / review grid / "
+        f"timeline); do NOT inline colors. Bound regions must render REAL rows at runtime. Do not publish."
+    )
+
+
 def row_actions(params: dict) -> str:
     """Per-row Edit/Delete affordances on a list screen — the Update + Delete write-paths.
     Reuses the create-form's local var (New<Entity>) + Save<Entity>Record. Authored as separate
@@ -601,19 +865,38 @@ def _sig(items) -> str:
 
 
 def service_action(params: dict) -> str:
-    """Author a PUBLIC Service Action — the cross-app-callable API unit. A Server Action CANNOT be Public
-    in an app (OS-BLD-40409); a Service Action IS the exposed operation. params: name, inputs, outputs,
-    wraps?(existing server action the flow calls)."""
+    """Author a PUBLIC Service Action — the cross-app-callable API unit (also how an AI agent's Tools are
+    exposed). A Server Action CANNOT be Public in an app (OS-BLD-40409); a Service Action IS the exposed
+    operation. params: name, inputs, outputs, wraps?(existing server action the flow calls).
+
+    TWO build-time rules the in-session validator does NOT catch — both surface as OS-DPL-50205 "model
+    features validation failed" only at PUBLISH (live-proven SLATracker 2026-07-07):
+      1. An exposed/public action must be SIDE-EFFECT-FREE — NO entity writes (Create/Update/Delete/
+         DeleteAll/CreateOrUpdate) anywhere in its flow. Keep writes in a NON-public Server Action.
+      2. Its signature must use only PORTABLE types — primitives, Structures, Lists thereof. NO Entity
+         Record and NO Entity Identifier parameters. Take an entity key as a plain Long Integer input and
+         cast internally with LongIntegerToIdentifier(x) where the FK comparison needs the identifier type.
+    (OS-DPL-50205 is a generic bucket — also fires for a cross-app-entity FK and a public raise-event
+    action; always diagnose the specific element read-only.)"""
     name = _p(params, "name", required=True)
     wraps = _p(params, "wraps")
+    writes = _p(params, "writes", False)  # does the wrapped operation mutate entities?
     body = (f"Its flow calls the existing Server Action {wraps} and maps its result to the output(s)."
             if wraps else "Its flow performs the operation and sets the output(s) (typed local + Assign per "
                           "attribute; never an inline record literal).")
+    write_guard = (" NOTE: this operation writes entities — a PUBLIC action may not perform entity writes "
+                   "(OS-DPL-50205). Put the write in a NON-public Server Action and either make THIS action "
+                   "non-public, or have it call a read-only path only." if writes else "")
     return (f"{_PREAMBLE}\n\n"
             f"Author a Service Action named {name} with Public=TRUE (a Service Action IS cross-app callable; a "
             f"Server Action can NOT be Public — OS-BLD-40409). Input parameter(s): {_sig(_p(params, 'inputs', []))}. "
-            f"Output parameter(s): {_sig(_p(params, 'outputs', []))}. {body} Build the flow with Start + End nodes "
-            f"and the operation between. After authoring, run model validation and report errors. Do not publish.")
+            f"Output parameter(s): {_sig(_p(params, 'outputs', []))}. {body}{write_guard} "
+            f"PUBLIC-SIGNATURE RULE (OS-DPL-50205 at publish, not caught in-session): use ONLY primitive / "
+            f"Structure / List types in the signature — NO Entity Record or Entity Identifier parameters; take "
+            f"an entity key as Long Integer and cast with LongIntegerToIdentifier() internally. PUBLIC-WRITE "
+            f"RULE: this action must NOT Create/Update/Delete/DeleteAll any entity — keep writes in a separate "
+            f"non-public Server Action. Build the flow with Start + End nodes and the operation between. After "
+            f"authoring, run model validation and report errors. Do not publish.")
 
 
 def client_action(params: dict) -> str:
@@ -783,6 +1066,7 @@ RECIPES = {
     "external-library": external_library,
     "screen": screen,
     "nav-block": nav_block,
+    "place-nav": place_nav,
     "list-screen": list_screen,
     "role-gate": role_gate,
     "login": login,
@@ -792,6 +1076,8 @@ RECIPES = {
     "agent": agent,
     "chart": chart,
     "theme": theme,
+    "dashboard": dashboard,
+    "detail": detail,
 }
 
 
@@ -810,6 +1096,12 @@ def _columns_of(comp: dict) -> list:
     for col in comp.get("columns", []) or []:
         cols.append(col.get("field", col) if isinstance(col, dict) else col)
     return cols
+
+
+def _columns_structured(comp: dict) -> list:
+    """The component's columns preserving each cell's render `kind` (chip/badge/avatar/glyph/…)
+    so list_screen authors styled cells. Falls back to bare field strings if none declared."""
+    return list(comp.get("columns", []) or [])
 
 
 _MUTATING = {"CreateEntity", "UpdateEntity", "DeleteEntity"}
@@ -917,6 +1209,54 @@ def _sample_rows(spec: dict, entity: str, n: int = 3) -> list:
     return [{f: f"Sample {entity} {i}" for f in fields} for i in range(1, n + 1)]
 
 
+def _natural_key(spec: dict, entity: str) -> str:
+    """The attribute a child seed row references a PARENT by — a human-readable, unique-ish key (not
+    the auto-number Id, which does not exist until the parent is created). Prefers an attribute flagged
+    `naturalKey: true`, else the first non-id, non-FK, non-audit Text attribute, else 'Name'."""
+    attrs = _entities_map(spec).get(entity, {}).get("attributes", [])
+    for a in attrs:
+        if a.get("naturalKey"):
+            return a["name"]
+    for a in attrs:
+        if (a.get("dataType") == "Text" and not a.get("isIdentifier")
+                and not a.get("references") and a["name"] not in _AUDIT_ATTRS):
+            return a["name"]
+    return "Name"
+
+
+def _fk_refs(spec: dict, entity: str) -> list:
+    """FK attributes on `entity`, each paired with its parent + the parent's natural key. Lets the seed
+    resolve a natural-key value carried in a child row to the parent's real Id (SEED-A). Returns
+    [{attr, parent, parent_key}]."""
+    refs = []
+    for a in _entities_map(spec).get(entity, {}).get("attributes", []):
+        parent = a.get("references")
+        if parent and not a.get("isIdentifier"):
+            refs.append({"attr": a["name"], "parent": parent, "parent_key": _natural_key(spec, parent)})
+    return refs
+
+
+def _seed_topo_order(names: list, spec: dict) -> list:
+    """Order entity names PARENTS-BEFORE-CHILDREN so a child's FK can resolve to an already-seeded
+    parent (Kahn). Only FK deps WITHIN the set constrain order; external/already-seeded parents are
+    treated as satisfied. Deterministic (ties alphabetical); a cycle emits its remainder alphabetically
+    (best-effort — a real FK cycle is a data-model smell the arch-gate flags, not seed's job to fix)."""
+    nameset = set(names)
+    deps = {n: {a.get("references")
+                for a in _entities_map(spec).get(n, {}).get("attributes", [])
+                if a.get("references") in nameset and a.get("references") != n}
+            for n in names}
+    ordered, remaining = [], set(names)
+    while remaining:
+        ready = sorted(n for n in remaining if not (deps[n] & remaining))
+        if not ready:
+            ordered.extend(sorted(remaining))
+            break
+        ordered.extend(ready)
+        remaining -= set(ready)
+    return ordered
+
+
 def _theme_css(t: dict) -> str:
     """Compile design.theme tokens (palette/typography/spacing + raw css) into a stylesheet string
     for the theme recipe. Each token group becomes deterministic :root custom properties so the same
@@ -995,13 +1335,31 @@ def plan_from_spec(spec: dict) -> list[dict]:
 
     nav = spec.get("navigation")
     if nav and nav.get("items"):
-        steps.append({"recipe": "nav-block", "why": "app.navigation declared", "params": {
+        def _nav_item(i: dict) -> dict:
+            item = {"label": i.get("label", ""), "toScreen": i.get("toScreen", "")}
+            for k in ("tag", "badge", "section"):   # product-UI shell extras, only when declared
+                if i.get(k) not in (None, ""):
+                    item[k] = i[k]
+            return item
+        nav_params = {
             "block_name": nav.get("block", "SidebarNav"),
             "workspace_label": nav.get("workspaceLabel", ""),
-            "logout_to": login,
-            "items": [{"label": i.get("label", ""), "toScreen": i.get("toScreen", "")}
-                      for i in nav["items"]],
-        }})
+            "items": [_nav_item(i) for i in nav["items"]],
+        }
+        # Only wire a logout link when the app actually has a login screen — otherwise it would
+        # navigate to a non-existent screen, and the block's nav-in-a-(would-be-public)-block risk.
+        if auth.get("loginScreen"):
+            nav_params["logout_to"] = login
+        for src, dst in (("brand", "brand"), ("subtitle", "subtitle"),
+                         ("userLabel", "user_label"), ("userRole", "user_role")):
+            if nav.get(src):
+                nav_params[dst] = nav[src]
+        steps.append({"recipe": "nav-block", "why": "app.navigation declared", "params": nav_params})
+        # Placing the block on every screen is a SEPARATE step — authoring the block does not render it.
+        if screens:
+            steps.append({"recipe": "place-nav", "why": "instantiate the nav block on every screen",
+                          "params": {"block_name": nav_params["block_name"],
+                                     "screens": [s.get("name", s["id"]) for s in screens]}})
 
     if auth.get("provider") == "app-local" and auth.get("userEntity") and auth.get("testUsers"):
         ue, aa = auth["userEntity"], auth.get("adminAttribute")
@@ -1027,7 +1385,7 @@ def plan_from_spec(spec: dict) -> list[dict]:
             if c.get("type") in _DATA_COMPONENT_TYPES and c.get("boundTo"):
                 entity = c["boundTo"].split(".")[0]
                 params = {"screen": s["id"], "entity": entity,
-                          "columns": _columns_of(c) or ["(entity display fields)"],
+                          "columns": _columns_structured(c) or ["(entity display fields)"],
                           "component_id": c["id"]}
                 # seam 3e: emit the spec's declared row-nav component (its label + id) so the
                 # gate's parent-nav finds it — from ANY nav entry on the screen, not just the table.
@@ -1123,11 +1481,36 @@ def plan_from_spec(spec: dict) -> list[dict]:
                           "params": {"screen": s["id"], "chart_type": ch["chartType"],
                                      "category_field": ch["categoryField"], "series": ch["series"],
                                      "source_aggregate": ch.get("sourceAggregate")}})
+        # UI-A: a KPI dashboard header on this screen -> `dashboard` step.
+        dash = s.get("dashboard")
+        if dash and dash.get("cards"):
+            p = {"screen": s["id"], "cards": dash["cards"]}
+            if dash.get("columns"):
+                p["columns"] = dash["columns"]
+            steps.append({"recipe": "dashboard", "why": f"{s['id']} KPI dashboard header", "params": p})
+        # UI-A: a rich case-detail screen (stepper + parallel reviews + audit timeline) -> `detail` step.
+        det = s.get("detail")
+        if det and det.get("stages"):
+            p = {"screen": s["id"], "stages": det["stages"]}
+            for src, dst in (("reviewTeams", "review_teams"), ("reviewEntity", "review_entity"),
+                             ("reviewStateField", "review_state_field"),
+                             ("timelineEntity", "timeline_entity"), ("timelineFields", "timeline_fields")):
+                if det.get(src):
+                    p[dst] = det[src]
+            steps.append({"recipe": "detail", "why": f"{s['id']} case-detail (workflow made visual)",
+                          "params": p})
 
     # Seam 3g: an entity rendered in a list but with NO create UI can never be populated at runtime —
     # seed it so its list renders (and any parent-context create on it can be reached by the gate).
     listed = {c["boundTo"].split(".")[0] for s in screens for c in s.get("components", [])
               if c.get("type") in _DATA_COMPONENT_TYPES and c.get("boundTo")}
+    # a detail screen's review/timeline panels bind entities that appear in no table — seed them too,
+    # else the "workflow made visual" hero renders empty review cards + timeline.
+    for s in screens:
+        det = s.get("detail") or {}
+        for k in ("reviewEntity", "timelineEntity"):
+            if det.get(k):
+                listed.add(det[k])
     created = set()
     for s in screens:
         for a in s.get("actions", []):
@@ -1138,10 +1521,15 @@ def plan_from_spec(spec: dict) -> list[dict]:
     already_seeded = {st["params"].get("entity") for st in steps if st["recipe"] == "seed-entity"}
     default_screen = next((s["id"] for s in screens if s.get("isDefault")),
                           screens[0]["id"] if screens else None)
-    for ent in sorted(listed - created - already_seeded):
+    # SEED-A: emit PARENTS-BEFORE-CHILDREN (topo over FKs) so a child row's FK resolves to an
+    # already-seeded parent; pass each entity's fk_refs so the recipe authors the natural-key lookup.
+    for ent in _seed_topo_order(sorted(listed - created - already_seeded), spec):
         rows = _sample_rows(spec, ent)
         if rows:
             p = {"entity": ent, "rows": rows}
+            fk = _fk_refs(spec, ent)
+            if fk:
+                p["fk_refs"] = fk
             if default_screen:
                 p["bootstrap_screens"] = [default_screen]   # seam B: seed on first load, not just the timer
             steps.append({"recipe": "seed-entity",

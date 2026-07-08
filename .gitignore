@@ -19,3 +19,8 @@ builds/*/runner_state.db
 # Figma PAT (never commit)
 .figma_token
 *.figma_token
+
+# build artifacts
+_prompts/
+builds/gate_demo/
+.playwright-mcp/

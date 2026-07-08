@@ -1,0 +1,47 @@
+{
+  "specVersion": "0.1",
+  "domain": {
+    "name": "retail_platform",
+    "entities": [
+      {"name": "Product", "context": "catalog", "references": ["Category"],
+       "attributes": [{"name": "Name", "dataType": "Text", "mandatory": true},
+                      {"name": "Price", "dataType": "Currency", "mandatory": true},
+                      {"name": "Sku", "dataType": "Text"}]},
+      {"name": "Category", "context": "catalog",
+       "attributes": [{"name": "Name", "dataType": "Text", "mandatory": true}]},
+      {"name": "Inventory", "context": "catalog", "references": ["Product"],
+       "attributes": [{"name": "QuantityOnHand", "dataType": "Integer", "mandatory": true}]},
+      {"name": "Order", "context": "ordering", "references": ["Product"],
+       "attributes": [{"name": "PlacedAt", "dataType": "DateTime", "mandatory": true},
+                      {"name": "Total", "dataType": "Currency"}]},
+      {"name": "OrderLine", "context": "ordering", "references": ["Order"],
+       "attributes": [{"name": "Quantity", "dataType": "Integer", "mandatory": true}]},
+      {"name": "Cart", "context": "ordering",
+       "attributes": [{"name": "SessionKey", "dataType": "Text", "mandatory": true}]},
+      {"name": "Payment", "context": "payments",
+       "attributes": [{"name": "Amount", "dataType": "Currency", "mandatory": true},
+                      {"name": "Captured", "dataType": "Boolean"}]},
+      {"name": "Refund", "context": "payments", "references": ["Payment"],
+       "attributes": [{"name": "Amount", "dataType": "Currency", "mandatory": true},
+                      {"name": "Reason", "dataType": "Text"}]}
+    ],
+    "actors": ["shopper", "merchant"],
+    "capabilities": [
+      {"name": "Browse", "actor": "shopper", "reads": ["Product", "Category"]},
+      {"name": "Checkout", "actor": "shopper", "reads": ["Product"], "writes": ["Order"],
+       "service": "PlaceOrder", "raisesEvent": "OrderPlaced"},
+      {"name": "Pay", "actor": "shopper", "writes": ["Payment"], "service": "CapturePayment"},
+      {"name": "ManageInventory", "actor": "merchant", "reads": ["Inventory"], "writes": ["Inventory"],
+       "service": "AdjustInventory"},
+      {"name": "IssueRefunds", "actor": "merchant", "reads": ["Payment"], "writes": ["Refund"],
+       "service": "IssueRefund"},
+      {"name": "Fulfill", "orchestrates": true, "triggerEvent": "OrderPlaced",
+       "steps": [
+         {"name": "FraudCheck", "ai": "ScoreOrderRisk", "reads": ["Order", "OrderLine"]},
+         {"name": "Capture", "callsService": "CapturePayment"},
+         {"name": "Reserve", "callsService": "AdjustInventory"}
+       ]}
+    ],
+    "libraries": ["DesignSystem"]
+  }
+}

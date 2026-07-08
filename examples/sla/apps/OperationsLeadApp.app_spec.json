@@ -1,0 +1,60 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "OperationsLeadApp",
+    "roles": [
+      "OperationsLead"
+    ],
+    "description": "End-user app for operations-lead"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "SLADashboard",
+      "name": "SLADashboard",
+      "components": [
+        {
+          "id": "SLADashboard_application_table",
+          "type": "Table",
+          "boundTo": "Application",
+          "label": "SLADashboard"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "SLADashboard_application_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "SLADashboard_application_table",
+            "boundTo": "Application"
+          }
+        ]
+      },
+      "isDefault": true
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "SlaCore",
+      "elements": [
+        {
+          "name": "Application",
+          "kind": "Entity"
+        },
+        {
+          "name": "Requirement",
+          "kind": "Entity"
+        },
+        {
+          "name": "CaseOwner",
+          "kind": "Entity"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "everything_app",
+    "description": "Anti-pattern: a UI/data monolith with an upward-pointing coupling knot. Must FAIL the no-monolith gate (trips layer-purity, single-owner, no-cross-app-fk, acyclic-downward, and orchestration-externalized).",
+    "apps": [
+      {
+        "name": "TheApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "everyone",
+        "owns": ["Customer", "Account", "Order"],
+        "exposes": {"events": ["OrderPlaced"], "screens": ["Everything"]},
+        "raisesEvents": ["OrderPlaced"],
+        "consumes": [
+          {"app": "Billing", "entities": ["Invoice"]}
+        ]
+      },
+      {
+        "name": "Billing",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "billing",
+        "owns": ["Invoice", "Customer"],
+        "foreignKeys": [
+          {"from": "Invoice", "target": "Order"}
+        ],
+        "consumes": [
+          {"app": "TheApp", "entities": ["Order"]}
+        ]
+      }
+    ]
+  }
+}
