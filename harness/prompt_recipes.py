@@ -373,6 +373,66 @@ def seed_entity(params: dict) -> str:
     )
 
 
+def seed_graph(params: dict) -> str:
+    """Seed a FK-linked entity GRAPH in ONE LoadSampleData action — the robust FK seed.
+    params: entities:[{name, natural_key?, rows:[{...}], fk_refs:[{attr,parent,parent_key}]}]
+    (in dependency order: parents first), bootstrap_screens?:[screen].
+
+    WHY this and not per-entity seed_entity for FK data: at RUNTIME an aggregate does NOT see rows
+    created earlier in the SAME action, so the natural-key parent LOOKUP returns empty and every FK
+    child gets skipped (live Rivian 2026-07-08: Supplier seeded, Part/Case seeded 0). The fix is to
+    CAPTURE each parent's Id from its CreateAction RETURN VALUE into a local and reference it directly
+    in children — no lookup. That requires ONE action so the parent-Id locals are in scope for children."""
+    entities = _p(params, "entities", [], required=True)
+    bootstrap = _p(params, "bootstrap_screens", []) or []
+    # entities whose Id a child references -> their created Id must be captured into a local
+    parents = {fr["parent"] for e in entities for fr in (e.get("fk_refs") or [])}
+    blocks = []
+    for e in entities:
+        name = e["name"]
+        nkey = e.get("natural_key")
+        fk_by_attr = {r["attr"]: r for r in (e.get("fk_refs") or [])}
+        row_lines = []
+        for r in e.get("rows", []):
+            nk_val = r.get(nkey) if nkey else None
+            id_local = f"{name}_{_slug(nk_val)}_Id" if (name in parents and nk_val) else None
+            assigns = []
+            for k, v in r.items():
+                if k in fk_by_attr:
+                    fk = fk_by_attr[k]
+                    assigns.append(f"{k} = the captured local {fk['parent']}_{_slug(v)}_Id "
+                                   f"(the {fk['parent']} whose {fk['parent_key']}=\"{v}\")")
+                else:
+                    assigns.append(f'{k} = "{v}"')
+            capture = f", then CAPTURE its returned Id into local {id_local}" if id_local else ""
+            row_lines.append(f"      • {name} {{ {'; '.join(assigns)} }} -> {name}.CreateAction{capture}")
+        blocks.append(
+            f"   - INDEPENDENT guard: aggregate (max 1) — if {name} has 0 rows, seed these (each via a typed "
+            f"local {name} + one Assign per attribute, then {name}.CreateAction):\n" + "\n".join(row_lines))
+    body = "\n".join(blocks)
+    ent_names = ", ".join(e["name"] for e in entities)
+    bootstrap_txt = (
+        f"3. Call LoadSampleData as the FIRST node of the OnReady screen action of {', '.join(bootstrap)} "
+        f"(create the OnReady if absent) so the graph is present on first load.\n" if bootstrap else "")
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Seed this FK-linked entity graph ({ent_names}) with ONE server action LoadSampleData (create it if "
+        f"absent; if it exists, REPLACE its body with this). Author the entities IN THIS ORDER (parents first) "
+        f"so each child can reference its parent's captured Id:\n"
+        f"1. CRITICAL FK RULE — resolve every FK by CAPTURING the parent's Id from its CreateAction RETURN VALUE "
+        f"into a local variable, then setting the child's FK attribute to that local. Do NOT look up parents "
+        f"with an aggregate: at runtime an aggregate does NOT return rows created earlier in the SAME action, so "
+        f"a lookup yields empty and the child is skipped. The captured-Id locals are named {ent_names.split(',')[0]}"
+        f"_<naturalkey>_Id etc.\n"
+        f"2. Each entity gets its OWN INDEPENDENT emptiness guard, in sequence (not nested), so re-runs are "
+        f"idempotent and a later entity still seeds if an earlier one is already populated:\n{body}\n"
+        f"{bootstrap_txt}"
+        f"Make LoadSampleData NON-PUBLIC (a public entity-writer trips OS-DPL-50205). Keep each row's Assigns "
+        f"minimal. After authoring, run validation and confirm change_applied. Do not publish (orchestrator "
+        f"publishes). At runtime, every listed entity — including the FK children — must have its rows."
+    )
+
+
 def create_form(params: dict) -> str:
     """Wire a WORKING create/edit form for an entity — the write-path (Phase 6, the
     definition of done). Encodes every correction a hand-authored create turn needs.
@@ -1078,6 +1138,7 @@ RECIPES = {
     "role-gate": role_gate,
     "login": login,
     "seed-entity": seed_entity,
+    "seed-graph": seed_graph,
     "create-form": create_form,
     "row-actions": row_actions,
     "agent": agent,
@@ -1528,19 +1589,31 @@ def plan_from_spec(spec: dict) -> list[dict]:
     already_seeded = {st["params"].get("entity") for st in steps if st["recipe"] == "seed-entity"}
     default_screen = next((s["id"] for s in screens if s.get("isDefault")),
                           screens[0]["id"] if screens else None)
-    # SEED-A: emit PARENTS-BEFORE-CHILDREN (topo over FKs) so a child row's FK resolves to an
-    # already-seeded parent; pass each entity's fk_refs so the recipe authors the natural-key lookup.
-    for ent in _seed_topo_order(sorted(listed - created - already_seeded), spec):
+    # SEED-A: parents-before-children (topo over FKs). An FK-linked set is seeded as ONE graph
+    # (seed-graph: capture parent Id from CreateAction return — an aggregate lookup can't see rows
+    # created in the same action at runtime). A standalone set stays per-entity seed-entity.
+    seed_order = _seed_topo_order(sorted(listed - created - already_seeded), spec)
+    seed_ents = []
+    for ent in seed_order:
         rows = _sample_rows(spec, ent)
         if rows:
-            p = {"entity": ent, "rows": rows}
-            fk = _fk_refs(spec, ent)
-            if fk:
-                p["fk_refs"] = fk
+            seed_ents.append({"name": ent, "rows": rows, "natural_key": _natural_key(spec, ent),
+                              "fk_refs": _fk_refs(spec, ent)})
+    if any(e["fk_refs"] for e in seed_ents) and len(seed_ents) > 1:
+        p = {"entities": seed_ents}
+        if default_screen:
+            p["bootstrap_screens"] = [default_screen]
+        steps.append({"recipe": "seed-graph",
+                      "why": f"FK-linked seed graph ({', '.join(e['name'] for e in seed_ents)})", "params": p})
+    else:
+        for e in seed_ents:
+            p = {"entity": e["name"], "rows": e["rows"]}
+            if e["fk_refs"]:
+                p["fk_refs"] = e["fk_refs"]
             if default_screen:
-                p["bootstrap_screens"] = [default_screen]   # seam B: seed on first load, not just the timer
+                p["bootstrap_screens"] = [default_screen]
             steps.append({"recipe": "seed-entity",
-                          "why": f"{ent} is listed but has no create UI — seed so its list renders",
+                          "why": f"{e['name']} is listed but has no create UI — seed so its list renders",
                           "params": p})
 
     # v0.3: app theme from design.theme tokens.

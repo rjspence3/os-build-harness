@@ -143,8 +143,9 @@ def test_seed_entity_resolves_fk_refs_by_natural_key(the=None):
     assert "SKIP that row" in prompt                                   # no dangling FK
 
 
-def test_plan_seeds_parents_before_children_and_passes_fk_refs():
-    """SEED-A wiring: FK-heavy display entities seed parents-first (topo) and carry fk_refs."""
+def test_plan_seeds_fk_set_as_one_graph_parents_first():
+    """SEED-A wiring: an FK-linked seed set becomes ONE seed-graph step (capture-Id-from-create),
+    entities in dependency order (parents first), each carrying its natural_key + fk_refs."""
     spec = {
         "specVersion": "0.3", "app": {"name": "fk"},
         "dataModel": {"entities": [
@@ -163,13 +164,17 @@ def test_plan_seeds_parents_before_children_and_passes_fk_refs():
                 {"id": "supT", "type": "Table", "boundTo": "Supplier", "columns": [{"field": "Code", "kind": "text"}]}]},
         ]}
     steps = pr.plan_from_spec(spec)
-    seeds = [s for s in steps if s["recipe"] == "seed-entity"]
-    order = [s["params"]["entity"] for s in seeds]
-    assert order.index("Supplier") < order.index("Part")              # parent seeded first
-    part = next(s for s in seeds if s["params"]["entity"] == "Part")
-    assert part["params"]["fk_refs"] == [{"attr": "SupplierId", "parent": "Supplier", "parent_key": "Code"}]
-    supplier = next(s for s in seeds if s["params"]["entity"] == "Supplier")
-    assert "fk_refs" not in supplier["params"]                        # no FKs -> no fk_refs
+    graph = next(s for s in steps if s["recipe"] == "seed-graph")
+    ents = graph["params"]["entities"]
+    order = [e["name"] for e in ents]
+    assert order.index("Supplier") < order.index("Part")              # parent before child
+    part = next(e for e in ents if e["name"] == "Part")
+    assert part["fk_refs"] == [{"attr": "SupplierId", "parent": "Supplier", "parent_key": "Code"}]
+    supplier = next(e for e in ents if e["name"] == "Supplier")
+    assert supplier["fk_refs"] == [] and supplier["natural_key"] == "Code"
+    # the rendered prompt captures parent Ids from CreateAction return (no aggregate lookup)
+    prompt = pr.render("seed-graph", graph["params"])
+    assert "CAPTURE" in prompt and "Supplier_acme_Id" in prompt and "aggregate does not return rows" in prompt.lower()
 
 
 def test_seed_topo_order_breaks_cycles_deterministically():
