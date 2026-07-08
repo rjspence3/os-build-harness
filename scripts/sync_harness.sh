@@ -26,6 +26,7 @@ FILES=(
   harness/schemas/app_spec.v0.json
   harness/schemas/system_spec.v0.json
   harness/BUILD_LOOP.md
+  harness/STEP_ATOMICITY.md
   harness/ARCHITECTURE_DECOMPOSITION.md
   harness/SEAMS.md
   harness/CAPABILITY_MATRIX.md

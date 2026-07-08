@@ -75,6 +75,10 @@ def _step_target(step: dict, index: int) -> str:
                or p.get("block_name") or p.get("producer_app") or "")
     phase = p.get("phase")           # create-form/row-actions sub-phase disambiguator
     base = f"{step['recipe']}:{_slug(primary, str(index))}"
+    # per-button action-button steps share an entity — disambiguate by the button label
+    buttons = p.get("buttons")
+    if buttons and isinstance(buttons, list) and buttons[0].get("label"):
+        base = f"{base}:{_slug(buttons[0]['label'], 'btn')}"
     return f"{base}:{phase}" if phase else base
 
 
@@ -426,9 +430,19 @@ async def resolve_env_key(mcp, override: Optional[str]) -> str:
 
 def _print_plan(spec: dict) -> None:
     steps = plan_from_spec(spec)
-    print(f"Plan: {len(steps)} steps\n")
+    warn = [s for s in steps if s.get("atomicity_warning")]
+    note = [s for s in steps if s.get("atomicity_note")]
+    summary = []
+    if warn:
+        summary.append(f"{len(warn)} splittable-heavy ⚠")
+    if note:
+        summary.append(f"{len(note)} one-turn-heavy ·")
+    print(f"Plan: {len(steps)} steps" + (f"  ({', '.join(summary)})" if summary else "  (all atomic)") + "\n")
     for i, s in enumerate(steps):
-        print(f"  {i+1:>3}. {s['recipe']:<16} {_step_target(s, i):<40} — {s.get('why','')}")
+        w = s.get("weight", "")
+        tail = ("  ⚠ " + s["atomicity_warning"] if s.get("atomicity_warning")
+                else "  · " + s["atomicity_note"] if s.get("atomicity_note") else "")
+        print(f"  {i+1:>3}. [{w:>2}] {s['recipe']:<16} {_step_target(s, i):<38} — {s.get('why','')}{tail}")
 
 
 def main(argv: Optional[list[str]] = None) -> int:

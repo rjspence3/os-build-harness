@@ -185,35 +185,50 @@ def nav_block(params: dict) -> str:
     )
 
 
+def _apply_action_name(label: str) -> str:
+    return "Apply" + _slug(label).title().replace("-", "")
+
+
 def action_button(params: dict) -> str:
-    """State-transition action buttons on a detail screen — the workflow write-paths (approve /
-    send-back / activate etc.). Each button runs a NON-PUBLIC server action that fetches the record
-    by the screen's id param, assigns the target fields, updates it, and refreshes the screen.
-    params: screen, entity, id_param, buttons:[{label, set:{field: value}, style?}]."""
+    """ONE state-transition action button on a detail screen — a workflow write-path. ATOMIC by phase
+    (one concern per Mentor turn, like create-form): phase='action' authors ONLY the NON-PUBLIC server
+    action; phase='wire' adds ONLY the button + wires it; phase='combined' (default) does both in one
+    small turn. params: screen, entity, id_param, buttons:[{label, set:{field:value}, style?}], phase."""
     screen = _p(params, "screen", required=True)
     entity = _p(params, "entity", required=True)
     id_param = _p(params, "id_param", f"{entity}Id")
     buttons = _p(params, "buttons", [], required=True)
-    lines = []
-    for b in buttons:
-        sets = "; ".join(f'{k} = "{v}"' for k, v in (b.get("set") or {}).items())
-        style = f' (Style class "{b["style"]}")' if b.get("style") else ""
-        lines.append(
-            f'   - a Button labelled "{b["label"]}"{style} (data-spec-id="{_slug(b["label"])}btn") whose OnClick '
-            f'runs a NON-PUBLIC server action Apply{_slug(b["label"]).title().replace("-","")}: it fetches the '
-            f'{entity} whose Id = the screen\'s {id_param} input (an aggregate max 1, or Get{entity}ById), then '
-            f'Assigns {{ {sets} }} onto a typed local {entity} record and calls {entity}.UpdateAction (the local '
-            f'must carry the Id). After the server action, RefreshData on the screen\'s {entity} aggregate so the '
-            f'change shows without a reload.')
-    body = "\n".join(lines)
+    phase = _p(params, "phase", "combined")
+    b = buttons[0]                                     # atomic recipe: one button per call
+    label = b["label"]
+    act = _apply_action_name(label)
+    sets = "; ".join(f'{k} = "{v}"' for k, v in (b.get("set") or {}).items())
+    style = f' (Style class "{b["style"]}")' if b.get("style") else ""
+
+    action_txt = (
+        f"Author ONE NON-PUBLIC server action {act} (it WRITES an entity, so it MUST be non-public — a public "
+        f"entity-writer trips OS-DPL-50205 at publish). Give it a mandatory input Id (the {entity} Id). Inside: "
+        f"fetch the {entity} whose Id = that input (an aggregate max 1), Assign {{ {sets} }} onto a typed local "
+        f"{entity} record that carries the Id (NEVER an inline record literal), and call {entity}.UpdateAction on "
+        f"it. Just this one server action, nothing else.")
+    wire_txt = (
+        f'On the {screen} screen, add a single Button labelled "{label}"{style} (data-spec-id="{_slug(label)}btn") '
+        f'in an action bar near the top of the content. Wire its OnClick to a screen action that calls the existing '
+        f'{act} server action passing the screen\'s {id_param} input as the Id, then RefreshData on the screen\'s '
+        f'{entity} aggregate so the change shows without a reload. Do not author the {act} server action here — it '
+        f'already exists.')
+
+    if phase == "action":
+        body = action_txt
+    elif phase == "wire":
+        body = wire_txt
+    else:  # combined
+        body = (f"On the {screen} screen, add ONE state-transition button that mutates the {entity} identified by "
+                f"the screen's {id_param} input:\n1. {action_txt}\n2. {wire_txt}")
     return (
-        f"{_PREAMBLE}\n\n"
-        f"On the {screen} screen, add these state-transition action buttons that mutate the {entity} identified by "
-        f"the screen's {id_param} input parameter. Place them in an action bar near the top of the content.\n{body}\n"
-        f"CRITICAL: each Apply* server action WRITES an entity, so it MUST be NON-PUBLIC (a public entity-writing "
-        f"action trips OS-DPL-50205 at publish). Use {entity}.UpdateAction with a typed local carrying the Id; do "
-        f"NOT use an inline record literal. Verify at RUNTIME that clicking a button changes the {entity}'s field(s) "
-        f"and the change survives a reload. Do not publish."
+        f"{_PREAMBLE}\n\n{body}\n"
+        f"Verify at RUNTIME that clicking the button changes the {entity}'s field(s) and the change survives a "
+        f"reload. Do not publish."
     )
 
 
@@ -1191,6 +1206,65 @@ def render(name: str, params: dict) -> str:
 # ── spec -> ordered build plan (the loop-closer) ─────────────────────────────
 _DATA_COMPONENT_TYPES = {"Table", "List", "Card", "Board"}
 
+# ── STEP ATOMICITY MODEL ──────────────────────────────────────────────────────
+# Every plan step maps to ONE Mentor turn. The single biggest reliability lever (learned the hard
+# way, live) is keeping each turn ATOMIC — one concern, few authored elements. Overloaded turns hang
+# (R1) or fail/phantom; atomic ones land. So the planner splits multi-element work into one-concern
+# steps (create-form → action then form+wire; row-actions → edit/delete; action-button → action then
+# wire, per button; seeds → per-entity or one FK graph). `_step_weight` estimates a step's turn-load
+# so heavy steps are visible and can be split BEFORE they fail.
+#
+# The exceptions — recipes that MUST be one turn because their elements are interdependent within a
+# single Model-API transaction (a later separate turn would roll them back / can't share locals):
+#   * data-model  — interdependent entities (a FK to a not-yet-created entity fails); one turn.
+#   * seed-graph  — captured parent-Id locals are shared across the child creates; one action.
+# These are exempt from the split rule but their weight is still surfaced (keep rows/entities lean).
+_ATOMIC_UNIT_RECIPES = {"data-model", "seed-graph"}
+MAX_STEP_WEIGHT = 14        # a turn beyond ~this many authored elements risks overload/hang
+
+
+def _step_weight(recipe: str, params: dict) -> int:
+    """Rough count of the elements a step asks Mentor to author in one turn (advisory)."""
+    p = params or {}
+    if recipe == "data-model":
+        return sum(1 + len([a for a in e.get("attributes", []) if not a.get("isIdentifier")])
+                   for e in p.get("entities", []))
+    if recipe == "seed-graph":
+        return sum(len(e.get("rows", []) or []) for e in p.get("entities", []))
+    if recipe == "seed-entity":
+        return len(p.get("rows", []) or [])
+    if recipe == "action-button":
+        return 4 if p.get("phase") in (None, "combined") else 2
+    if recipe == "create-form":
+        return len(p.get("fields", []) or []) + 2
+    if recipe == "list-screen":
+        return len(p.get("columns", []) or []) + 2
+    if recipe == "detail":
+        return len(p.get("stages", []) or []) + len(p.get("review_teams", []) or []) + 2
+    if recipe == "nav-block":
+        return len(p.get("items", []) or []) + 2
+    if recipe == "screen":
+        return len(p.get("screens", []) or [])
+    if recipe == "dashboard":
+        return len(p.get("cards", []) or []) + 1
+    return 2
+
+
+def annotate_weights(steps: list[dict]) -> list[dict]:
+    """Attach a `weight` (est. Mentor-turn load) to each step + an `atomicity_warning` on any heavy,
+    non-exempt step. Pure/advisory — does not split; surfaces steps a human/loop should split."""
+    for st in steps:
+        w = _step_weight(st["recipe"], st.get("params", {}))
+        st["weight"] = w
+        if w > MAX_STEP_WEIGHT:
+            if st["recipe"] in _ATOMIC_UNIT_RECIPES:
+                # can't split (interdependent) — but honestly flag the load; keep it lean
+                st["atomicity_note"] = (f"heavy (~{w}) but must be one turn — keep entities/rows lean; "
+                                        f"the recovery loop (R1) absorbs an occasional hang")
+            else:
+                st["atomicity_warning"] = f"heavy step (~{w} > {MAX_STEP_WEIGHT}); split for one concern/turn"
+    return steps
+
 
 def _columns_of(comp: dict) -> list:
     cols = []
@@ -1607,10 +1681,13 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 ip = next((x for x in s.get("inputParameters", []) if x.get("references")), None)
                 if ip:
                     for b in det["stateActions"]:
-                        steps.append({"recipe": "action-button",
-                                      "why": f"{s['id']} action — {b['label']}",
-                                      "params": {"screen": s["id"], "entity": ip["references"],
-                                                 "id_param": ip["name"], "buttons": [b]}})
+                        base = {"screen": s["id"], "entity": ip["references"],
+                                "id_param": ip["name"], "buttons": [b]}
+                        # ATOMIC: author the server action, then (separate turn) add + wire the button.
+                        steps.append({"recipe": "action-button", "why": f"{s['id']} {b['label']} — server action",
+                                      "params": {**base, "phase": "action"}})
+                        steps.append({"recipe": "action-button", "why": f"{s['id']} {b['label']} — button + wire",
+                                      "params": {**base, "phase": "wire"}})
 
     # Seam 3g: an entity rendered in a list but with NO create UI can never be populated at runtime —
     # seed it so its list renders (and any parent-context create on it can be reached by the gate).
@@ -1701,4 +1778,4 @@ def plan_from_spec(spec: dict) -> list[dict]:
                       "params": {"name": proc["name"], "producer_app": proc["producerApp"],
                                  "trigger_event": proc["triggerEvent"],
                                  "activities": proc.get("activities", [])}})
-    return steps
+    return annotate_weights(steps)

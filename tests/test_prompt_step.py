@@ -60,6 +60,42 @@ def test_nav_block_authors_app_shell_with_tags_badges_sections():
     assert '"sidebar-user"' in prompt and "Compliance" in prompt
 
 
+def test_action_button_splits_action_from_wire_atomically():
+    """Atomicity: action-button authors ONE button, split into an action turn + a wire turn."""
+    act = pr.render("action-button", {"screen": "caseDetail", "entity": "Case", "id_param": "CaseId",
+                                       "buttons": [{"label": "Approve Case", "set": {"Status": "APPROVED"}}],
+                                       "phase": "action"})
+    assert "NON-PUBLIC server action ApplyApproveCase" in act and "UpdateAction" in act
+    assert "OS-DPL-50205" in act and 'Button labelled' not in act   # action-only turn, no button here
+    wire = pr.render("action-button", {"screen": "caseDetail", "entity": "Case", "id_param": "CaseId",
+                                        "buttons": [{"label": "Approve Case", "set": {"Status": "APPROVED"}}],
+                                        "phase": "wire"})
+    assert 'Button labelled "Approve Case"' in wire and "already exists" in wire and "RefreshData" in wire
+
+
+def test_plan_action_buttons_are_two_atomic_steps_each():
+    spec = _spec_with_first_class_fields()
+    spec["screens"][2]["inputParameters"] = [{"name": "DocId", "dataType": "Identifier", "references": "Doc"}]
+    spec["screens"][2]["detail"] = {"stages": ["Draft", "Final"],
+                                    "stateActions": [{"label": "Publish", "set": {"State": "PUBLISHED"}}]}
+    steps = pr.plan_from_spec(spec)
+    ab = [s for s in steps if s["recipe"] == "action-button"]
+    phases = [s["params"]["phase"] for s in ab]
+    assert phases == ["action", "wire"]                       # one button -> action then wire
+    assert all(s["weight"] <= pr.MAX_STEP_WEIGHT for s in ab)  # atomic
+
+
+def test_step_weight_flags_heavy_split_vs_exempt():
+    # a splittable heavy step warns; data-model/seed-graph (exempt) get a softer note, never a split warning
+    steps = pr.annotate_weights([
+        {"recipe": "nav-block", "params": {"items": [{"label": f"n{i}"} for i in range(20)]}},
+        {"recipe": "data-model", "params": {"entities": [{"attributes": [{"name": f"a{i}"} for i in range(9)]}
+                                                         for _ in range(6)]}},
+    ])
+    assert steps[0].get("atomicity_warning") and steps[0]["weight"] > pr.MAX_STEP_WEIGHT
+    assert steps[1].get("atomicity_note") and not steps[1].get("atomicity_warning")   # exempt: note, not warn
+
+
 def test_nav_block_is_non_public_and_logout_is_auth_conditional():
     """R11(d): a PUBLIC block with an internal navigation trips OS-DPL-50205 at publish. The app-shell
     nav is internal → author Public=false. A logout link (which navigates) is emitted ONLY when the app
