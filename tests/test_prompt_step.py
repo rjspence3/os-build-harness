@@ -118,6 +118,8 @@ def test_seed_entity_creates_mechanism_from_scratch_on_fresh_app():
     assert "Do NOT assume a sample-data mechanism already exists" in prompt
     assert "server action LoadSampleData" in prompt and "WhenPublished" in prompt
     assert "zero rows" in prompt and "ONLY if empty" in prompt        # empty-guard
+    assert "INDEPENDENT PER-ENTITY GUARD" in prompt                   # not nested under the first entity's guard
+    assert "do NOT nest it inside another entity" in prompt
     assert "Q3 Product Planning" in prompt
     assert "DETERMINISTIC BOOTSTRAP" not in prompt                    # no bootstrap_screens -> timer only
 
