@@ -1600,14 +1600,17 @@ def plan_from_spec(spec: dict) -> list[dict]:
                     p[dst] = det[src]
             steps.append({"recipe": "detail", "why": f"{s['id']} case-detail (workflow made visual)",
                           "params": p})
-            # workflow state-transition buttons that mutate the screen's entity-typed input record
+            # workflow state-transition buttons that mutate the screen's entity-typed input record.
+            # ONE step per button — a single action+button turn is reliable; 3-in-one overloads the
+            # turn and fails (live Rivian 2026-07-08: a 3-button action-button halted after 3 retries).
             if det.get("stateActions"):
                 ip = next((x for x in s.get("inputParameters", []) if x.get("references")), None)
                 if ip:
-                    steps.append({"recipe": "action-button",
-                                  "why": f"{s['id']} workflow state actions",
-                                  "params": {"screen": s["id"], "entity": ip["references"],
-                                             "id_param": ip["name"], "buttons": det["stateActions"]}})
+                    for b in det["stateActions"]:
+                        steps.append({"recipe": "action-button",
+                                      "why": f"{s['id']} action — {b['label']}",
+                                      "params": {"screen": s["id"], "entity": ip["references"],
+                                                 "id_param": ip["name"], "buttons": [b]}})
 
     # Seam 3g: an entity rendered in a list but with NO create UI can never be populated at runtime —
     # seed it so its list renders (and any parent-context create on it can be reached by the gate).
