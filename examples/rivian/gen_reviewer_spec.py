@@ -180,7 +180,9 @@ SCREENS = [
          {"field": "Stage", "kind": "text"},
          {"field": "Status", "kind": "chip"},
          {"field": "SlaState", "kind": "badge"}]}],
-     "navigation": [{"fromComponent": "caseTable", "event": "onClick", "toScreen": "caseDetail"}]},
+     "navigation": [{"fromComponent": "caseTable", "event": "onClick", "toScreen": "caseDetail"}],
+     "actions": [{"name": "UpdateCase", "trigger": {"onComponent": "caseTable", "event": "onClick"},
+                  "does": ["UpdateEntity"]}]},
     {"id": "caseDetail", "name": "Case Detail",
      "inputParameters": [{"name": "CaseId", "dataType": "Identifier", "references": "QualificationCase"}],
      "detail": {
@@ -199,11 +201,17 @@ SCREENS = [
     {"id": "release", "name": "Part Release",
      "components": [{"id": "relTable", "type": "Table", "boundTo": "Part", "columns": [
          {"field": "Sku", "kind": "identifier"}, {"field": "Name", "kind": "text"},
-         {"field": "Category", "kind": "text"}, {"field": "Status", "kind": "chip"}]}]},
+         {"field": "Category", "kind": "text"}, {"field": "Status", "kind": "chip"}]}],
+     "actions": [{"name": "UpdatePart", "trigger": {"onComponent": "relTable", "event": "onClick"},
+                  "does": ["UpdateEntity"]}]},
     {"id": "intake", "name": "Supplier Intake",
-     "components": [{"id": "intakeTable", "type": "Table", "boundTo": "Supplier", "columns": [
-         {"field": "Code", "kind": "identifier"}, {"field": "Name", "kind": "text"},
-         {"field": "Tier", "kind": "tag"}, {"field": "Status", "kind": "chip"}]}]},
+     "components": [
+         {"id": "addSupplierBtn", "type": "Button", "label": "+ New Supplier"},
+         {"id": "intakeTable", "type": "Table", "boundTo": "Supplier", "columns": [
+             {"field": "Code", "kind": "identifier"}, {"field": "Name", "kind": "text"},
+             {"field": "Tier", "kind": "tag"}, {"field": "Status", "kind": "chip"}]}],
+     "actions": [{"name": "CreateSupplier", "trigger": {"onComponent": "addSupplierBtn", "event": "onClick"},
+                  "does": ["CreateEntity"], "validate": True}]},
 ]
 
 # Every screen needs a machine-checkable acceptance contract (harness-verify gates on it).

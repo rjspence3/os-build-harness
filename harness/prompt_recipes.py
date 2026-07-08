@@ -1592,7 +1592,19 @@ def plan_from_spec(spec: dict) -> list[dict]:
     # SEED-A: parents-before-children (topo over FKs). An FK-linked set is seeded as ONE graph
     # (seed-graph: capture parent Id from CreateAction return — an aggregate lookup can't see rows
     # created in the same action at runtime). A standalone set stays per-entity seed-entity.
-    seed_order = _seed_topo_order(sorted(listed - created - already_seeded), spec)
+    # FK integrity: a captured-Id seed graph needs its PARENTS seeded even if a parent has a create
+    # UI (is in `created`) — else the child's captured-Id FK ref points at a never-created local.
+    graph_set = set(listed - created - already_seeded)
+    changed = True
+    while changed:
+        changed = False
+        for ent in list(graph_set):
+            for fr in _fk_refs(spec, ent):
+                parent = fr["parent"]
+                if parent in listed and parent not in graph_set and parent not in already_seeded:
+                    graph_set.add(parent)
+                    changed = True
+    seed_order = _seed_topo_order(sorted(graph_set), spec)
     seed_ents = []
     for ent in seed_order:
         rows = _sample_rows(spec, ent)

@@ -497,6 +497,18 @@
           "toScreen": "caseDetail"
         }
       ],
+      "actions": [
+        {
+          "name": "UpdateCase",
+          "trigger": {
+            "onComponent": "caseTable",
+            "event": "onClick"
+          },
+          "does": [
+            "UpdateEntity"
+          ]
+        }
+      ],
       "acceptance": {
         "assertions": [
           {
@@ -638,6 +650,18 @@
           ]
         }
       ],
+      "actions": [
+        {
+          "name": "UpdatePart",
+          "trigger": {
+            "onComponent": "relTable",
+            "event": "onClick"
+          },
+          "does": [
+            "UpdateEntity"
+          ]
+        }
+      ],
       "acceptance": {
         "assertions": [
           {
@@ -651,6 +675,11 @@
       "id": "intake",
       "name": "Supplier Intake",
       "components": [
+        {
+          "id": "addSupplierBtn",
+          "type": "Button",
+          "label": "+ New Supplier"
+        },
         {
           "id": "intakeTable",
           "type": "Table",
@@ -675,11 +704,24 @@
           ]
         }
       ],
+      "actions": [
+        {
+          "name": "CreateSupplier",
+          "trigger": {
+            "onComponent": "addSupplierBtn",
+            "event": "onClick"
+          },
+          "does": [
+            "CreateEntity"
+          ],
+          "validate": true
+        }
+      ],
       "acceptance": {
         "assertions": [
           {
             "kind": "componentPresent",
-            "componentId": "intakeTable"
+            "componentId": "addSupplierBtn"
           }
         ]
       }
