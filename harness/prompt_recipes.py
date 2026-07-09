@@ -552,10 +552,21 @@ def create_form(params: dict) -> str:
         recv_txt = (f"The screen receives a {id_param} input ({id_param} = a null/empty identifier means CREATE "
                     f"a new record; a real id means EDIT that one).")
         id_set_txt = f"sets its Id from {id_param} (use LongIntegerToIdentifier(TextToLongInteger(...)) if a cast is needed)"
+        # EDIT support (the write-path is create OR update): without prefilling the form from the existing
+        # record, an edit opens a BLANK form and the save blanks every field. Load the record on screen-init.
+        id_prefill_txt = (
+            f" EDIT PREFILL — add a screen aggregate Get{entity}ById filtered by Id = {id_param}; on screen "
+            f"initialize, WHEN {id_param} is a real (non-empty) identifier, Assign {local} = Get{entity}ById.List.Current "
+            f"so the Form shows that {entity}'s CURRENT values (edit); when {id_param} is empty leave {local} empty (create).")
+        id_assign_txt = (f"Assign {local}.Id = {id_param} when it is a real identifier — so Save{entity}Record calls "
+                         f"UpdateAction and EDITS in place — else NullIdentifier() to create (cast with "
+                         f"LongIntegerToIdentifier(TextToLongInteger(...)) if needed)")
     else:
         recv_txt = ("This is a CREATE-ONLY form: the screen has no own-record id input, so every save creates a "
                     "new record (Id = NullIdentifier()).")
         id_set_txt = "sets its Id = NullIdentifier() (always create)"
+        id_prefill_txt = ""
+        id_assign_txt = f"Assign {local}.Id = NullIdentifier()"
     ret_txt = f" After saving, Destination back to the {ret} screen." if ret else " After saving, RefreshData the screen's list aggregate."
 
     action_step = (
@@ -587,20 +598,20 @@ def create_form(params: dict) -> str:
         f"aggregate, or any existing widget: {form_widgets} with its OnClick LEFT EMPTY for now. Keep the screen "
         f"Anonymous. Do NOT add any screen action or save logic in this turn.")
     wire_step = (
-        f"Wire the \"{_btn_label}\" button (data-spec-id=\"{_btn_id}\") you just created. Create ONE screen "
-        f"action, set as that button's OnClick, that in order: Assign {local}.Id = NullIdentifier();{context_txt}"
+        f"Wire the \"{_btn_label}\" button (data-spec-id=\"{_btn_id}\") you just created.{id_prefill_txt} Create ONE screen "
+        f"action, set as that button's OnClick, that in order: {id_assign_txt};{context_txt}"
         f"{creator_txt} calls Save{entity}Record passing {local} as {entity}Record; then RefreshData the "
-        f"{screen} list aggregate so the new row appears.{ret_txt} Leave the inputs' bindings intact. The prior "
+        f"{screen} list aggregate so the row appears/updates.{ret_txt} Leave the inputs' bindings intact. The prior "
         f"\"On Click must be set\" error MUST now be resolved.")
     # The PROVEN-persist shape (the batcha recovery): build the Form + inputs + button AND wire the OnClick
     # in ONE turn, AFTER the server action already exists. Keeps the action separate (so this is not the
     # action+form+wire mega-turn that cascades) while avoiding the fragile bare-widgets-only turn.
     combined_step = (
-        f"On the {screen} screen, build a WORKING create form in ONE turn (the {entity}'s Save{entity}Record server "
+        f"On the {screen} screen, build a WORKING create/edit form in ONE turn (the {entity}'s Save{entity}Record server "
         f"action ALREADY exists — call it, do not re-author it). ADD ONLY (do NOT modify the existing table or its "
-        f"aggregate): {form_widgets}; then ONE screen action set as that Button's OnClick that in order: Assign "
-        f"{local}.Id = NullIdentifier();{context_txt}{creator_txt} calls Save{entity}Record passing {local} as "
-        f"{entity}Record; then RefreshData the {screen} list aggregate so the new row appears.{ret_txt} Keep the "
+        f"aggregate): {form_widgets};{id_prefill_txt} then ONE screen action set as that Button's OnClick that in order: "
+        f"{id_assign_txt};{context_txt}{creator_txt} calls Save{entity}Record passing {local} as "
+        f"{entity}Record; then RefreshData the {screen} list aggregate so the row appears/updates.{ret_txt} Keep the "
         f"screen Anonymous.")
 
     # PHANTOM SELF-CHECK for the widgets phase: leaving OnClick empty MUST raise the "On Click must be set"
@@ -630,7 +641,7 @@ def create_form(params: dict) -> str:
         f"not a display. {recv_txt}\n"
         f"1. {action_step}\n"
         f"2. On the screen, add editable inputs: {inputs} (fields: {flist}), and a Save button "
-        f'(data-spec-id="{_btn_id}").{creator_txt}{context_txt}\n'
+        f'(data-spec-id="{_btn_id}").{creator_txt}{context_txt}{id_prefill_txt}\n'
         f"3. Wire Save OnClick to a screen action that reads the form values into the typed {entity} local, {id_set_txt}, "
         f"calls Save{entity}Record, then RefreshData.{ret_txt}\n"
         f"The result MUST persist to the database and survive a page reload. If a 'New {entity}' entry point navigates "

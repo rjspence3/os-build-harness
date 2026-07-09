@@ -812,6 +812,22 @@ def test_create_form_combined_phase_builds_form_and_wires_in_one_turn():
     assert "NewContact.Id = NullIdentifier()" in combined and "RefreshData" in combined
 
 
+def test_create_form_edit_screen_prefills_and_updates_in_place():
+    """An edit screen (id_param) must PREFILL the form from the existing record and set Id FROM the
+    param so Save UpdateActions in place — NOT force NullIdentifier (which opens a blank form and the
+    save blanks every field: the partEdit no-prefill defect)."""
+    combined = pr.render("create-form", {"screen": "partEdit", "entity": "Part",
+                                         "fields": ["Sku", "Name"], "id_param": "PartId", "phase": "combined"})
+    assert "GetPartById" in combined and "List.Current" in combined     # prefill aggregate + assign
+    assert "NewPart.Id = PartId" in combined and "UpdateAction" in combined  # edit in place
+    assert "Assign NewPart.Id = NullIdentifier()" not in combined       # NOT force-create
+    # create-only stays force-create with no prefill aggregate (byte-compatible)
+    create_only = pr.render("create-form", {"screen": "intake", "entity": "Supplier",
+                                            "fields": ["Code"], "phase": "combined"})
+    assert "Assign NewSupplier.Id = NullIdentifier()" in create_only
+    assert "GetSupplierById" not in create_only
+
+
 # ── Phase 4 Batch B: service/client/SQL actions, aggregate join, global event, index ──
 
 def test_service_action_is_public_unlike_server_action():
