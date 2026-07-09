@@ -31,6 +31,7 @@ class _Script:
     fail_starts: int = 0                       # first N mentor_start calls raise (transient)
     publish_payload: dict = None               # override publish_wait return (OS-DPL-50205, no_changes)
     heal_after: int = 0                        # after N attempts, this script switches to clean success
+    error: str = ""                            # terminal error blob (e.g. 'per_tenant_cap_reached')
 
 
 class FakeMCP:
@@ -80,9 +81,10 @@ class FakeMCP:
         status = "succeeded" if healed else s.status
         errs = [] if healed else list(s.compile_errors)
         self._last_script = _Script() if healed else s
-        ok = status == "succeeded" and not errs
+        err = "" if healed else s.error
+        ok = status == "succeeded" and not errs and not err
         return MentorRunResult(
-            run_id=run_id, status=status, stdout="ok", compile_errors=errs,
+            run_id=run_id, status=status, stdout="ok", compile_errors=errs, error=err,
             summary="", session_id="sid" if ok else None, session_token="tok" if ok else None,
             raw_events=[])
 
@@ -147,8 +149,56 @@ def test_build_success_path_publishes_every_step(tmp_path):
     assert report.succeeded == report.total > 0
     # publish-per-unit: one publish per successful step
     assert mcp.publish_calls == report.succeeded
+    # cancel-after-publish: each published session is released so it stops holding the per-tenant cap
+    assert len(mcp.cancels) == report.succeeded
     # every rendered prompt was written for reproducibility
     assert list((tmp_path / "p").glob("*.prompt.txt"))
+
+
+def test_cap_hit_waits_and_cascades_instead_of_halting(tmp_path):
+    # A per-tenant-cap hit is transient: the step should wait-and-retry in-build (not halt) until a
+    # slot frees, so the build cascades through it. heal_after=2 => caps twice, then a slot frees.
+    mcp = FakeMCP()
+    mcp.script_for("SidebarNav", _Script(error="per_tenant_cap_reached", heal_after=2))
+    driver = SpecDriver(mcp, tmp_path / "p", cap_wait_seconds=0, cap_retries=5)
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    assert report.ok and report.failed == 0
+    assert not any("per_tenant_cap" in (s.outcome or "") for s in report.steps)
+
+
+def test_cap_hit_halts_after_exhausting_cap_retries(tmp_path):
+    # If the slot never frees, bounded cap-waits are exhausted and the step halts for the poller.
+    mcp = FakeMCP()
+    mcp.script_for("SidebarNav", _Script(error="per_tenant_cap_reached"))   # never heals
+    driver = SpecDriver(mcp, tmp_path / "p", cap_wait_seconds=0, cap_retries=3)
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    assert not report.ok and report.halted_at and "nav-block" in report.halted_at
+    assert "per_tenant_cap" in next(s.outcome for s in report.steps if s.recipe == "nav-block")
+
+
+def test_two_list_screens_same_entity_different_screens_both_build(tmp_path):
+    # Regression (intake-table bug): _step_target is entity-based, so two tables bound to the SAME
+    # entity on DIFFERENT screens share the target `list-screen:<entity>`. _already_succeeded must be
+    # position-aware (phase) or it skips the second as a dup of the first, leaving that screen listless.
+    spec = {
+        "specVersion": "0.3", "app": {"name": "Demo"},
+        "dataModel": {"entities": [{"name": "Case", "sampleData": [{"Title": "A"}], "attributes": [
+            {"name": "Id", "dataType": "Identifier", "isIdentifier": True},
+            {"name": "Title", "dataType": "Text"}]}]},
+        "navigation": {"block": "SidebarNav", "items": [
+            {"label": "Queue", "toScreen": "queue"}, {"label": "Archive", "toScreen": "archive"}]},
+        "screens": [
+            {"id": "queue", "name": "Queue", "isDefault": True, "components": [
+                {"id": "qT", "type": "Table", "boundTo": "Case", "columns": [{"field": "Title", "kind": "text"}]}]},
+            {"id": "archive", "name": "Archive", "components": [
+                {"id": "aT", "type": "Table", "boundTo": "Case", "columns": [{"field": "Title", "kind": "text"}]}]},
+        ]}
+    db = StateDB(tmp_path / "s.db")
+    driver = SpecDriver(FakeMCP(), tmp_path / "p", db=db)
+    report = _run(driver.build(spec, "app-key", app_name="Demo"))
+    db.close()
+    ls = [s for s in report.steps if s.recipe == "list-screen"]
+    assert len(ls) == 2 and all(s.outcome == "succeeded" for s in ls)   # BOTH built, neither skipped
 
 
 def test_build_halts_after_retry_and_skips_dependents(tmp_path):

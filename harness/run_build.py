@@ -103,6 +103,19 @@ def _nonretryable_reason(result) -> Optional[str]:
     return next((sig for sig in _NONRETRYABLE if sig in blob), None)
 
 
+# The subset of non-retryable signals that are TRANSIENT resource contention, not a permanent block:
+# a per-tenant session slot may free within seconds (our own publish releasing, or ambient 24h reap).
+# Unlike auth/quota/forbidden, these are worth a brief in-build wait-and-retry so the build CASCADES
+# through freed slots instead of dropping to the slow external poller. A capped mentor_start is rejected
+# pre-admission (no session opened), so retrying it does NOT deepen exhaustion.
+_CAP_SIGNALS = ("per_tenant_cap", "session cap", "session_cap", "capacity")
+
+
+def _is_cap_halt(detail: str) -> bool:
+    d = (detail or "").lower()
+    return any(sig in d for sig in _CAP_SIGNALS)
+
+
 def classify_terminal(result) -> tuple[str, str]:
     """A terminal MentorRunResult ⇒ (action, reason). HALT on compile errors (deterministic — a
     recipe gap a re-fire won't fix); RETRY on hang/timeout/cancel (fresh-session re-author, R1/R7);
@@ -225,7 +238,8 @@ class SpecDriver:
     Missing optional methods degrade gracefully — verification is skipped, never faked green."""
 
     def __init__(self, mcp, prompts_dir: Path, *, per_call_timeout: int = 400,
-                 publish_timeout: int = 600, db=None, env_key: str = "", max_attempts: int = 3):
+                 publish_timeout: int = 600, db=None, env_key: str = "", max_attempts: int = 3,
+                 cap_wait_seconds: float = 8.0, cap_retries: int = 6):
         self.mcp = mcp
         self.prompts_dir = Path(prompts_dir)
         self.per_call_timeout = per_call_timeout
@@ -233,6 +247,11 @@ class SpecDriver:
         self.db = db                 # optional StateDB for resumable runs
         self.env_key = env_key       # ODC Dev environment key for publishes (resolved via env_list)
         self.max_attempts = max(1, max_attempts)   # fresh-session re-authors before halting (§Recovery)
+        # Cap-cascade: on a per-tenant-cap hit, wait this long and re-fire the SAME step (up to
+        # cap_retries) before halting to the external poller — lets a build ride freed slots and flow
+        # through consecutive steps in one invocation instead of one-step-per-poller-tick.
+        self.cap_wait_seconds = max(0.0, cap_wait_seconds)
+        self.cap_retries = max(0, cap_retries)
 
     async def build(self, spec: dict, app_key: str, *, app_name: str = "app",
                     max_steps: Optional[int] = None) -> BuildReport:
@@ -240,6 +259,14 @@ class SpecDriver:
         if max_steps is not None:
             steps = steps[:max_steps]
         self.prompts_dir.mkdir(parents=True, exist_ok=True)
+
+        # Targets that repeat in THIS plan (e.g. two list-screens bound to the same entity on
+        # different screens both render as `list-screen:<entity>`). Only these need position-aware
+        # skip-matching; unique targets match by name alone, so inserting/removing steps elsewhere
+        # doesn't shift their identity and needlessly re-fire them on resume.
+        from collections import Counter
+        counts = Counter(_step_target(s, i) for i, s in enumerate(steps))
+        self._dup_targets = {t for t, c in counts.items() if c > 1}
 
         report = BuildReport(app_key=app_key, total=len(steps),
                              succeeded=0, failed=0, skipped=0)
@@ -265,8 +292,14 @@ class SpecDriver:
         return report
 
     def _already_succeeded(self, app: str, index: int, target: str) -> bool:
+        # A step is "already done" if a succeeded row matches its target. For targets that repeat in
+        # the plan (duplicates), also require the plan position (phase=index) to match — else the
+        # second occurrence is silently skipped as a dup of the first (the intake-table bug,
+        # 2026-07-09: two `list-screen:supplier` on different screens). Unique targets match by name
+        # alone, so they survive index shifts from edits elsewhere without a needless re-fire.
+        want_phase = f"{index:03d}" if target in getattr(self, "_dup_targets", set()) else None
         for call in self.db.list_by_status(app, "succeeded"):
-            if call.target_name == target:
+            if call.target_name == target and (want_phase is None or call.phase == want_phase):
                 return True
         return False
 
@@ -287,11 +320,24 @@ class SpecDriver:
 
         last = "not attempted"
         last_run_id = None
-        for attempt in range(1, self.max_attempts + 1):
+        cap_waits = 0
+        attempt = 0
+        while attempt < self.max_attempts:
+            attempt += 1
             action, detail, result = await self._attempt_step(prompt, app_key, row_id)
             last = detail
             last_run_id = result.run_id if result else last_run_id
             if action == HALT:
+                # Cap contention is transient: wait briefly and re-fire the SAME step so the build
+                # cascades through slots as they free, rather than halting to the 10-min poller. A
+                # busy slot is not a failed author attempt, so it doesn't burn one. Bounded, then halt.
+                if _is_cap_halt(detail) and cap_waits < self.cap_retries:
+                    cap_waits += 1
+                    attempt -= 1
+                    print(f"          ⏳ cap wait {cap_waits}/{self.cap_retries}: session slot busy — "
+                          f"retry in {self.cap_wait_seconds:g}s")
+                    await asyncio.sleep(self.cap_wait_seconds)
+                    continue
                 if row_id is not None:
                     self.db.mark_failed(row_id, detail)
                 return StepResult(index, recipe, target, f"halt: {detail}", run_id=last_run_id)
@@ -333,9 +379,15 @@ class SpecDriver:
             pub_id = await self.mcp.publish_start(result.session_id, result.session_token,
                                                   env_key=self.env_key)
             payload = await self.mcp.publish_wait(pub_id, timeout_seconds=self.publish_timeout)
+            paction, preason = classify_publish(payload)
         except MentorError as exc:
-            return RETRY, f"publish error: {exc}", result
-        paction, preason = classify_publish(payload)
+            paction, preason = RETRY, f"publish error: {exc}"
+        # Cancel-after-publish: the turn reached terminal and we've published (or abandoned it on a
+        # publish failure). Release the Mentor session slot NOW — an idle session keeps holding the
+        # per-tenant cap until its 24h inactivity reap, and the harness never resumes a session (each
+        # step re-authors fresh), so nothing downstream needs it. Post-publish there is no unpublished
+        # OML to roll back, so this is safe (unlike cancelling a mutation before terminal).
+        await self._safe_cancel(result.run_id)
         return paction, preason, result
 
     async def _safe_cancel(self, run_id) -> None:
