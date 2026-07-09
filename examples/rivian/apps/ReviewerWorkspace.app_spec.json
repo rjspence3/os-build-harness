@@ -29,7 +29,8 @@
         "heading": "'Space Grotesk'",
         "mono": "'JetBrains Mono'"
       },
-      "css": "body,.screen-container{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;}\nh1,h2,h3,h4,h5,.kpi-value{font-family:'Space Grotesk',sans-serif;}\n/* the fixed sidebar sits in this left gutter on every screen */\nbody{padding-left:248px;}\n\n/* \u2500\u2500 app-shell sidebar (fixed left rail) \u2500\u2500 */\n.app-sidebar{position:fixed;left:0;top:0;bottom:0;width:248px;overflow-y:auto;z-index:20;background:#0d0f0c;border-right:1px solid var(--line);padding:18px 14px;box-sizing:border-box;}\n.sidebar-brand{color:var(--yellow);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:.04em;}\n.sidebar-brand small,.sidebar-sub{display:block;color:var(--faint);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-top:4px;}\n.nav-section{color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin:18px 6px 6px;}\n.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:5px;color:#c9cdc2;text-decoration:none;font-size:14px;border-left:3px solid transparent;}\n.nav-item:hover{background:#161810;}\n.nav-item.is-active{background:#1a1d13;border-left:3px solid var(--yellow);color:var(--ink);font-weight:600;}\n.nav-tag{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.08em;background:#20241d;color:var(--muted);padding:3px 5px;border-radius:3px;}\n.nav-badge{margin-left:auto;background:#20241d;color:var(--muted);border-radius:10px;padding:1px 8px;font-size:11px;}\n.sidebar-user{display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid var(--line);}\n.sidebar-user .avatar{width:32px;height:32px;}\n.online-dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:auto;}\n\n/* \u2500\u2500 top bar \u2500\u2500 */\n.app-topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line);}\n.breadcrumb{color:var(--faint);font-size:13px;}\n.breadcrumb b{color:var(--ink);}\n.env-chip{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);border:1px solid var(--line);border-radius:3px;padding:3px 8px;}\n\n/* \u2500\u2500 status cells \u2500\u2500 */\n.chip,.tag,.badge{display:inline-block;padding:3px 8px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;}\n.chip{background:#20241d;color:var(--ink);}\n.chip-approved,.chip-clear,.chip-qualified,.badge-approved,.badge-clear{background:rgba(127,206,143,.15);color:var(--green);}\n.chip-in-review,.chip-pending,.badge-in-review,.badge-pending{background:rgba(240,182,87,.15);color:var(--amber);}\n.chip-overdue,.chip-rejected,.chip-blocked,.badge-overdue,.badge-breached{background:rgba(239,125,107,.15);color:var(--red);}\n.chip-screening,.badge-screening{background:rgba(121,176,230,.15);color:var(--blue);}\n.tag-t1,.tag-critical{background:rgba(255,211,41,.15);color:var(--yellow);}\n.tag-t2,.tag-standard{background:#20241d;color:var(--muted);}\n.cell-id{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;color:var(--muted);}\n.avatar{width:28px;height:28px;border-radius:50%;background:#2a2f27;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:11px;}\n\n/* \u2500\u2500 KPI dashboard \u2500\u2500 */\n.kpi-row{display:flex;gap:16px;}\n.kpi-card{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:16px;}\n.kpi-icon{color:var(--yellow);font-size:16px;margin-bottom:8px;}\n.kpi-value{font-weight:600;font-size:28px;color:var(--ink);}\n.kpi-label{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}\n.kpi-trend{color:var(--green);font-size:12px;margin-top:6px;}\n\n/* \u2500\u2500 case-detail: stepper + reviews + timeline \u2500\u2500 */\n.stepper{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px;}\n.step{padding:8px 12px;border-radius:5px;border:1px solid var(--line);background:var(--panel);color:var(--faint);font-size:13px;}\n.step.is-done{border-color:var(--green);color:var(--green);}\n.step.is-active{border-color:var(--yellow);color:var(--ink);box-shadow:0 0 0 1px var(--yellow) inset;}\n.step.is-pending{opacity:.55;}\n.review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 18px;}\n.review-card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:12px;}\n.review-card h5{margin:0 0 8px;font-size:13px;color:var(--muted);}\n.timeline{border-left:2px solid var(--line);padding-left:14px;margin-top:8px;}\n.timeline-item{margin-bottom:12px;color:var(--muted);font-size:13px;}\n\n/* \u2500\u2500 tables + content \u2500\u2500 */\n.content{padding:20px;}\ntable{border-collapse:collapse;width:100%;}\nth{text-align:left;color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:10px;border-bottom:1px solid var(--line);}\ntd{padding:12px 10px;border-bottom:1px solid var(--line-soft);color:#c9cdc2;font-size:14px;}\ntr:hover td{background:#10120f;}\n.btn-primary,.is-primary{background:var(--yellow);color:#161810;border-radius:5px;font-weight:600;}"
+      "css": "body,.screen-container{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;}\nh1,h2,h3,h4,h5,.kpi-value{font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em;}\n/* the fixed sidebar sits in this left gutter on every screen */\nbody{padding-left:248px;}\n/* DENSITY/LAYOUT: give screen content real breathing room + a max width so it isn't bare on black */\n.screen-container,[data-screen],.content{padding:28px 34px;max-width:1180px;box-sizing:border-box;}\nh1,h2{font-size:22px;font-weight:600;margin:0 0 4px;}\nh1+*,h2+*{margin-top:0;}\n.screen-container h1,[data-screen] h1{margin-bottom:18px;}\nhr{border:none;border-top:1px solid var(--line);margin:20px 0;}\n\n/* \u2500\u2500 app-shell sidebar (fixed left rail) \u2500\u2500 */\n.app-sidebar{position:fixed;left:0;top:0;bottom:0;width:248px;overflow-y:auto;z-index:20;background:#0d0f0c;border-right:1px solid var(--line);padding:18px 14px;box-sizing:border-box;}\n.sidebar-brand{color:var(--yellow);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;letter-spacing:.04em;}\n.sidebar-brand small,.sidebar-sub{display:block;color:var(--faint);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-top:4px;}\n.nav-section{color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin:18px 6px 6px;}\n.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:5px;color:#c9cdc2;text-decoration:none;font-size:14px;border-left:3px solid transparent;}\n.nav-item:hover{background:#161810;}\n.nav-item.is-active{background:#1a1d13;border-left:3px solid var(--yellow);color:var(--ink);font-weight:600;}\n.nav-tag{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10px;letter-spacing:.08em;background:#20241d;color:var(--muted);padding:3px 5px;border-radius:3px;}\n.nav-badge{margin-left:auto;background:#20241d;color:var(--muted);border-radius:10px;padding:1px 8px;font-size:11px;}\n.sidebar-user{display:flex;align-items:center;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid var(--line);}\n.sidebar-user .avatar{width:32px;height:32px;}\n.online-dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-left:auto;}\n\n/* \u2500\u2500 top bar \u2500\u2500 */\n.app-topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line);}\n.breadcrumb{color:var(--faint);font-size:13px;}\n.breadcrumb b{color:var(--ink);}\n.env-chip{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);border:1px solid var(--line);border-radius:3px;padding:3px 8px;}\n\n/* \u2500\u2500 status cells \u2500\u2500 */\n.chip,.tag,.badge{display:inline-block;padding:3px 8px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.04em;text-transform:uppercase;}\n.chip{background:#20241d;color:var(--ink);}\n.chip-approved,.chip-clear,.chip-qualified,.badge-approved,.badge-clear{background:rgba(127,206,143,.15);color:var(--green);}\n.chip-in-review,.chip-pending,.badge-in-review,.badge-pending{background:rgba(240,182,87,.15);color:var(--amber);}\n.chip-overdue,.chip-rejected,.chip-blocked,.badge-overdue,.badge-breached{background:rgba(239,125,107,.15);color:var(--red);}\n.chip-screening,.badge-screening{background:rgba(121,176,230,.15);color:var(--blue);}\n.tag-t1,.tag-critical{background:rgba(255,211,41,.15);color:var(--yellow);}\n.tag-t2,.tag-standard{background:#20241d;color:var(--muted);}\n.cell-id{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;color:var(--muted);}\n.avatar{width:28px;height:28px;border-radius:50%;background:#2a2f27;color:var(--ink);display:inline-flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:11px;}\n\n/* \u2500\u2500 KPI dashboard \u2500\u2500 */\n.kpi-row{display:flex;gap:16px;}\n.kpi-card{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:16px;}\n.kpi-icon{color:var(--yellow);font-size:16px;margin-bottom:8px;}\n.kpi-value{font-weight:600;font-size:28px;color:var(--ink);}\n.kpi-label{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}\n.kpi-trend{color:var(--green);font-size:12px;margin-top:6px;}\n\n/* \u2500\u2500 case-detail: stepper + reviews + timeline \u2500\u2500 */\n.stepper{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px;}\n.step{padding:8px 12px;border-radius:5px;border:1px solid var(--line);background:var(--panel);color:var(--faint);font-size:13px;}\n.step.is-done{border-color:var(--green);color:var(--green);}\n.step.is-active{border-color:var(--yellow);color:var(--ink);box-shadow:0 0 0 1px var(--yellow) inset;}\n.step.is-pending{opacity:.55;}\n.review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 18px;}\n.review-card{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:12px;}\n.review-card h5{margin:0 0 8px;font-size:13px;color:var(--muted);}\n.timeline{border-left:2px solid var(--line);padding-left:14px;margin-top:8px;}\n.timeline-item{margin-bottom:12px;color:var(--muted);font-size:13px;}\n\n/* \u2500\u2500 tables + content \u2500\u2500 */\n.content{padding:20px;}\ntable{border-collapse:collapse;width:100%;}\nth{text-align:left;color:var(--faint);font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:10px;border-bottom:1px solid var(--line);}\ntd{padding:12px 10px;border-bottom:1px solid var(--line-soft);color:#c9cdc2;font-size:14px;}\ntr:hover td{background:#10120f;}\n.btn-primary,.is-primary{background:var(--yellow);color:#161810;border-radius:5px;font-weight:600;}",
+      "fontFaces": "@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:400;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans@latest/latin-400-normal.woff2') format('woff2');}\n@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:500;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans@latest/latin-500-normal.woff2') format('woff2');}\n@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:600;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/ibm-plex-sans@latest/latin-600-normal.woff2') format('woff2');}\n@font-face{font-family:'Space Grotesk';font-style:normal;font-weight:500;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/space-grotesk@latest/latin-500-normal.woff2') format('woff2');}\n@font-face{font-family:'Space Grotesk';font-style:normal;font-weight:600;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/space-grotesk@latest/latin-600-normal.woff2') format('woff2');}\n@font-face{font-family:'Space Grotesk';font-style:normal;font-weight:700;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/space-grotesk@latest/latin-700-normal.woff2') format('woff2');}\n@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-500-normal.woff2') format('woff2');}\n@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:600;font-display:swap;src:url('https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-600-normal.woff2') format('woff2');}"
     }
   },
   "dataModel": {
@@ -497,18 +498,6 @@
           "toScreen": "caseDetail"
         }
       ],
-      "actions": [
-        {
-          "name": "UpdateCase",
-          "trigger": {
-            "onComponent": "caseTable",
-            "event": "onClick"
-          },
-          "does": [
-            "UpdateEntity"
-          ]
-        }
-      ],
       "acceptance": {
         "assertions": [
           {
@@ -674,16 +663,11 @@
           ]
         }
       ],
-      "actions": [
+      "navigation": [
         {
-          "name": "UpdatePart",
-          "trigger": {
-            "onComponent": "relTable",
-            "event": "onClick"
-          },
-          "does": [
-            "UpdateEntity"
-          ]
+          "fromComponent": "relTable",
+          "event": "onClick",
+          "toScreen": "partEdit"
         }
       ],
       "acceptance": {
@@ -696,14 +680,47 @@
       }
     },
     {
+      "id": "partEdit",
+      "name": "Edit Part",
+      "inputParameters": [
+        {
+          "name": "PartId",
+          "dataType": "Identifier",
+          "references": "Part"
+        }
+      ],
+      "components": [
+        {
+          "id": "partForm",
+          "type": "Container"
+        }
+      ],
+      "actions": [
+        {
+          "name": "SavePart",
+          "trigger": {
+            "onComponent": "partForm",
+            "event": "onClick"
+          },
+          "does": [
+            "CreateEntity"
+          ],
+          "validate": true
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "partForm"
+          }
+        ]
+      }
+    },
+    {
       "id": "intake",
       "name": "Supplier Intake",
       "components": [
-        {
-          "id": "addSupplierBtn",
-          "type": "Button",
-          "label": "+ New Supplier"
-        },
         {
           "id": "intakeTable",
           "type": "Table",
@@ -732,7 +749,7 @@
         {
           "name": "CreateSupplier",
           "trigger": {
-            "onComponent": "addSupplierBtn",
+            "onComponent": "intakeTable",
             "event": "onClick"
           },
           "does": [
@@ -745,7 +762,7 @@
         "assertions": [
           {
             "kind": "componentPresent",
-            "componentId": "addSupplierBtn"
+            "componentId": "intakeTable"
           }
         ]
       }

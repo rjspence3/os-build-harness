@@ -199,9 +199,7 @@ SCREENS = [
          {"field": "Stage", "kind": "text"},
          {"field": "Status", "kind": "chip"},
          {"field": "SlaState", "kind": "badge"}]}],
-     "navigation": [{"fromComponent": "caseTable", "event": "onClick", "toScreen": "caseDetail"}],
-     "actions": [{"name": "UpdateCase", "trigger": {"onComponent": "caseTable", "event": "onClick"},
-                  "does": ["UpdateEntity"]}]},
+     "navigation": [{"fromComponent": "caseTable", "event": "onClick", "toScreen": "caseDetail"}]},
     {"id": "caseDetail", "name": "Case Detail",
      "inputParameters": [{"name": "CaseId", "dataType": "Identifier", "references": "QualificationCase"}],
      "detail": {
@@ -225,15 +223,22 @@ SCREENS = [
      "components": [{"id": "relTable", "type": "Table", "boundTo": "Part", "columns": [
          {"field": "Sku", "kind": "identifier"}, {"field": "Name", "kind": "text"},
          {"field": "Category", "kind": "text"}, {"field": "Status", "kind": "chip"}]}],
-     "actions": [{"name": "UpdatePart", "trigger": {"onComponent": "relTable", "event": "onClick"},
-                  "does": ["UpdateEntity"]}]},
+     "navigation": [{"fromComponent": "relTable", "event": "onClick", "toScreen": "partEdit"}]},
+    # Edit → navigate to detail: a per-part edit screen reached from the release row. Its create-form
+    # takes PartId (an existing-record id) so the same form UPDATES the part in place.
+    {"id": "partEdit", "name": "Edit Part",
+     "inputParameters": [{"name": "PartId", "dataType": "Identifier", "references": "Part"}],
+     "components": [{"id": "partForm", "type": "Container"}],
+     "actions": [{"name": "SavePart", "trigger": {"onComponent": "partForm", "event": "onClick"},
+                  "does": ["CreateEntity"], "validate": True}]},
     {"id": "intake", "name": "Supplier Intake",
+     # The create-form recipe authors the form + its own "Add Supplier" save button, so the intake
+     # screen is its list + the co-located create form (no separate declared trigger button).
      "components": [
-         {"id": "addSupplierBtn", "type": "Button", "label": "+ New Supplier"},
          {"id": "intakeTable", "type": "Table", "boundTo": "Supplier", "columns": [
              {"field": "Code", "kind": "identifier"}, {"field": "Name", "kind": "text"},
              {"field": "Tier", "kind": "tag"}, {"field": "Status", "kind": "chip"}]}],
-     "actions": [{"name": "CreateSupplier", "trigger": {"onComponent": "addSupplierBtn", "event": "onClick"},
+     "actions": [{"name": "CreateSupplier", "trigger": {"onComponent": "intakeTable", "event": "onClick"},
                   "does": ["CreateEntity"], "validate": True}]},
 ]
 
