@@ -21,7 +21,8 @@
           {
             "name": "Code",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "naturalKey": true
           },
           {
             "name": "Name",
@@ -44,6 +45,40 @@
             "name": "TaxId",
             "dataType": "Text"
           }
+        ],
+        "sampleData": [
+          {
+            "Code": "ACM",
+            "Name": "Acme Drivetrains",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "QUALIFIED",
+            "Country": "USA",
+            "TaxId": "US-84-1102"
+          },
+          {
+            "Code": "NVL",
+            "Name": "Novalite Cells",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "IN REVIEW",
+            "Country": "USA",
+            "TaxId": "US-77-5521"
+          },
+          {
+            "Code": "BRG",
+            "Name": "Bright Composites",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "SCREENING",
+            "Country": "MEX",
+            "TaxId": "MX-31-8890"
+          },
+          {
+            "Code": "TORQ",
+            "Name": "TorqWorks",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "QUALIFIED",
+            "Country": "CAN",
+            "TaxId": "CA-19-4432"
+          }
         ]
       },
       {
@@ -63,7 +98,8 @@
           {
             "name": "Email",
             "dataType": "Email",
-            "mandatory": true
+            "mandatory": true,
+            "naturalKey": true
           },
           {
             "name": "Phone",
@@ -79,6 +115,29 @@
             "references": "Supplier",
             "mandatory": false
           }
+        ],
+        "sampleData": [
+          {
+            "Name": "Rae Okafor",
+            "Email": "rae@acmedrivetrains.com",
+            "Phone": "+1-313-555-0142",
+            "Role": "Program Lead",
+            "SupplierId": "ACM"
+          },
+          {
+            "Name": "Ben Sato",
+            "Email": "ben@novalitecells.com",
+            "Phone": "+1-408-555-0199",
+            "Role": "Quality",
+            "SupplierId": "NVL"
+          },
+          {
+            "Name": "Lia Cruz",
+            "Email": "lia@brightcomposites.mx",
+            "Phone": "+52-55-5555-0170",
+            "Role": "Sales",
+            "SupplierId": "BRG"
+          }
         ]
       },
       {
@@ -93,7 +152,8 @@
           {
             "name": "Sku",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "naturalKey": true
           },
           {
             "name": "Name",
@@ -114,6 +174,29 @@
             "references": "Supplier",
             "mandatory": false
           }
+        ],
+        "sampleData": [
+          {
+            "Sku": "BRK-014",
+            "Name": "Regen Brake Module",
+            "Category": "Braking",
+            "Status": "PENDING",
+            "SupplierId": "ACM"
+          },
+          {
+            "Sku": "CEL-221",
+            "Name": "4695 Cell Pack",
+            "Category": "Battery",
+            "Status": "IN REVIEW",
+            "SupplierId": "NVL"
+          },
+          {
+            "Sku": "PNL-071",
+            "Name": "Frunk Panel",
+            "Category": "Body",
+            "Status": "BLOCKED",
+            "SupplierId": "BRG"
+          }
         ]
       },
       {
@@ -128,7 +211,8 @@
           {
             "name": "CaseNo",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "naturalKey": true
           },
           {
             "name": "Tier",
@@ -166,6 +250,52 @@
             "references": "Part",
             "mandatory": false
           }
+        ],
+        "sampleData": [
+          {
+            "CaseNo": "Q-1041",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "IN REVIEW",
+            "Stage": "Functional Review",
+            "Score": "92",
+            "SlaState": "OVERDUE",
+            "Owner": "Devin Lang",
+            "SupplierId": "ACM",
+            "PartId": "BRK-014"
+          },
+          {
+            "CaseNo": "Q-1042",
+            "Tier": "T1 \u00b7 CRITICAL",
+            "Status": "SCREENING",
+            "Stage": "Screening",
+            "Score": "\u2014",
+            "SlaState": "IN REVIEW",
+            "Owner": "Mara Vance",
+            "SupplierId": "NVL",
+            "PartId": "CEL-221"
+          },
+          {
+            "CaseNo": "Q-1043",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "APPROVED",
+            "Stage": "Activation",
+            "Score": "88",
+            "SlaState": "CLEAR",
+            "Owner": "Sanjay Rao",
+            "SupplierId": "BRG",
+            "PartId": "PNL-071"
+          },
+          {
+            "CaseNo": "Q-1044",
+            "Tier": "T2 \u00b7 STANDARD",
+            "Status": "IN REVIEW",
+            "Stage": "Qualification",
+            "Score": "76",
+            "SlaState": "IN REVIEW",
+            "Owner": "Devin Lang",
+            "SupplierId": "TORQ",
+            "PartId": "BRK-014"
+          }
         ]
       },
       {
@@ -195,6 +325,32 @@
             "dataType": "Identifier",
             "references": "QualificationCase",
             "mandatory": false
+          }
+        ],
+        "sampleData": [
+          {
+            "Team": "Procurement",
+            "State": "APPROVED",
+            "DueDate": "2026-07-02",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Team": "Quality",
+            "State": "IN REVIEW",
+            "DueDate": "2026-07-09",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Team": "Engineering",
+            "State": "IN REVIEW",
+            "DueDate": "2026-07-09",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Team": "Compliance",
+            "State": "PENDING",
+            "DueDate": "2026-07-11",
+            "QualificationCaseId": "Q-1041"
           }
         ]
       },
@@ -236,6 +392,32 @@
             "references": "QualificationCase",
             "mandatory": false
           }
+        ],
+        "sampleData": [
+          {
+            "Name": "ISO 9001 Certificate",
+            "Type": "Certification",
+            "Url": "stub://docs/acm-iso9001.pdf",
+            "UploadedAt": "Jul 1",
+            "SupplierId": "ACM",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Name": "Financial Statement 2025",
+            "Type": "Financial",
+            "Url": "stub://docs/acm-fin25.pdf",
+            "UploadedAt": "Jul 1",
+            "SupplierId": "ACM",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Name": "Cell Safety Datasheet",
+            "Type": "Technical",
+            "Url": "stub://docs/nvl-cell.pdf",
+            "UploadedAt": "Jul 2",
+            "SupplierId": "NVL",
+            "QualificationCaseId": "Q-1042"
+          }
         ]
       },
       {
@@ -269,6 +451,29 @@
             "references": "Supplier",
             "mandatory": false
           }
+        ],
+        "sampleData": [
+          {
+            "Provider": "DeniedPartyAPI",
+            "Match": "None",
+            "Status": "CLEAR",
+            "CheckedAt": "Jul 1",
+            "SupplierId": "ACM"
+          },
+          {
+            "Provider": "DeniedPartyAPI",
+            "Match": "Pending",
+            "Status": "SCREENING",
+            "CheckedAt": "Jul 2",
+            "SupplierId": "NVL"
+          },
+          {
+            "Provider": "DeniedPartyAPI",
+            "Match": "Review",
+            "Status": "IN REVIEW",
+            "CheckedAt": "Jul 2",
+            "SupplierId": "BRG"
+          }
         ]
       },
       {
@@ -298,6 +503,32 @@
             "dataType": "Identifier",
             "references": "QualificationCase",
             "mandatory": false
+          }
+        ],
+        "sampleData": [
+          {
+            "Description": "Case created from supplier intake",
+            "Actor": "System",
+            "At": "Jul 1",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Description": "Denied-party screening cleared",
+            "Actor": "ScreeningAgent",
+            "At": "Jul 1",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Description": "Qualification score 92 recorded",
+            "Actor": "Devin Lang",
+            "At": "Jul 3",
+            "QualificationCaseId": "Q-1041"
+          },
+          {
+            "Description": "Procurement review approved",
+            "Actor": "Mara Vance",
+            "At": "Jul 3",
+            "QualificationCaseId": "Q-1041"
           }
         ]
       }

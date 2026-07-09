@@ -1886,6 +1886,9 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
         for k in ("reviewEntity", "timelineEntity"):
             if det.get(k):
                 listed.add(det[k])
+    # An entity that DECLARES sampleData is seeded even if this app renders no screen for it — a
+    # headless data-owning Core (no screens) seeds the graph the portals that reference it display.
+    listed |= {e["name"] for e in (spec.get("dataModel") or {}).get("entities", []) if e.get("sampleData")}
     created = set()
     for s in screens:
         for a in s.get("actions", []):
