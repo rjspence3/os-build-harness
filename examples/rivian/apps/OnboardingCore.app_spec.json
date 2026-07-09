@@ -1,0 +1,341 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "OnboardingCore",
+    "roles": [
+      "User"
+    ],
+    "description": "Core service (onboarding context)"
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "Supplier",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Tier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "Country",
+            "dataType": "Text"
+          },
+          {
+            "name": "TaxId",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Contact",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Email",
+            "dataType": "Email",
+            "mandatory": true
+          },
+          {
+            "name": "Phone",
+            "dataType": "PhoneNumber"
+          },
+          {
+            "name": "Role",
+            "dataType": "Text"
+          },
+          {
+            "name": "SupplierId",
+            "dataType": "Identifier",
+            "references": "Supplier",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Part",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Sku",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Category",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "SupplierId",
+            "dataType": "Identifier",
+            "references": "Supplier",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "QualificationCase",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "CaseNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Tier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "Stage",
+            "dataType": "Text"
+          },
+          {
+            "name": "Score",
+            "dataType": "Text"
+          },
+          {
+            "name": "SlaState",
+            "dataType": "Text"
+          },
+          {
+            "name": "Owner",
+            "dataType": "Text"
+          },
+          {
+            "name": "SupplierId",
+            "dataType": "Identifier",
+            "references": "Supplier",
+            "mandatory": false
+          },
+          {
+            "name": "PartId",
+            "dataType": "Identifier",
+            "references": "Part",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "ReviewTask",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Team",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "State",
+            "dataType": "Text"
+          },
+          {
+            "name": "DueDate",
+            "dataType": "Text"
+          },
+          {
+            "name": "QualificationCaseId",
+            "dataType": "Identifier",
+            "references": "QualificationCase",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Document",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Type",
+            "dataType": "Text"
+          },
+          {
+            "name": "Url",
+            "dataType": "Text"
+          },
+          {
+            "name": "UploadedAt",
+            "dataType": "Text"
+          },
+          {
+            "name": "SupplierId",
+            "dataType": "Identifier",
+            "references": "Supplier",
+            "mandatory": false
+          },
+          {
+            "name": "QualificationCaseId",
+            "dataType": "Identifier",
+            "references": "QualificationCase",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "ScreeningResult",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Provider",
+            "dataType": "Text"
+          },
+          {
+            "name": "Match",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "CheckedAt",
+            "dataType": "Text"
+          },
+          {
+            "name": "SupplierId",
+            "dataType": "Identifier",
+            "references": "Supplier",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "Text"
+          },
+          {
+            "name": "QualificationCaseId",
+            "dataType": "Identifier",
+            "references": "QualificationCase",
+            "mandatory": false
+          }
+        ]
+      }
+    ]
+  },
+  "screens": [],
+  "logic": [
+    {
+      "kind": "serviceAction",
+      "name": "SubmitOnboarding"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "UploadDocument"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SubmitReview"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ApproveCase"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ReleasePart"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "CaptureFeedback"
+    },
+    {
+      "kind": "globalEvent",
+      "name": "OnboardingSubmitted"
+    },
+    {
+      "kind": "globalEvent",
+      "name": "CaseApproved"
+    }
+  ]
+}

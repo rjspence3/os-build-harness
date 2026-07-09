@@ -1,0 +1,130 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "SupplierApp",
+    "roles": [
+      "Supplier"
+    ],
+    "description": "End-user app for supplier"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "SubmitIntake",
+      "name": "SubmitIntake",
+      "components": [
+        {
+          "id": "SubmitIntake_contact_table",
+          "type": "Table",
+          "boundTo": "Contact",
+          "label": "SubmitIntake"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "SubmitIntake_contact_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "SubmitIntake_contact_table",
+            "boundTo": "Contact"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "UploadDocument",
+      "name": "UploadDocument",
+      "components": [
+        {
+          "id": "UploadDocument_document_table",
+          "type": "Table",
+          "boundTo": "Document",
+          "label": "UploadDocument"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "UploadDocument_document_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "UploadDocument_document_table",
+            "boundTo": "Document"
+          }
+        ]
+      }
+    },
+    {
+      "id": "TrackStatus",
+      "name": "TrackStatus",
+      "components": [
+        {
+          "id": "TrackStatus_part_table",
+          "type": "Table",
+          "boundTo": "Part",
+          "label": "TrackStatus"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "TrackStatus_part_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "TrackStatus_part_table",
+            "boundTo": "Part"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "OnboardingCore",
+      "elements": [
+        {
+          "name": "Contact",
+          "kind": "Entity"
+        },
+        {
+          "name": "Document",
+          "kind": "Entity"
+        },
+        {
+          "name": "Part",
+          "kind": "Entity"
+        },
+        {
+          "name": "QualificationCase",
+          "kind": "Entity"
+        },
+        {
+          "name": "ScreeningResult",
+          "kind": "Entity"
+        },
+        {
+          "name": "Supplier",
+          "kind": "Entity"
+        },
+        {
+          "name": "SubmitOnboarding",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "UploadDocument",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

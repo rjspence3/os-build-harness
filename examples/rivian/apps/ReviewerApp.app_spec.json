@@ -1,0 +1,184 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ReviewerApp",
+    "roles": [
+      "Reviewer"
+    ],
+    "description": "End-user app for reviewer"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ReviewQueue",
+      "name": "ReviewQueue",
+      "components": [
+        {
+          "id": "ReviewQueue_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ReviewQueue"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ReviewQueue_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ReviewQueue_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "EvaluateCase",
+      "name": "EvaluateCase",
+      "components": [
+        {
+          "id": "EvaluateCase_document_table",
+          "type": "Table",
+          "boundTo": "Document",
+          "label": "EvaluateCase"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "EvaluateCase_document_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "EvaluateCase_document_table",
+            "boundTo": "Document"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ApproveCase",
+      "name": "ApproveCase",
+      "components": [
+        {
+          "id": "ApproveCase_part_table",
+          "type": "Table",
+          "boundTo": "Part",
+          "label": "ApproveCase"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ApproveCase_part_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ApproveCase_part_table",
+            "boundTo": "Part"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ReleasePart",
+      "name": "ReleasePart",
+      "components": [
+        {
+          "id": "ReleasePart_qualificationcase_table",
+          "type": "Table",
+          "boundTo": "QualificationCase",
+          "label": "ReleasePart"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ReleasePart_qualificationcase_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ReleasePart_qualificationcase_table",
+            "boundTo": "QualificationCase"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CaptureFeedback",
+      "name": "CaptureFeedback",
+      "components": [
+        {
+          "id": "CaptureFeedback_reviewtask_table",
+          "type": "Table",
+          "boundTo": "ReviewTask",
+          "label": "CaptureFeedback"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "CaptureFeedback_reviewtask_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "CaptureFeedback_reviewtask_table",
+            "boundTo": "ReviewTask"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "OnboardingCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Document",
+          "kind": "Entity"
+        },
+        {
+          "name": "Part",
+          "kind": "Entity"
+        },
+        {
+          "name": "QualificationCase",
+          "kind": "Entity"
+        },
+        {
+          "name": "ReviewTask",
+          "kind": "Entity"
+        },
+        {
+          "name": "ApproveCase",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "CaptureFeedback",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "ReleasePart",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "SubmitReview",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}
