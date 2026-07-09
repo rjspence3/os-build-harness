@@ -61,6 +61,34 @@ def _gate_row(name: str, status: str, detail: str = "", results=None) -> dict:
     return {"gate": name, "status": status, "detail": detail, "results": results or []}
 
 
+def _fold_dimension(verdict_dicts: list[dict]) -> tuple[str, dict]:
+    """Classify a list of driver/render result dicts into a dimension_state and counts.
+
+    Each dict may carry a pre-attached `verdict_class` (set by _finalize in capture.py),
+    or we classify its `verdict` string on the fly (so monkeypatched stub dicts that lack
+    verdict_class still classify correctly — the aggregation always folds at this point).
+
+    Returns (dimension_state, counts) where:
+      dimension_state: "PASS" | "FAILED" | "INCOMPLETE"
+      counts:          {"ok": N, "defect": N, "incomplete": N}
+    """
+    from harness.capture import _classify_verdict
+    counts = {"ok": 0, "defect": 0, "incomplete": 0}
+    for r in verdict_dicts:
+        cls = r.get("verdict_class") or _classify_verdict(r.get("verdict", ""))
+        if cls == "ok":
+            counts["ok"] += 1
+        elif cls == "defect":
+            counts["defect"] += 1
+        else:
+            counts["incomplete"] += 1
+    if counts["defect"]:
+        return "FAILED", counts
+    if counts["incomplete"]:
+        return "INCOMPLETE", counts
+    return "PASS", counts
+
+
 def _empty_bound_components(snapshot: dict) -> set:
     """(screen_id, component_id) for data widgets that are PRESENT but rendered zero rows
     (the snapshot marks these `boundTo_unrendered`). Their binding cannot be confirmed OR
@@ -114,11 +142,17 @@ def run_all_gates(spec: dict, base_url: str, login: dict, *, pixel_ref: str | No
     # 3. behavioral — the real bar, iff the spec has write-paths.
     if _has_write_paths(spec):
         br = capture.run_behavioral(spec, base_url, login)
-        good = {"PERSISTS", "UPDATES", "DELETES"}
+        dim_state, counts = _fold_dimension(br)
         bad = [f"{r['screen']}·{r.get('op', 'create')} {r['entity']}: {r['verdict']}"
-               for r in br if r["verdict"] not in good]
-        rows.append(_gate_row("behavioral", "FAIL" if bad else "PASS",
-                              f"{len(br) - len(bad)}/{len(br)} write-path(s) persist", bad))
+               for r in br
+               if (r.get("verdict_class") or capture._classify_verdict(r.get("verdict", ""))) != "ok"]
+        n_ok = counts["ok"]
+        status = "FAIL" if dim_state in ("FAILED", "INCOMPLETE") else "PASS"
+        row = _gate_row("behavioral", status,
+                        f"{n_ok}/{len(br)} write-path(s) persist", bad)
+        row["dimension_state"] = dim_state
+        row["counts"] = counts
+        rows.append(row)
     else:
         rows.append(_gate_row("behavioral", "OMIT", "no Create/Update/Delete write-paths in spec"))
 
@@ -135,10 +169,17 @@ def run_all_gates(spec: dict, base_url: str, login: dict, *, pixel_ref: str | No
     # 5. render — iff the spec has charts or a design.theme.
     if _has_render_targets(spec):
         rn = capture.run_render(spec, base_url, login)
-        good = {"APPLIED", "RENDERS"}
-        bad = [f"{r.get('kind')} {r.get('target')}: {r['verdict']}" for r in rn if r["verdict"] not in good]
-        rows.append(_gate_row("render", "FAIL" if bad else "PASS",
-                              f"{len(rn) - len(bad)}/{len(rn)} target(s) ok", bad))
+        dim_state, counts = _fold_dimension(rn)
+        bad = [f"{r.get('kind')} {r.get('target')}: {r['verdict']}"
+               for r in rn
+               if (r.get("verdict_class") or capture._classify_verdict(r.get("verdict", ""))) != "ok"]
+        n_ok = counts["ok"]
+        status = "FAIL" if dim_state in ("FAILED", "INCOMPLETE") else "PASS"
+        row = _gate_row("render", status,
+                        f"{n_ok}/{len(rn)} target(s) ok", bad)
+        row["dimension_state"] = dim_state
+        row["counts"] = counts
+        rows.append(row)
     else:
         rows.append(_gate_row("render", "OMIT", "no charts or design.theme in spec"))
 
@@ -219,7 +260,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"harness-gate — {args.spec.name}: {'✅ DONE' if done else '❌ NOT DONE'}")
         for r in rows:
-            mark = {"PASS": "ok ", "FAIL": "FAIL", "OMIT": "—  "}[r["status"]]
+            if r["status"] == "FAIL" and r.get("dimension_state") == "INCOMPLETE":
+                mark = "INCP"
+            else:
+                mark = {"PASS": "ok ", "FAIL": "FAIL", "OMIT": "—  "}[r["status"]]
             print(f"  [{mark}] {r['gate']:<11} {r['detail']}")
             for d in r["results"]:
                 print(f"          · {d}")

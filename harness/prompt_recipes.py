@@ -480,11 +480,37 @@ def seed_graph(params: dict) -> str:
     )
 
 
+def _declared_create_button(spec: dict, screen_id: str, entity: str) -> dict | None:
+    """Resolve the button declared on a CreateEntity action via trigger.onComponent (W4).
+
+    Finds the screen's CreateEntity action, reads `trigger.onComponent`, then looks up that
+    component in the screen's components list and returns {"id", "label"} when both are
+    present.  Returns None for specs that don't declare the trigger (legacy specs fall back to
+    the generated id/label).  Never invents a label."""
+    screen = next((s for s in spec.get("screens", []) if s["id"] == screen_id), None)
+    if not screen:
+        return None
+    # Find the CreateEntity action and its trigger.onComponent.
+    trigger_component_id = None
+    for a in screen.get("actions", []):
+        if "CreateEntity" in set(a.get("does", [])):
+            trigger_component_id = (a.get("trigger") or {}).get("onComponent")
+            break
+    if not trigger_component_id:
+        return None
+    # Look up that component and return its id + label.
+    for c in screen.get("components", []):
+        if c.get("id") == trigger_component_id and c.get("label"):
+            return {"id": c["id"], "label": c["label"]}
+    return None
+
+
 def create_form(params: dict) -> str:
     """Wire a WORKING create/edit form for an entity — the write-path (Phase 6, the
     definition of done). Encodes every correction a hand-authored create turn needs.
 
-    params: screen, entity, fields:[attr], return_screen?, id_param?, context_fk?, creator_attr?, phase?
+    params: screen, entity, fields:[attr], return_screen?, id_param?, context_fk?,
+            creator_attr?, phase?, button_id?, button_label?
 
     `phase` (iteration-3 seam 3f — thrash-free decomposition). Authoring the server action +
     form + save-wiring in ONE Mentor turn cascades for many minutes on a populated screen. The
@@ -493,7 +519,11 @@ def create_form(params: dict) -> str:
       - "widgets" : the form inputs + button bound to a local var, OnClick LEFT EMPTY (fresh turn).
       - "wire"    : wire the button OnClick — RESUME the widgets turn's session so it builds on
                     the unpublished widgets, then publish ONCE.
-    phase=None (default) returns the single combined prompt (backward-compatible)."""
+    phase=None (default) returns the single combined prompt (backward-compatible).
+
+    `button_id` / `button_label` (W4): when supplied, the recipe authors EXACTLY that button
+    id + label (from the spec's declared trigger.onComponent).  When absent, the recipe falls
+    back to the legacy generated id (save<entity>btn) + label (Add <Entity>)."""
     screen = _p(params, "screen", required=True)
     entity = _p(params, "entity", required=True)
     fields = _p(params, "fields", [], required=True)
@@ -502,6 +532,9 @@ def create_form(params: dict) -> str:
     ctx = _p(params, "context_fk")                 # {"attr","from_param"} mandatory parent FK from a screen param
     creator = _p(params, "creator_attr")           # e.g. CreatorId — set from session identity
     phase = _p(params, "phase")
+    # W4: declared button overrides the legacy generated id/label.
+    button_id = _p(params, "button_id")
+    button_label = _p(params, "button_label")
     lentity = entity.lower()
     local = f"New{entity}"
     flist = ", ".join(fields)
@@ -535,6 +568,12 @@ def create_form(params: dict) -> str:
         f"its identifier/Id attribute (the identifier is already settled; changing an entity identifier after its "
         f"first publish is IRREVERSIBLE and blocks the deploy with OS-DPL-RDBS-40020). Only READ {entity} via its "
         f"CreateAction/UpdateAction and a typed {entity} local — author ONLY the server action, touch no entity schema.")
+    # W4: use spec-declared button id+label when supplied; legacy fallback otherwise.
+    # The save-click JS in _drive_create matches /save|create|add|submit/i so both
+    # "Add Supplier" (legacy) and "+ New Supplier" (declared) are caught without changes.
+    _btn_id    = button_id    or f"save{lentity}btn"
+    _btn_label = button_label or f"Add {entity}"
+
     # The form's inputs live INSIDE a Form container widget. A BARE Input added directly to the screen
     # is the shape that intermittently phantoms (change_applied=true but nothing persists — batcha,
     # 2026-07-07, 4× fresh); the Form-wrapped build is what persisted. So every form path wraps its
@@ -542,13 +581,13 @@ def create_form(params: dict) -> str:
     form_widgets = (
         f"a screen-local variable {local} of the {entity} data type; a Form container widget "
         f"(data-spec-id=\"{lentity}form\") whose Source record is {local}, and INSIDE that Form these editable "
-        f"inputs: {inputs} (fields: {flist}); and a Button labeled \"Add {entity}\" (data-spec-id=\"save{lentity}btn\")")
+        f"inputs: {inputs} (fields: {flist}); and a Button labeled \"{_btn_label}\" (data-spec-id=\"{_btn_id}\")")
     widgets_step = (
         f"On the {screen} screen, ADD ONLY these and nothing else — do NOT modify or rebind the existing table, "
         f"aggregate, or any existing widget: {form_widgets} with its OnClick LEFT EMPTY for now. Keep the screen "
         f"Anonymous. Do NOT add any screen action or save logic in this turn.")
     wire_step = (
-        f"Wire the \"Add {entity}\" button (data-spec-id=\"save{lentity}btn\") you just created. Create ONE screen "
+        f"Wire the \"{_btn_label}\" button (data-spec-id=\"{_btn_id}\") you just created. Create ONE screen "
         f"action, set as that button's OnClick, that in order: Assign {local}.Id = NullIdentifier();{context_txt}"
         f"{creator_txt} calls Save{entity}Record passing {local} as {entity}Record; then RefreshData the "
         f"{screen} list aggregate so the new row appears.{ret_txt} Leave the inputs' bindings intact. The prior "
@@ -591,7 +630,7 @@ def create_form(params: dict) -> str:
         f"not a display. {recv_txt}\n"
         f"1. {action_step}\n"
         f"2. On the screen, add editable inputs: {inputs} (fields: {flist}), and a Save button "
-        f'(data-spec-id="save{lentity}btn").{creator_txt}{context_txt}\n'
+        f'(data-spec-id="{_btn_id}").{creator_txt}{context_txt}\n'
         f"3. Wire Save OnClick to a screen action that reads the form values into the typed {entity} local, {id_set_txt}, "
         f"calls Save{entity}Record, then RefreshData.{ret_txt}\n"
         f"The result MUST persist to the database and survive a page reload. If a 'New {entity}' entry point navigates "
@@ -768,11 +807,19 @@ def dashboard(params: dict) -> str:
     """A KPI dashboard header: a row of stat cards (icon + big value + label + optional trend
     tag), laid out in a responsive columns grid. The theme paints .kpi-card/.kpi-icon/.kpi-value.
     params: screen, cards:[{label, value_field?|aggregate?|value?, icon?, trend?, entity?}],
-    columns?(default 3). Each card's value is a live aggregate COUNT when `entity`/`aggregate`
-    is given, else the literal `value`."""
+    columns?(default 3), phase?("aggregate"|"bind"|None).
+
+    Each card's value is a live aggregate COUNT when `entity`/`aggregate` is given, else literal.
+
+    W5b: `phase` enables two-step atomic authoring for COUNT cards (one-step-per-unit, commit 654f038):
+      - phase="aggregate": author the Count{Ent} screen aggregate for each COUNT card (data-only turn, no bind).
+      - phase="bind":      set each KPI Expression Value to Count{Ent}.Count (bind-only turn).
+      - phase=None (default): combined single prompt (legacy back-compat — unchanged when no COUNT cards)."""
     screen = _p(params, "screen", required=True)
     cards = _p(params, "cards", [], required=True)
     ncols = _p(params, "columns", min(len(cards), 4) or 1)
+    phase = _p(params, "phase")
+
     lines = []
     for c in cards:
         icon = c.get("icon", "chart-bar")
@@ -794,6 +841,45 @@ def dashboard(params: dict) -> str:
             f'CSS-icon (Container Style class "kpi-icon glyph-{icon}"), a big value Expression (Style class '
             f'"kpi-value") showing {val}, a label (Style class "kpi-label") "{label}"{trend}.')
     body = "\n".join(lines)
+
+    # W5b: phase-split path for COUNT cards.
+    count_cards = [c for c in cards if c.get("entity") or c.get("aggregate")]
+    if phase == "aggregate" and count_cards:
+        agg_lines = []
+        for c in count_cards:
+            ent = c.get("entity") or c.get("aggregate")
+            filt = f' filtered where {c["filter"]}' if c.get("filter") else ""
+            agg_name = f"Count{ent}"
+            agg_lines.append(
+                f'  - Add a screen aggregate named {agg_name} over {ent}{filt}, '
+                f'Max Records = 1 (count-only query). Do NOT bind it to any widget yet.'
+            )
+        return (
+            f"{_PREAMBLE}\n\n"
+            f"On the {screen} screen, author ONLY the COUNT screen aggregate(s) — no widgets, no bindings.\n"
+            + "\n".join(agg_lines)
+            + "\nDo not publish."
+        )
+
+    if phase == "bind" and count_cards:
+        bind_lines = []
+        for c in count_cards:
+            ent = c.get("entity") or c.get("aggregate")
+            label = c.get("label", "")
+            slug = _slug(label)
+            bind_lines.append(
+                f'  - Set the Expression Value inside [data-spec-id="kpi{slug}"] .kpi-value '
+                f'to Count{ent}.Count (the aggregate\'s total-count output). '
+                f'Do NOT bind to Count{ent}.List.Length (wrong: page-size, not count).'
+            )
+        return (
+            f"{_PREAMBLE}\n\n"
+            f"On the {screen} screen, ONLY update the KPI Expression bindings — do not add new widgets.\n"
+            + "\n".join(bind_lines)
+            + "\nDo not publish."
+        )
+
+    # phase=None: combined single prompt (backward-compatible).
     return (
         f"{_PREAMBLE}\n\n"
         f"On the {screen} screen, add a KPI dashboard header — a row of {len(cards)} stat cards in a "
@@ -1163,6 +1249,40 @@ def json_1line(obj) -> str:
     return json.dumps(obj, separators=(", ", "="))
 
 
+def kpi_rebind(params: dict) -> str:
+    """W5c: applyModelApiCode corrective — locate each KPI Expression and rebind its Value to
+    the screen aggregate's `.Count`.  A deterministic fallback when the NL bind step (W5b) still
+    produces the wrong binding (e.g. Mentor persists .List.Length despite explicit instructions).
+
+    params: screen, cards:[{label, entity}].
+
+    Only emitted when plan_from_spec(..., kpi_model_api_fallback=True). Default is False."""
+    screen = _p(params, "screen", required=True)
+    cards = _p(params, "cards", [], required=True)
+    bind_lines = []
+    for c in cards:
+        ent = c.get("entity") or c.get("aggregate")
+        if not ent:
+            continue
+        label = c.get("label", "")
+        slug = _slug(label)
+        bind_lines.append(
+            f'  - Find the Expression inside [data-spec-id="kpi{slug}"] .kpi-value. '
+            f'Set its Value to the screen aggregate Count{ent}.Count. '
+            f'Count{ent} must be a screen aggregate over {ent} with Max Records=1. '
+            f'Use applyModelApiCode to make this change directly — do NOT use NL authoring for this rebind.'
+        )
+    body = "\n".join(bind_lines)
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"CORRECTIVE REBIND (Model-API only): On the {screen} screen, re-wire each KPI Expression "
+        f"to the correct aggregate count. This step exists because the NL bind produced the wrong "
+        f"expression (likely .List.Length instead of .Count). Fix ONLY the Expression values:\n"
+        f"{body}\n"
+        f"Do NOT change the card structure, labels, or aggregate definitions. Do not publish."
+    )
+
+
 RECIPES = {
     "data-model": data_model,
     "static-entity": static_entity,
@@ -1194,6 +1314,7 @@ RECIPES = {
     "theme": theme,
     "dashboard": dashboard,
     "detail": detail,
+    "kpi-rebind": kpi_rebind,
 }
 
 
@@ -1361,13 +1482,39 @@ def _creator_attr(spec: dict, entity: str, user_entity: str | None) -> str | Non
     return None
 
 
-def _list_screen_for_entity(spec: dict, entity: str, exclude: str | None = None) -> str | None:
-    for s in spec.get("screens", []):
+def _is_entity_bound_screen(spec_screen: dict, entity: str) -> bool:
+    """True when at least one data component on this screen is bound to `entity`."""
+    for c in spec_screen.get("components", []):
+        if c.get("type") in _DATA_COMPONENT_TYPES and (c.get("boundTo") or "").split(".")[0] == entity:
+            return True
+    return False
+
+
+def _list_screen_for_entity(
+    spec: dict, entity: str, exclude: str | None = None, prefer: str | None = None
+) -> str | None:
+    """Return the id of a screen that shows a data list for `entity`.
+
+    Selection order (W2):
+    1. If `prefer` names a screen that is itself entity-bound, return it (anchor to
+       the action's own screen — fixes the create-form measurement seam).
+    2. Else: the first non-excluded entity-bound screen (legacy behaviour).
+    3. None when no entity-bound screen exists.
+
+    `prefer` is keyword-optional with default None so all existing call-sites that
+    pass positional (spec, entity) or (spec, entity, exclude) are byte-identical."""
+    screens = spec.get("screens", [])
+    # Step 1: honour the preferred anchor if it is entity-bound.
+    if prefer:
+        for s in screens:
+            if s["id"] == prefer and _is_entity_bound_screen(s, entity):
+                return s["id"]
+    # Step 2: first non-excluded entity-bound screen (original behaviour).
+    for s in screens:
         if s["id"] == exclude:
             continue
-        for c in s.get("components", []):
-            if c.get("type") in _DATA_COMPONENT_TYPES and (c.get("boundTo") or "").split(".")[0] == entity:
-                return s["id"]
+        if _is_entity_bound_screen(s, entity):
+            return s["id"]
     return None
 
 
@@ -1452,13 +1599,17 @@ def _theme_css(t: dict) -> str:
     return "\n".join(parts) or "/* theme */"
 
 
-def plan_from_spec(spec: dict) -> list[dict]:
+def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[dict]:
     """Derive an ordered list of pre-corrected build steps directly from an
     app_spec's first-class fields — the chain spec -> recipe -> (build) -> verify.
     Each step is {recipe, params, why}; render each with `render(step['recipe'],
     step['params'])`. Reads app.navigation, app.auth, and per-screen components +
     access. Order: shared nav block -> seed the user entity -> per data screen
-    (bind its list, then gate it if access requires)."""
+    (bind its list, then gate it if access requires).
+
+    kpi_model_api_fallback (W5c, default False): when True, append one `kpi-rebind`
+    step after each dashboard bind step — a deterministic Model-API corrective for
+    the KPI rebind if the NL bind still produces .List.Length.  Off by default."""
     steps: list[dict] = []
     screens = spec.get("screens", [])
     auth = spec.get("auth") or {}
@@ -1614,6 +1765,11 @@ def plan_from_spec(spec: dict) -> list[dict]:
                 ret = _list_screen_for_entity(spec, entity, exclude=s["id"])
                 if ret:
                     p["return_screen"] = ret
+                # W4: resolve the declared button from the action's trigger.onComponent.
+                btn = _declared_create_button(spec, s["id"], entity)
+                if btn:
+                    p["button_id"] = btn["id"]
+                    p["button_label"] = btn["label"]
                 # Seam 3f (revised after batcha): action FIRST (its own turn), then Form+widgets+wire in
                 # ONE turn — the PROVEN-persist shape. The old bare-widgets-only turn phantomed 4× (batcha);
                 # keeping the action separate avoids the action+form+wire mega-cascade the split guarded against.
@@ -1656,13 +1812,32 @@ def plan_from_spec(spec: dict) -> list[dict]:
                           "params": {"screen": s["id"], "chart_type": ch["chartType"],
                                      "category_field": ch["categoryField"], "series": ch["series"],
                                      "source_aggregate": ch.get("sourceAggregate")}})
-        # UI-A: a KPI dashboard header on this screen -> `dashboard` step.
+        # UI-A: a KPI dashboard header on this screen -> `dashboard` step(s).
+        # W5b: when any card is a COUNT card, split into two atomic steps (aggregate, then bind)
+        # so each turn has a single responsibility (proven one-step-per-unit pattern, commit 654f038).
         dash = s.get("dashboard")
         if dash and dash.get("cards"):
-            p = {"screen": s["id"], "cards": dash["cards"]}
+            p_base = {"screen": s["id"], "cards": dash["cards"]}
             if dash.get("columns"):
-                p["columns"] = dash["columns"]
-            steps.append({"recipe": "dashboard", "why": f"{s['id']} KPI dashboard header", "params": p})
+                p_base["columns"] = dash["columns"]
+            has_count_card = any(c.get("entity") or c.get("aggregate") for c in dash["cards"])
+            if has_count_card:
+                steps.append({"recipe": "dashboard",
+                              "why": f"{s['id']} KPI dashboard — author COUNT aggregates (atomic step 1/2)",
+                              "params": {**p_base, "phase": "aggregate"}})
+                steps.append({"recipe": "dashboard",
+                              "why": f"{s['id']} KPI dashboard — bind KPI Expressions to Count.Count (atomic step 2/2)",
+                              "params": {**p_base, "phase": "bind"}})
+                # W5c: deterministic Model-API corrective — only when explicitly requested.
+                if kpi_model_api_fallback:
+                    rebind_cards = [{"label": c.get("label", ""), "entity": c.get("entity") or c.get("aggregate")}
+                                    for c in dash["cards"] if c.get("entity") or c.get("aggregate")]
+                    steps.append({"recipe": "kpi-rebind",
+                                  "why": f"{s['id']} KPI corrective rebind (applyModelApiCode)",
+                                  "params": {"screen": s["id"], "cards": rebind_cards}})
+            else:
+                steps.append({"recipe": "dashboard", "why": f"{s['id']} KPI dashboard header",
+                              "params": p_base})
         # UI-A: a rich case-detail screen (stepper + parallel reviews + audit timeline) -> `detail` step.
         det = s.get("detail")
         if det and det.get("stages"):

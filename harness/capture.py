@@ -43,6 +43,57 @@ from pathlib import Path
 # Component types that carry data (binding == present AND renders rows).
 _DATA_TYPES = {"Table", "List", "Card", "Board", "Chart"}
 
+# ── W1: Verdict taxonomy ─────────────────────────────────────────────────────
+# Maps the leading token of a verdict string to "ok" | "defect" | "unverified".
+# Keys on the token before the first space or paren.  Unknown -> "unverified"
+# (never silently "ok").  ERROR* -> "unverified" (a driver exception blocks DONE
+# but is NOT a confirmed app defect — route the fix to the driver/gate, not the app).
+_VERDICT_CLASS: dict[str, str] = {
+    # real app defects → HALT
+    "NO_PERSIST":       "defect",
+    "NO_UPDATE":        "defect",
+    "NO_DELETE":        "defect",
+    "NOT_APPLIED":      "defect",
+    "NO_CHART":         "defect",
+    "KPI_WRONG":        "defect",
+    # reachability / driver gaps → INCOMPLETE (blocks DONE, routes fix to harness)
+    "NO_LIST_SCREEN":   "unverified",
+    "NO_CREATE_ENTRY":  "unverified",
+    "NO_EDIT_ENTRY":    "unverified",
+    "NO_DELETE_ENTRY":  "unverified",
+    "NO_PARENT_CONTEXT":"unverified",
+    "FORM_NOT_FOUND":   "unverified",
+    "EDIT_FORM_NOT_FOUND": "unverified",
+    "SAVE_NOT_FOUND":   "unverified",
+    "NO_ROWS":          "unverified",
+    # confirmed-ok verdicts
+    "PERSISTS":         "ok",
+    "UPDATES":          "ok",
+    "DELETES":          "ok",
+    "APPLIED":          "ok",
+    "RENDERS":          "ok",
+    "KPI_OK":           "ok",
+}
+
+
+def _classify_verdict(verdict: str) -> str:
+    """Map a driver/render verdict string to "ok" | "defect" | "unverified".
+
+    Keys on the token before the first space or paren (verdicts carry
+    parenthetical detail, e.g. "NO_PERSIST (submitted, ...)").
+    ERROR-prefixed verdicts -> "unverified".  Unknown token -> "unverified"
+    (never silently "ok" — an unknown verdict blocks DONE until investigated)."""
+    token = re.split(r"[ (]", verdict.strip())[0] if verdict else ""
+    if token.startswith("ERROR"):
+        return "unverified"
+    return _VERDICT_CLASS.get(token, "unverified")
+
+
+def _finalize(r: dict) -> dict:
+    """Attach verdict_class to a driver result dict (additive — never renames keys)."""
+    r["verdict_class"] = _classify_verdict(r.get("verdict", ""))
+    return r
+
 
 def _lazy_playwright():
     try:
@@ -345,21 +396,31 @@ def _parent_context_nav(spec: dict, form_screen: dict):
 
 _COUNT_JS = r"""(entity) => {
   const inNav=(el)=>!!el.closest('nav,aside,[role=navigation],[class*="sidebar-nav"],[class*="navbar"]');
-  // EXACT with the contract (data-entity on the list container); heuristic otherwise.
-  const host=[...document.querySelectorAll('[data-entity="'+entity+'"]')].find(x=>!inNav(x));
-  const scope=host||document.querySelector('.sidebar-content, main, [class*="content"]')||document;
-  let rows=[...scope.querySelectorAll('[data-row-id]')].filter(x=>!inNav(x));
-  if(!rows.length) rows=[...scope.querySelectorAll('table tbody tr')].filter(x=>!inNav(x));
-  if(!rows.length) rows=[...scope.querySelectorAll('li')].filter(x=>!inNav(x) && (x.innerText||'').trim().length>2);
-  if(!rows.length){ // repeated-sibling heuristic for div/anchor-based lists (largest same-shape group >=2)
-    const groups={};
-    [...scope.querySelectorAll('a,div')].filter(x=>!inNav(x) && (x.innerText||'').trim().length>3).forEach(x=>{
-      const p=x.parentElement; const k=(p?(p.className||p.tagName):'')+'|'+x.tagName+'|'+(x.className||'');
-      (groups[k]=groups[k]||[]).push(x);});
-    const big=Object.values(groups).filter(g=>g.length>=2).sort((a,b)=>b.length-a.length)[0];
-    rows=big||[];
-  }
-  return rows.length;
+  const countIn=(scope)=>{
+    // Take the MAX of the structured-row strategies rather than the first non-empty: a create Form
+    // carries a single `[data-row-id]` (the New<Entity> record) that must NOT short-circuit and mask
+    // the list Table's many `table tbody tr` on the same screen (the intake create false-NO_PERSIST).
+    const dr=[...scope.querySelectorAll('[data-row-id]')].filter(x=>!inNav(x)).length;
+    const tr=[...scope.querySelectorAll('table tbody tr')].filter(x=>!inNav(x)).length;
+    let best=Math.max(dr, tr);
+    if(!best) best=[...scope.querySelectorAll('li')].filter(x=>!inNav(x) && (x.innerText||'').trim().length>2).length;
+    if(!best){ // repeated-sibling heuristic for div/anchor-based lists (largest same-shape group >=2)
+      const groups={};
+      [...scope.querySelectorAll('a,div')].filter(x=>!inNav(x) && (x.innerText||'').trim().length>3).forEach(x=>{
+        const p=x.parentElement; const k=(p?(p.className||p.tagName):'')+'|'+x.tagName+'|'+(x.className||'');
+        (groups[k]=groups[k]||[]).push(x);});
+      const big=Object.values(groups).filter(g=>g.length>=2).sort((a,b)=>b.length-a.length)[0];
+      best=big?big.length:0;
+    }
+    return best;
+  };
+  // A screen can carry the entity on MORE than one container (e.g. an intake screen has both a
+  // create Form bound to a single New<Entity> record AND the list Table). Count the MAX across all
+  // entity hosts so the many-row list wins over the one-record form — else a create looks like 0 delta.
+  const hosts=[...document.querySelectorAll('[data-entity="'+entity+'"]')].filter(x=>!inNav(x));
+  if(hosts.length) return Math.max(...hosts.map(countIn));
+  const scope=document.querySelector('.sidebar-content, main, [class*="content"]')||document;
+  return countIn(scope);
 }"""
 
 _FILL_JS = r"""(fields) => {
@@ -394,7 +455,7 @@ def _drive_create(page, base_url: str, spec: dict, form_screen: dict, entity: st
     r = {"entity": entity, "screen": form_screen["id"]}
     base = base_url.rstrip("/")
     try:
-        list_screen = _list_screen_for_entity(spec, entity)
+        list_screen = _list_screen_for_entity(spec, entity, prefer=form_screen["id"])
         if not list_screen:
             r["verdict"] = "NO_LIST_SCREEN (cannot measure persistence)"
             return r
@@ -423,19 +484,25 @@ def _drive_create(page, base_url: str, spec: dict, form_screen: dict, entity: st
             list_url = base + "/" + _route_of(spec, list_screen).lstrip("/")
         page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
         before = page.evaluate(_COUNT_JS, entity); r["before"] = before
-        # the create entry point on the list screen: "New <entity>" / "+ New" / "Create"
-        opened = page.evaluate(
-            r"""(entity)=>{const re=new RegExp('(new|create|add)\\s*('+entity+')?|^\\s*\\+\\s*new','i');
-              const b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
-                 .find(x=>re.test((x.innerText||'').trim()) && !x.closest('nav,aside,[class*="sidebar-nav"]'));
-              if(b){b.click(); return (b.innerText||'').trim();} return null;}""", entity)
-        r["openedVia"] = opened
-        if not opened:
-            r["verdict"] = "NO_CREATE_ENTRY (no New/Create/Add button on the list)"; return r
-        page.wait_for_timeout(2600)
-        filled = page.evaluate(_FILL_JS, _form_fields(spec, entity)); r["inputsFilled"] = filled
+        # Fill an already-visible create form FIRST (always-visible-form pattern). The save button
+        # (Add/Create <entity>) is itself the create entry, so clicking it before filling would submit
+        # an empty form. Only when no entity input is present do we click a New/Create/Add button to
+        # REVEAL the form (reveal-on-click pattern), then fill.
+        filled = page.evaluate(_FILL_JS, _form_fields(spec, entity))
         if filled == 0:
-            r["verdict"] = "FORM_NOT_FOUND ('New' opened no editable form — dead button / read-only)"; return r
+            opened = page.evaluate(
+                r"""(entity)=>{const re=new RegExp('(new|create|add)\\s*('+entity+')?|^\\s*\\+\\s*new','i');
+                  const b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                     .find(x=>re.test((x.innerText||'').trim()) && !x.closest('nav,aside,[class*="sidebar-nav"]'));
+                  if(b){b.click(); return (b.innerText||'').trim();} return null;}""", entity)
+            r["openedVia"] = opened
+            if not opened:
+                r["verdict"] = "NO_CREATE_ENTRY (no New/Create/Add button on the list)"; return r
+            page.wait_for_timeout(2600)
+            filled = page.evaluate(_FILL_JS, _form_fields(spec, entity))
+            if filled == 0:
+                r["verdict"] = "FORM_NOT_FOUND ('New' opened no editable form — dead button / read-only)"; return r
+        r["inputsFilled"] = filled
         page.wait_for_timeout(400)
         saved = page.evaluate(
             r"""(entity)=>{let b=document.querySelector('[data-spec-id="save'+entity.toLowerCase()+'btn"]');
@@ -459,7 +526,7 @@ def _goto_entity_list(page, base: str, spec: dict, form_screen: dict, entity: st
     """Navigate to the entity's list, contextualized via the parent nav when the screen needs a
     parent input param (seam 3c). Returns (list_url, None) or (None, error_verdict)."""
     from harness.prompt_recipes import _list_screen_for_entity
-    list_screen = _list_screen_for_entity(spec, entity)
+    list_screen = _list_screen_for_entity(spec, entity, prefer=form_screen["id"])
     if not list_screen:
         return None, "NO_LIST_SCREEN (cannot measure)"
     needs_ctx = any(ip.get("references") for ip in form_screen.get("inputParameters", []))
@@ -528,9 +595,31 @@ def _drive_delete(page, base_url: str, spec: dict, form_screen: dict, entity: st
     return r
 
 
+def _edit_screen_for_entity(spec: dict, entity: str) -> dict | None:
+    """Return a screen that edits `entity` via an input parameter referencing it (W3).
+
+    This is distinct from the entity's own list screen: it is a detail/form screen that
+    is reached via navigation from a parent/source row (its inputParameter references the
+    entity's identifier, meaning a real row id is supplied by the nav).  Returns None when
+    no such screen exists (inline-only or no edit path at all)."""
+    for s in spec.get("screens", []):
+        for ip in s.get("inputParameters", []):
+            if ip.get("references") == entity:
+                return s
+    return None
+
+
 def _drive_update(page, base_url: str, spec: dict, form_screen: dict, entity: str) -> dict:
-    """Per-row Update: open a row's Edit (prefills the form) → set the first text field to a unique
-    marker → save → reload → assert the marker appears in the list."""
+    """Per-row Update: inline Edit row-action preferred; else navigate to an edit screen
+    that accepts the entity via an input param (W3 nav-to-edit path); else NO_EDIT_ENTRY.
+
+    Selection rule:
+    1. Inline path — _CLICK_ROWACTION_JS finds 'edit<entity>btn' / '^edit$' on the list.
+    2. Nav-to-edit path — _edit_screen_for_entity returns a screen reachable via
+       _parent_context_nav; open a parent row, set marker, save, reload list, assert marker.
+    3. Neither → NO_EDIT_ENTRY (unverified — driver gap, not an app defect).
+
+    Adds editVia: "inline" | "nav" (additive field)."""
     from harness.prompt_recipes import _form_fields
     r = {"entity": entity, "screen": form_screen["id"], "op": "update"}
     base = base_url.rstrip("/")
@@ -540,27 +629,71 @@ def _drive_update(page, base_url: str, spec: dict, form_screen: dict, entity: st
             r["verdict"] = err; return r
         if not page.evaluate(_COUNT_JS, entity):
             r["verdict"] = "NO_ROWS (nothing to edit)"; return r
+
+        # ── 1. Try inline Edit row-action ──────────────────────────────────
         opened = page.evaluate(_CLICK_ROWACTION_JS, ["edit" + entity.lower() + "btn", r"^\s*edit\s*$"])
-        if not opened:
-            r["verdict"] = "NO_EDIT_ENTRY (no Edit control on rows)"; return r
-        page.wait_for_timeout(1800)
-        marker = "QAEDIT" + str(int(page.evaluate("()=>Math.floor(performance.now())")))
-        setok = page.evaluate(_SET_FIELD_JS, [_form_fields(spec, entity), marker])
-        if not setok:
-            r["verdict"] = "EDIT_FORM_NOT_FOUND (Edit opened no editable field)"; return r
-        page.wait_for_timeout(300)
-        saved = page.evaluate(
-            r"""(entity)=>{let b=document.querySelector('[data-spec-id="save'+entity.toLowerCase()+'btn"]');
-              if(!b) b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
-                 .find(x=>/^\s*(save|update|submit|done)\b/i.test((x.innerText||'').trim()));
-              if(b){b.click(); return true;} return false;}""", entity)
-        if not saved:
-            r["verdict"] = "SAVE_NOT_FOUND (edit form present but no save button)"; return r
-        page.wait_for_timeout(3200)
-        page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2800)
-        present = page.evaluate("(m)=>document.body.innerText.includes(m)", marker)
-        r["marker"] = marker
-        r["verdict"] = "UPDATES" if present else "NO_UPDATE (edited value not present after reload)"
+        if opened:
+            r["editVia"] = "inline"
+            page.wait_for_timeout(1800)
+            marker = "QAEDIT" + str(int(page.evaluate("()=>Math.floor(performance.now())")))
+            setok = page.evaluate(_SET_FIELD_JS, [_form_fields(spec, entity), marker])
+            if not setok:
+                r["verdict"] = "EDIT_FORM_NOT_FOUND (Edit opened no editable field)"; return r
+            page.wait_for_timeout(300)
+            saved = page.evaluate(
+                r"""(entity)=>{let b=document.querySelector('[data-spec-id="save'+entity.toLowerCase()+'btn"]');
+                  if(!b) b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                     .find(x=>/^\s*(save|update|submit|done)\b/i.test((x.innerText||'').trim()));
+                  if(b){b.click(); return true;} return false;}""", entity)
+            if not saved:
+                r["verdict"] = "SAVE_NOT_FOUND (edit form present but no save button)"; return r
+            page.wait_for_timeout(3200)
+            page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2800)
+            present = page.evaluate("(m)=>document.body.innerText.includes(m)", marker)
+            r["marker"] = marker
+            r["verdict"] = "UPDATES" if present else "NO_UPDATE (edited value not present after reload)"
+            return r
+
+        # ── 2. Try nav-to-edit path ─────────────────────────────────────
+        edit_screen = _edit_screen_for_entity(spec, entity)
+        if edit_screen:
+            ctx_nav = _parent_context_nav(spec, edit_screen)
+            if ctx_nav:
+                parent_route, click_label = ctx_nav
+                page.goto(base + "/" + parent_route.lstrip("/"), wait_until="networkidle", timeout=45000)
+                page.wait_for_timeout(2500)
+                opened_parent = page.evaluate(
+                    r"""(label)=>{const re=label?new RegExp('^\\s*'+label+'\\s*$','i'):/^\s*(open|view|details?)\s*$/i;
+                      const b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                         .find(x=>re.test((x.innerText||'').trim()) && !x.closest('nav,aside,[class*="sidebar-nav"]'));
+                      if(b){b.click(); return true;} return false;}""", click_label)
+                if not opened_parent:
+                    r["verdict"] = ("NO_EDIT_ENTRY (nav-to-edit: parent row click failed for "
+                                    + edit_screen["id"] + ")")
+                    return r
+                page.wait_for_timeout(2800)
+                r["editVia"] = "nav"
+                marker = "QAEDIT" + str(int(page.evaluate("()=>Math.floor(performance.now())")))
+                setok = page.evaluate(_SET_FIELD_JS, [_form_fields(spec, entity), marker])
+                if not setok:
+                    r["verdict"] = "EDIT_FORM_NOT_FOUND (nav-to-edit opened no editable field)"; return r
+                page.wait_for_timeout(300)
+                saved = page.evaluate(
+                    r"""(entity)=>{let b=document.querySelector('[data-spec-id="save'+entity.toLowerCase()+'btn"]');
+                      if(!b) b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                         .find(x=>/^\s*(save|update|submit|done)\b/i.test((x.innerText||'').trim()));
+                      if(b){b.click(); return true;} return false;}""", entity)
+                if not saved:
+                    r["verdict"] = "SAVE_NOT_FOUND (nav-to-edit: save button not found)"; return r
+                page.wait_for_timeout(3200)
+                page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2800)
+                present = page.evaluate("(m)=>document.body.innerText.includes(m)", marker)
+                r["marker"] = marker
+                r["verdict"] = "UPDATES" if present else "NO_UPDATE (nav-to-edit: marker absent after reload)"
+                return r
+
+        # ── 3. No edit path found ───────────────────────────────────────
+        r["verdict"] = "NO_EDIT_ENTRY (no Edit control on rows and no nav-to-edit screen found)"
     except Exception as e:
         r["verdict"] = "ERROR " + repr(e)[:90]
     return r
@@ -583,15 +716,72 @@ def run_behavioral(spec: dict, base_url: str, login: dict) -> list[dict]:
             entity = _screen_write_entity(spec, screen)
             if not entity:
                 continue
-            for kind, driver in (("CreateEntity", _drive_create),
+            # An edit-screen declares CreateEntity but takes an id param referencing the entity, so its
+            # create-form edits an existing record in place and is reached by navigation (Edit → detail).
+            # Verify it as an UPDATE via the nav-to-edit driver — it structurally has no create-on-a-list
+            # entry point, so the create-from-list driver would false-report NO_CREATE_ENTRY.
+            is_edit_screen = any(ip.get("references") == entity
+                                 for ip in screen.get("inputParameters", []) or [])
+            create_driver = _drive_update if is_edit_screen else _drive_create
+            for kind, driver in (("CreateEntity", create_driver),
                                  ("UpdateEntity", _drive_update),
                                  ("DeleteEntity", _drive_delete)):
                 key = (screen["id"], entity, kind)
                 if kind in does_all and key not in seen:
                     seen.add(key)
-                    results.append(driver(page, base_url, spec, screen, entity))
+                    results.append(_finalize(driver(page, base_url, spec, screen, entity)))
         browser.close()
     return results
+
+
+# ── W5a: KPI correctness assertion ──────────────────────────────────────────
+_KPI_VALUE_JS = r"""(specId) => {
+  const el = document.querySelector('[data-spec-id="' + specId + '"] .kpi-value');
+  if (!el) return null;
+  const txt = (el.textContent || el.innerText || '').trim().replace(/,/g, '');
+  const n = parseInt(txt, 10);
+  return isNaN(n) ? null : n;
+}"""
+
+
+def _check_kpi_card(shown, expected: int, screen: str, slug: str) -> dict:
+    """Build a KPI check result dict comparing `shown` (live DOM value) to `expected`
+    (the true row count). Returns verdict KPI_OK or KPI_WRONG (defect)."""
+    if shown is None or shown != expected:
+        verdict = f"KPI_WRONG (shows {shown}, expected {expected})"
+    else:
+        verdict = "KPI_OK"
+    return _finalize({
+        "kind": "kpi", "screen": screen,
+        "target": f"kpi{slug}",
+        "shown": shown, "expected": expected,
+        "verdict": verdict,
+    })
+
+
+def _true_count_for_entity(spec: dict, entity: str, page, base: str) -> int | None:
+    """Derive the true row count for an entity (W5a).
+
+    Prefers `sampleData` length from the spec (offline-testable, no browser call).
+    Falls back to a live _COUNT_JS on the entity's list screen.  Returns None when
+    neither source is available (card is then skipped — no false verdict)."""
+    # Prefer sampleData length (offline, no browser needed).
+    for e in (spec.get("dataModel") or {}).get("entities", []):
+        if e["name"] == entity and e.get("sampleData"):
+            return len(e["sampleData"])
+    # Live count from the entity's list screen.
+    from harness.prompt_recipes import _list_screen_for_entity
+    list_screen = _list_screen_for_entity(spec, entity)
+    if not list_screen:
+        return None
+    try:
+        route = _route_of(spec, list_screen)
+        page.goto(base + "/" + route.lstrip("/"), wait_until="networkidle", timeout=45000)
+        page.wait_for_timeout(2500)
+        count = page.evaluate(_COUNT_JS, entity)
+        return count if isinstance(count, int) else None
+    except Exception:
+        return None
 
 
 _CHART_JS = r"""(chartId) => {
@@ -626,15 +816,35 @@ def run_render(spec: dict, base_url: str, login: dict) -> list[dict]:
                 r"""(keys)=>{const cs=getComputedStyle(document.documentElement);
                   return keys.some(k=>cs.getPropertyValue('--'+k).trim().length>0);}""",
                 list(palette.keys()) or ["primary"])
-            results.append({"kind": "theme", "target": "design.theme",
-                            "verdict": "APPLIED" if applied else "NOT_APPLIED (palette tokens absent from live stylesheet)"})
+            results.append(_finalize({"kind": "theme", "target": "design.theme",
+                            "verdict": "APPLIED" if applied else "NOT_APPLIED (palette tokens absent from live stylesheet)"}))
         for s in spec.get("screens", []):
             for ch in s.get("charts", []) or []:
                 page.goto(base + "/" + _route_of(spec, s["id"]).lstrip("/"),
                           wait_until="networkidle", timeout=45000); page.wait_for_timeout(3500)
                 n = page.evaluate(_CHART_JS, ch.get("id", ""))
-                results.append({"kind": "chart", "screen": s["id"], "target": ch.get("id"),
-                                "verdict": "RENDERS" if n else "NO_CHART (no non-trivial svg/canvas in content)"})
+                results.append(_finalize({"kind": "chart", "screen": s["id"], "target": ch.get("id"),
+                                "verdict": "RENDERS" if n else "NO_CHART (no non-trivial svg/canvas in content)"}))
+        # W5a: KPI correctness — for each dashboard COUNT card, read the rendered value and
+        # compare to the true row count.  A mismatch (e.g. Mentor bound .List.Length) is a defect.
+        for s in spec.get("screens", []):
+            dash = s.get("dashboard") or {}
+            for card in dash.get("cards", []):
+                entity = card.get("entity") or card.get("aggregate")
+                if not entity or card.get("filter"):
+                    # Only assert COUNT cards with no filter; literal/filtered cards are skipped.
+                    continue
+                from harness.prompt_recipes import _slug as _pr_slug
+                slug = _pr_slug(card.get("label", ""))
+                page.goto(base + "/" + _route_of(spec, s["id"]).lstrip("/"),
+                          wait_until="networkidle", timeout=45000)
+                page.wait_for_timeout(2500)
+                shown = page.evaluate(_KPI_VALUE_JS, f"kpi{slug}")
+                expected = _true_count_for_entity(spec, entity, page, base)
+                if expected is None:
+                    continue  # no true count available — skip, do not emit a false verdict
+                results.append(_check_kpi_card(shown=shown, expected=expected,
+                                               screen=s["id"], slug=slug))
         browser.close()
     return results
 

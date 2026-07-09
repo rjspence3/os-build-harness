@@ -170,6 +170,79 @@ def test_empty_bound_table_binding_is_inconclusive_not_fail(monkeypatch):
     assert "inconclusive" in rows["structural"]["detail"]
 
 
+# ── T-W1: taxonomy aggregation ───────────────────────────────────────────────
+def test_unverified_only_dimension_is_incomplete_blocks_done(monkeypatch):
+    """T-W1: a run whose only non-ok results are UNVERIFIED → dimension INCOMPLETE,
+    status=FAIL (blocks done) but NOT classified as FAILED (no confirmed app defect)."""
+    _stub_live(monkeypatch)
+    # override behavioral to return a single unverified verdict (no inline edit, not a defect)
+    monkeypatch.setattr(capture, "run_behavioral", lambda *a, **k: [
+        {"screen": "list", "entity": "Item", "op": "update",
+         "verdict": "NO_EDIT_ENTRY (no Edit control on rows)"}
+    ])
+    rows = _rows(_spec_full())
+    beh = rows["behavioral"]
+    assert beh["status"] == "FAIL"                         # blocks done
+    assert beh["dimension_state"] == "INCOMPLETE"          # not a confirmed defect
+    assert beh["counts"]["incomplete"] == 1
+    assert beh["counts"]["defect"] == 0
+
+
+def test_defect_dimension_is_failed_not_done(monkeypatch):
+    """T-W1: a confirmed app defect (NO_PERSIST) → dimension FAILED."""
+    _stub_live(monkeypatch)
+    monkeypatch.setattr(capture, "run_behavioral", lambda *a, **k: [
+        {"screen": "list", "entity": "Item", "op": "create",
+         "verdict": "NO_PERSIST (submitted, list row count did not grow)"}
+    ])
+    rows = _rows(_spec_full())
+    beh = rows["behavioral"]
+    assert beh["status"] == "FAIL"
+    assert beh["dimension_state"] == "FAILED"
+    assert beh["counts"]["defect"] == 1
+
+
+def test_all_ok_is_done_with_counts(monkeypatch):
+    """T-W1: all verdicts ok → dimension PASS, counts correct."""
+    _stub_live(monkeypatch)
+    monkeypatch.setattr(capture, "run_behavioral", lambda *a, **k: [
+        {"screen": "list", "entity": "Item", "op": "create", "verdict": "PERSISTS"},
+        {"screen": "list", "entity": "Item", "op": "update", "verdict": "UPDATES"},
+    ])
+    rows = _rows(_spec_full())
+    beh = rows["behavioral"]
+    assert beh["status"] == "PASS"
+    assert beh["dimension_state"] == "PASS"
+    assert beh["counts"]["ok"] == 2
+    assert beh["counts"]["defect"] == 0
+    assert beh["counts"]["incomplete"] == 0
+
+
+def test_json_is_back_compatible_additive(monkeypatch, tmp_path):
+    """T-W1: --json output retains legacy keys (verdict/status/detail/gate/done) and
+    ADDS counts/dimension_state on applicable dimensions."""
+    _stub_live(monkeypatch)
+    monkeypatch.setattr(capture, "run_behavioral", lambda *a, **k: [
+        {"screen": "list", "entity": "Item", "op": "create", "verdict": "PERSISTS"},
+    ])
+    import io, contextlib
+    p = tmp_path / "spec.json"
+    p.write_text(json.dumps(_spec_full()), encoding="utf-8")
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = gate.main([str(p), "--base-url", "http://x", "--json"])
+    data = json.loads(buf.getvalue())
+    # legacy top-level keys
+    assert "gates" in data and "done" in data and "verdict" in data
+    # per-gate legacy keys still present
+    for row in data["gates"]:
+        assert "gate" in row and "status" in row and "detail" in row
+    # behavioral gets additive fields
+    beh = next(r for r in data["gates"] if r["gate"] == "behavioral")
+    assert "dimension_state" in beh and "counts" in beh
+    assert beh["counts"]["ok"] == 1
+
+
 def test_empty_check_ignores_rendered_binding_failures(monkeypatch):
     """A binding fail on a component that DID render rows (not boundTo_unrendered) still hard-fails —
     the inconclusive downgrade is strictly for present-but-empty tables."""

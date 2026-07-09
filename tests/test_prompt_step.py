@@ -951,3 +951,141 @@ def test_plan_emits_batch_c_in_order():
     assert recipes[-1] == "workflow"
     assert recipes.index("workflow") > recipes.index("service-action")
     assert recipes.index("workflow") > recipes.index("global-event")
+
+
+# ── T-W4: button fidelity ─────────────────────────────────────────────────────
+def _spec_with_declared_button() -> dict:
+    """A spec where the CreateSupplier action has trigger.onComponent pointing at
+    addSupplierBtn whose label is '+ New Supplier'."""
+    return {
+        "specVersion": "0.3", "app": {"name": "r", "roles": ["User"]},
+        "dataModel": {"entities": [{"name": "Supplier", "attributes": [
+            {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+            {"name": "Name", "dataType": "Text", "mandatory": True}]}]},
+        "screens": [
+            {"id": "intake", "name": "Intake", "route": "/intake",
+             "components": [
+                 {"id": "addSupplierBtn", "type": "Button", "label": "+ New Supplier"},
+                 {"id": "intakeTable", "type": "Table", "boundTo": "Supplier"},
+             ],
+             "actions": [{"name": "CreateSupplier",
+                          "trigger": {"onComponent": "addSupplierBtn", "event": "onClick"},
+                          "does": ["CreateEntity"]}]},
+        ],
+    }
+
+
+def test_create_form_honors_declared_button():
+    """T-W4: create_form with button_id/button_label emits the declared id + label verbatim,
+    not the legacy 'Add Supplier' / 'savesupplierBtn'."""
+    prompt = pr.render("create-form", {
+        "screen": "intake", "entity": "Supplier", "fields": ["Name"],
+        "button_id": "addSupplierBtn", "button_label": "+ New Supplier",
+        "phase": "combined",
+    })
+    assert '"addSupplierBtn"' in prompt
+    assert '"+ New Supplier"' in prompt
+    # Must NOT contain the legacy generated label
+    assert "Add Supplier" not in prompt
+
+
+def test_plan_resolves_button_from_trigger():
+    """T-W4 wiring: plan_from_spec resolves the declared button via trigger.onComponent and
+    wires button_id + button_label into the create-form params."""
+    spec = _spec_with_declared_button()
+    steps = pr.plan_from_spec(spec)
+    cf_steps = [s for s in steps if s["recipe"] == "create-form"]
+    assert cf_steps, "expected create-form steps"
+    # All create-form steps for this entity should carry the declared button
+    for cf in cf_steps:
+        if cf["params"].get("phase") in ("combined", "widgets", "wire", None):
+            assert cf["params"].get("button_id") == "addSupplierBtn"
+            assert cf["params"].get("button_label") == "+ New Supplier"
+
+
+def test_create_form_legacy_button_unchanged():
+    """T-W4 regression: create_form WITHOUT button_id/button_label falls back to the legacy
+    generated id (save<entity>btn) and label (Add <Entity>) — byte-identical to pre-W4."""
+    prompt = pr.render("create-form", {
+        "screen": "intake", "entity": "Supplier", "fields": ["Name"],
+        "phase": "combined",
+    })
+    assert 'savesupplierBtn' in prompt or 'savesupplier' in prompt
+    assert "Add Supplier" in prompt
+
+
+# ── T-W5b: dashboard split ───────────────────────────────────────────────────
+def _spec_with_dashboard_count_cards() -> dict:
+    return {
+        "specVersion": "0.3", "app": {"name": "d", "roles": ["User"]},
+        "dataModel": {"entities": [
+            {"name": "Supplier", "sampleData": [{"Name": "A"}, {"Name": "B"}, {"Name": "C"}, {"Name": "D"}],
+             "attributes": [{"name": "Id", "dataType": "Identifier", "isIdentifier": True},
+                            {"name": "Name", "dataType": "Text"}]},
+        ]},
+        "screens": [
+            {"id": "dashboard", "name": "Dashboard", "route": "/dashboard",
+             "dashboard": {"cards": [
+                 {"label": "Suppliers", "entity": "Supplier", "icon": "users"},
+                 {"label": "Status", "value": "Active"},  # literal-only card
+             ]}},
+        ],
+    }
+
+
+def test_plan_splits_dashboard_count_into_aggregate_then_bind():
+    """T-W5b: plan_from_spec on a spec with a COUNT card emits two dashboard steps —
+    an aggregate step (phase='aggregate') BEFORE a bind step (phase='bind')."""
+    spec = _spec_with_dashboard_count_cards()
+    steps = pr.plan_from_spec(spec)
+    dash_steps = [s for s in steps if s["recipe"] == "dashboard"]
+    assert len(dash_steps) == 2, f"expected 2 dashboard steps, got {len(dash_steps)}"
+    phases = [s["params"]["phase"] for s in dash_steps]
+    assert "aggregate" in phases and "bind" in phases
+    assert phases.index("aggregate") < phases.index("bind")
+
+
+def test_plan_single_dashboard_step_for_literal_cards():
+    """T-W5b regression: a dashboard with ONLY literal cards (no entity/aggregate) keeps the
+    legacy single step (no split, no phase key)."""
+    spec = {
+        "specVersion": "0.3", "app": {"name": "d", "roles": ["User"]},
+        "dataModel": {"entities": []},
+        "screens": [
+            {"id": "dashboard", "name": "Dashboard", "route": "/dashboard",
+             "dashboard": {"cards": [
+                 {"label": "Version", "value": "2.0"},
+                 {"label": "Status", "value": "Active"},
+             ]}},
+        ],
+    }
+    steps = pr.plan_from_spec(spec)
+    dash_steps = [s for s in steps if s["recipe"] == "dashboard"]
+    assert len(dash_steps) == 1
+    assert dash_steps[0]["params"].get("phase") is None
+
+
+# ── T-W5c: kpi_rebind flag ───────────────────────────────────────────────────
+def test_kpi_rebind_flag_gates_model_api_step():
+    """T-W5c: kpi-rebind is NOT emitted by default; emitted once when
+    kpi_model_api_fallback=True, positioned after the bind step."""
+    spec = _spec_with_dashboard_count_cards()
+    # Default: kpi-rebind absent
+    steps_default = pr.plan_from_spec(spec)
+    assert not any(s["recipe"] == "kpi-rebind" for s in steps_default)
+
+    # Flag on: kpi-rebind present, AFTER the bind step
+    steps_flag = pr.plan_from_spec(spec, kpi_model_api_fallback=True)
+    recipes = [s["recipe"] for s in steps_flag]
+    assert "kpi-rebind" in recipes
+    bind_idx = next(i for i, s in enumerate(steps_flag) if s["recipe"] == "dashboard"
+                    and s["params"].get("phase") == "bind")
+    rebind_idx = next(i for i, s in enumerate(steps_flag) if s["recipe"] == "kpi-rebind")
+    assert rebind_idx > bind_idx
+
+    # kpi-rebind renders a valid prompt
+    rebind_step = next(s for s in steps_flag if s["recipe"] == "kpi-rebind")
+    prompt = pr.render("kpi-rebind", rebind_step["params"])
+    assert "applyModelApiCode" in prompt
+    assert "CountSupplier.Count" in prompt
+    assert "data-spec-id" in prompt
