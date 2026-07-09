@@ -560,13 +560,22 @@ _CLICK_ROWACTION_JS = r"""([specId, textRe]) => {
 }"""
 
 _SET_FIELD_JS = r"""([fields, val]) => {
-  const bad=(el)=>el.disabled||el.readOnly||el.offsetParent===null||el.closest('nav,aside,[class*="sidebar-nav"]');
-  const set=(el,v)=>{const d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
+  const bad=(el)=>el.disabled||el.readOnly||el.offsetParent===null
+     ||['hidden','search','checkbox','radio','file'].includes(el.type)
+     ||el.closest('nav,aside,[class*="sidebar-nav"],[class*="search"]');
+  const set=(el,v)=>{const proto=el.tagName==='TEXTAREA'?window.HTMLTextAreaElement:window.HTMLInputElement;
+    const d=Object.getOwnPropertyDescriptor(proto.prototype,'value');
     el.focus(); d.set.call(el,v); el.dispatchEvent(new Event('input',{bubbles:true}));
     el.dispatchEvent(new Event('change',{bubbles:true})); el.blur();};
+  // 1. contract id from the form recipe
   for(const f of fields){ let el=document.querySelector('[data-spec-id="'+f.toLowerCase()+'input"]');
     if(el&&el.tagName!=='INPUT'&&el.tagName!=='TEXTAREA') el=el.querySelector('input,textarea');
     if(el&&!bad(el)){ set(el,val); return true; } }
+  // 2. fallback: the first visible editable text input/textarea — when the data-spec-id contract was
+  //    not honored verbatim (e.g. Mentor emitted part-sku-input instead of skuinput). Mirrors _FILL_JS.
+  const el=[...document.querySelectorAll('input,textarea')]
+     .find(x=>!bad(x) && (x.tagName==='TEXTAREA' || ['text','email','url',''].includes(x.type)));
+  if(el){ set(el,val); return true; }
   return false;
 }"""
 
@@ -663,10 +672,15 @@ def _drive_update(page, base_url: str, spec: dict, form_screen: dict, entity: st
                 page.goto(base + "/" + parent_route.lstrip("/"), wait_until="networkidle", timeout=45000)
                 page.wait_for_timeout(2500)
                 opened_parent = page.evaluate(
-                    r"""(label)=>{const re=label?new RegExp('^\\s*'+label+'\\s*$','i'):/^\s*(open|view|details?)\s*$/i;
-                      const b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
-                         .find(x=>re.test((x.innerText||'').trim()) && !x.closest('nav,aside,[class*="sidebar-nav"]'));
-                      if(b){b.click(); return true;} return false;}""", click_label)
+                    r"""(label)=>{const inNav=(el)=>!!el.closest('nav,aside,[class*="sidebar-nav"]');
+                      const re=label?new RegExp('^\\s*'+label+'\\s*$','i'):/^\s*(open|view|details?|edit)\s*$/i;
+                      let b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                         .find(x=>re.test((x.innerText||'').trim()) && !inNav(x));
+                      if(b){b.click(); return true;}
+                      // fallback: the whole row navigates on click (no labelled open button) — click the first data row
+                      const row=[...document.querySelectorAll('tbody tr,[data-row-id],.list-row,[class*="ListItem"]')].find(x=>!inNav(x));
+                      if(row){ (row.querySelector('a,button')||row).click(); return true; }
+                      return false;}""", click_label)
                 if not opened_parent:
                     r["verdict"] = ("NO_EDIT_ENTRY (nav-to-edit: parent row click failed for "
                                     + edit_screen["id"] + ")")
@@ -699,6 +713,60 @@ def _drive_update(page, base_url: str, spec: dict, form_screen: dict, entity: st
     return r
 
 
+def _nav_source_screen(spec: dict, target_id: str):
+    """The screen whose navigation edge targets target_id — the list you click a row on to reach
+    this (edit) screen. None if nothing navigates to it."""
+    for s in spec.get("screens", []):
+        for n in s.get("navigation", []) or []:
+            if n.get("toScreen") == target_id:
+                return s
+    return None
+
+
+def _drive_edit_via_nav(page, base_url: str, spec: dict, form_screen: dict, entity: str) -> dict:
+    """Edit reached BY NAVIGATION (the 'Edit → open a detail/edit screen' pattern): from the parent
+    list that navigates to this screen, click a row (carrying its id) → the form prefills → change
+    the first field to a unique marker → save → return to the list → assert the marker persisted.
+    Distinct from _drive_update (which measures on the entity's own list + an inline Edit control)."""
+    from harness.prompt_recipes import _form_fields
+    r = {"entity": entity, "screen": form_screen["id"], "op": "update", "editVia": "nav"}
+    base = base_url.rstrip("/")
+    try:
+        parent = _nav_source_screen(spec, form_screen["id"])
+        if not parent:
+            r["verdict"] = "NO_EDIT_ENTRY (no list navigates to this edit screen)"; return r
+        list_url = base + "/" + _route_of(spec, parent["id"]).lstrip("/")
+        page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2500)
+        if not page.evaluate(_COUNT_JS, entity):
+            r["verdict"] = "NO_ROWS (no parent rows to open)"; return r
+        clicked = page.evaluate(
+            r"""()=>{const inNav=(el)=>!!el.closest('nav,aside,[class*="sidebar-nav"]');
+              const row=[...document.querySelectorAll('tbody tr,[data-row-id],.list-row,[class*="ListItem"]')].find(x=>!inNav(x));
+              if(row){ (row.querySelector('a,button')||row).click(); return true; } return false;}""")
+        if not clicked:
+            r["verdict"] = "NO_EDIT_ENTRY (could not open a row's edit screen)"; return r
+        page.wait_for_timeout(2800)
+        marker = "QAEDIT" + str(int(page.evaluate("()=>Math.floor(performance.now())")))
+        if not page.evaluate(_SET_FIELD_JS, [_form_fields(spec, entity), marker]):
+            r["verdict"] = "EDIT_FORM_NOT_FOUND (row nav opened no editable field)"; return r
+        page.wait_for_timeout(300)
+        saved = page.evaluate(
+            r"""(entity)=>{let b=document.querySelector('[data-spec-id="save'+entity.toLowerCase()+'btn"]');
+              if(!b) b=[...document.querySelectorAll('button,a,.btn,[role=button]')]
+                 .find(x=>/^\s*(save|update|add|submit|done)\b/i.test((x.innerText||'').trim()));
+              if(b){b.click(); return true;} return false;}""", entity)
+        if not saved:
+            r["verdict"] = "SAVE_NOT_FOUND (edit form present but no save button)"; return r
+        page.wait_for_timeout(3200)
+        page.goto(list_url, wait_until="networkidle", timeout=45000); page.wait_for_timeout(2800)
+        present = page.evaluate("(m)=>document.body.innerText.includes(m)", marker)
+        r["marker"] = marker
+        r["verdict"] = "UPDATES" if present else "NO_UPDATE (edited value not present after reload)"
+    except Exception as e:
+        r["verdict"] = "ERROR " + repr(e)[:90]
+    return r
+
+
 def run_behavioral(spec: dict, base_url: str, login: dict) -> list[dict]:
     """For every spec'd Create/Update/Delete action, drive it and assert the change persists.
     Order per screen: create (adds a row) → update (edits one) → delete (removes one)."""
@@ -722,7 +790,7 @@ def run_behavioral(spec: dict, base_url: str, login: dict) -> list[dict]:
             # entry point, so the create-from-list driver would false-report NO_CREATE_ENTRY.
             is_edit_screen = any(ip.get("references") == entity
                                  for ip in screen.get("inputParameters", []) or [])
-            create_driver = _drive_update if is_edit_screen else _drive_create
+            create_driver = _drive_edit_via_nav if is_edit_screen else _drive_create
             for kind, driver in (("CreateEntity", create_driver),
                                  ("UpdateEntity", _drive_update),
                                  ("DeleteEntity", _drive_delete)):
@@ -760,28 +828,30 @@ def _check_kpi_card(shown, expected: int, screen: str, slug: str) -> dict:
 
 
 def _true_count_for_entity(spec: dict, entity: str, page, base: str) -> int | None:
-    """Derive the true row count for an entity (W5a).
+    """The true current row count for an entity (W5a) — the number the dashboard KPI must match.
 
-    Prefers `sampleData` length from the spec (offline-testable, no browser call).
-    Falls back to a live _COUNT_JS on the entity's list screen.  Returns None when
-    neither source is available (card is then skipped — no false verdict)."""
-    # Prefer sampleData length (offline, no browser needed).
+    Prefers a LIVE _COUNT_JS on the entity's list screen: the dashboard COUNT and the list are both
+    live counts of the SAME data, so they must agree — a live comparison is drift-proof against seed
+    changes and the behavioral gate's own create/delete (using sampleData length would false-flag a
+    correct KPI once a row is added). Falls back to sampleData length only when no page/list screen is
+    available (offline). None when neither source works (the card is then skipped — no false verdict)."""
+    from harness.prompt_recipes import _list_screen_for_entity
+    list_screen = _list_screen_for_entity(spec, entity)
+    if page is not None and list_screen:
+        try:
+            route = _route_of(spec, list_screen)
+            page.goto(base + "/" + route.lstrip("/"), wait_until="networkidle", timeout=45000)
+            page.wait_for_timeout(2500)
+            count = page.evaluate(_COUNT_JS, entity)
+            if isinstance(count, int):
+                return count
+        except Exception:
+            pass
+    # Offline / no list screen: fall back to the spec's sampleData length.
     for e in (spec.get("dataModel") or {}).get("entities", []):
         if e["name"] == entity and e.get("sampleData"):
             return len(e["sampleData"])
-    # Live count from the entity's list screen.
-    from harness.prompt_recipes import _list_screen_for_entity
-    list_screen = _list_screen_for_entity(spec, entity)
-    if not list_screen:
-        return None
-    try:
-        route = _route_of(spec, list_screen)
-        page.goto(base + "/" + route.lstrip("/"), wait_until="networkidle", timeout=45000)
-        page.wait_for_timeout(2500)
-        count = page.evaluate(_COUNT_JS, entity)
-        return count if isinstance(count, int) else None
-    except Exception:
-        return None
+    return None
 
 
 _CHART_JS = r"""(chartId) => {

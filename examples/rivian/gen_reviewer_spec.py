@@ -199,7 +199,8 @@ SCREENS = [
          {"field": "Stage", "kind": "text"},
          {"field": "Status", "kind": "chip"},
          {"field": "SlaState", "kind": "badge"}]}],
-     "navigation": [{"fromComponent": "caseTable", "event": "onClick", "toScreen": "caseDetail"}]},
+     "navigation": [{"fromComponent": "caseTable", "event": "onClick", "toScreen": "caseDetail",
+                     "params": ["CaseId"]}]},
     {"id": "caseDetail", "name": "Case Detail",
      "inputParameters": [{"name": "CaseId", "dataType": "Identifier", "references": "QualificationCase"}],
      "detail": {
@@ -223,7 +224,8 @@ SCREENS = [
      "components": [{"id": "relTable", "type": "Table", "boundTo": "Part", "columns": [
          {"field": "Sku", "kind": "identifier"}, {"field": "Name", "kind": "text"},
          {"field": "Category", "kind": "text"}, {"field": "Status", "kind": "chip"}]}],
-     "navigation": [{"fromComponent": "relTable", "event": "onClick", "toScreen": "partEdit"}]},
+     "navigation": [{"fromComponent": "relTable", "event": "onClick", "toScreen": "partEdit",
+                     "params": ["PartId"]}]},
     # Edit → navigate to detail: a per-part edit screen reached from the release row. Its create-form
     # takes PartId (an existing-record id) so the same form UPDATES the part in place.
     {"id": "partEdit", "name": "Edit Part",

@@ -495,7 +495,10 @@
         {
           "fromComponent": "caseTable",
           "event": "onClick",
-          "toScreen": "caseDetail"
+          "toScreen": "caseDetail",
+          "params": [
+            "CaseId"
+          ]
         }
       ],
       "acceptance": {
@@ -667,7 +670,10 @@
         {
           "fromComponent": "relTable",
           "event": "onClick",
-          "toScreen": "partEdit"
+          "toScreen": "partEdit",
+          "params": [
+            "PartId"
+          ]
         }
       ],
       "acceptance": {

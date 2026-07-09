@@ -308,8 +308,8 @@ def test_run_behavioral_routes_edit_screen_to_nav_driver(monkeypatch):
     called = []
     monkeypatch.setattr(capture, "_drive_create",
                         lambda p, b, s, sc, e: called.append(("create", sc["id"])) or {"verdict": "PERSISTS"})
-    monkeypatch.setattr(capture, "_drive_update",
-                        lambda p, b, s, sc, e: called.append(("update", sc["id"])) or {"verdict": "UPDATES"})
+    monkeypatch.setattr(capture, "_drive_edit_via_nav",
+                        lambda p, b, s, sc, e: called.append(("editnav", sc["id"])) or {"verdict": "UPDATES"})
     monkeypatch.setattr(capture, "_apply_login", lambda *a, **k: {})
 
     class _P:
@@ -336,8 +336,8 @@ def test_run_behavioral_routes_edit_screen_to_nav_driver(monkeypatch):
     ], "dataModel": {"entities": [
         {"name": "Supplier", "attributes": []}, {"name": "Part", "attributes": []}]}}
     capture.run_behavioral(spec, "http://x", {})
-    assert ("create", "intake") in called          # normal create screen -> create-from-list driver
-    assert ("update", "partEdit") in called         # edit screen -> nav-to-edit (update) driver
+    assert ("create", "intake") in called           # normal create screen -> create-from-list driver
+    assert ("editnav", "partEdit") in called         # edit screen -> dedicated edit-via-nav driver
     assert ("create", "partEdit") not in called
 
 
