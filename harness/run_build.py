@@ -98,9 +98,20 @@ _NONRETRYABLE = ("per_tenant_cap", "session cap", "session_cap", "capacity", "qu
                  "rate limit", "rate_limit", "too many requests", "unauthorized", "forbidden")
 
 
+# A 401/unauthorized coming from the SOURCE-CONTROL / OML-download API (not the tenant auth itself) is
+# TRANSIENT — the platform JWT is valid (independent reads keep working), the source-control endpoint
+# just blipped. Treat it as retryable, NOT the hard auth halt (observed recurring on Core/portal builds).
+_TRANSIENT_401_MARKERS = ("oml_download_failed", "source-control", "source_control",
+                          "failed to list revisions", "failed to get publication", "/api/source-control")
+
+
 def _nonretryable_reason(result) -> Optional[str]:
     blob = f"{getattr(result, 'error', '') or ''} {result.summary or ''}".lower()
-    return next((sig for sig in _NONRETRYABLE if sig in blob), None)
+    hit = next((sig for sig in _NONRETRYABLE if sig in blob), None)
+    # A source-control-API 401 is transient — don't hard-halt on it (let the bounded retry ride it out).
+    if hit in ("unauthorized", "forbidden") and any(m in blob for m in _TRANSIENT_401_MARKERS):
+        return None
+    return hit
 
 
 # The subset of non-retryable signals that are TRANSIENT resource contention, not a permanent block:
@@ -159,6 +170,13 @@ def classify_publish(payload: dict) -> tuple[str, str]:
                           f"carries an Entity Record/Identifier signature; a public action that raises a "
                           f"Global Event; a local FK to a cross-app entity; or a PUBLIC Web Block whose "
                           f"internal action navigates (DestinationNode). Diagnose the element; do NOT re-publish.)")
+        if code.startswith("OS-BEW-COMP"):
+            # Build-engine COMPILE crash. Mentor design-time validation passed, so a fresh re-author of
+            # the SAME unit into the SAME app tends to re-crash — and repeated failed publishes WEDGE the
+            # app's compiled state (proven: a plain aggregate re-crashed a wedged app while it compiled in
+            # a clean one). Tag it so the driver halt-fasts after a couple tries and rebuilds FRESH rather
+            # than grinding corrupting in-place retries.
+            return RETRY, f"OS-BEW-COMP publish crash {code}{detail_txt} — compile-wedge risk"
         return RETRY, f"publish failed {code or state or status}{detail_txt} — fresh re-author"
     if not succeeded:
         return RETRY, f"publish not terminal-success (state={state or status})"
@@ -334,12 +352,23 @@ class SpecDriver:
         last = "not attempted"
         last_run_id = None
         cap_waits = 0
+        compile_wedge = 0
         attempt = 0
         while attempt < self.max_attempts:
             attempt += 1
             action, detail, result = await self._attempt_step(prompt, app_key, row_id)
             last = detail
             last_run_id = result.run_id if result else last_run_id
+            # B1: an OS-BEW-COMP publish crash re-authored in-place WEDGES the app's compiled state, so
+            # grinding max_attempts deepens the corruption. Halt-fast after 2, with rebuild-fresh guidance.
+            if "OS-BEW-COMP" in (detail or ""):
+                compile_wedge += 1
+                if compile_wedge >= 2:
+                    msg = (f"{detail} — app likely COMPILE-WEDGED (repeated OS-BEW-COMP; in-place retries "
+                           f"corrupt the OML). REBUILD FRESH (new app name); do NOT keep retrying in place.")
+                    if row_id is not None:
+                        self.db.mark_failed(row_id, msg)
+                    return StepResult(index, recipe, target, f"halt: {msg}", run_id=last_run_id)
             if action == HALT:
                 # Cap contention is transient: wait briefly and re-fire the SAME step so the build
                 # cascades through slots as they free, rather than halting to the 10-min poller. A

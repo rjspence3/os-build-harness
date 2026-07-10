@@ -339,6 +339,19 @@ def test_classify_terminal_halts_fast_on_session_cap():
     assert classify_terminal(r2)[0] == RETRY
 
 
+def test_source_control_401_is_transient_not_a_hard_auth_halt():
+    # B3: a 401 from the SOURCE-CONTROL / OML-download API is transient (platform JWT still valid) —
+    # it must RETRY, not hit the non-retryable 'unauthorized' halt.
+    r = _result(status="failed")
+    r.error = ("oml_download_failed: Failed to list revisions with source: HTTP status client error "
+               "(401 Unauthorized) for url (https://.../api/source-control/v2/assets/.../revisions)")
+    assert classify_terminal(r)[0] == RETRY
+    # a bare unauthorized WITHOUT the source-control markers is still a hard halt
+    r2 = _result(status="failed")
+    r2.error = "unauthorized: token rejected"
+    assert classify_terminal(r2)[0] == HALT
+
+
 def test_classify_terminal_actions():
     assert classify_terminal(_result(compile_errors=["OS-DPL-50205"]))[0] == HALT
     assert classify_terminal(_result(status="running"))[0] == RETRY       # hang (R1)
@@ -376,6 +389,20 @@ def test_os_dpl_50205_at_publish_halts_without_wasting_retries(tmp_path):
     assert not report.ok and "OS-DPL-50205" in (report.halted_at and next(
         s.outcome for s in report.steps if s.recipe == "data-model") or "")
     assert mcp.start_calls == 1                                            # deterministic HALT, no retry storm
+
+
+def test_os_bew_comp_crash_halts_fast_with_rebuild_fresh_guidance(tmp_path):
+    # B1: an OS-BEW-COMP publish crash re-authored in-place wedges the app; halt-fast after 2 (not the
+    # full max_attempts=3) with rebuild-fresh guidance, rather than grinding corrupting in-place retries.
+    mcp = FakeMCP()
+    mcp.script_for("data model", _Script(publish_payload={"state": "failed", "code": "OS-BEW-COMP-50008",
+                                                          "detail": "An internal server error occurred!"}))
+    driver = SpecDriver(mcp, tmp_path / "p", max_attempts=3)
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    outcome = next(s.outcome for s in report.steps if s.recipe == "data-model")
+    assert not report.ok
+    assert "COMPILE-WEDGED" in outcome and "REBUILD FRESH" in outcome
+    assert mcp.start_calls == 2                                            # halt-fast at 2, not 3
 
 
 def test_hang_is_cancelled_then_recovered_in_a_fresh_session(tmp_path):
