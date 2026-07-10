@@ -247,12 +247,18 @@ class MentorMCP:
     async def app_info(self, app_key: str) -> dict[str, Any]:
         return await self._call("app_info", {"key": app_key})
 
-    async def app_list(self) -> dict[str, Any]:
-        return await self._call("app_list", {})
+    async def app_list(self, search: Optional[str] = None) -> dict[str, Any]:
+        args = {"search": search} if search else {}
+        return await self._call("app_list", args)
 
     async def env_list(self) -> dict[str, Any]:
         """List the tenant's ODC environments (for resolving the Dev env_key publish target)."""
         return await self._call("env_list", {})
+
+    async def env_app(self, app_key: str, env_key: str) -> dict[str, Any]:
+        """The deployed app's runtime details (incl. `url`) in an environment — used to reach a built
+        app (e.g. load its Home to fire the OnReady seed, or hand the user the link)."""
+        return await self._call("env_app", {"key": app_key, "env_key": env_key})
 
     async def app_create(self, name: str, kind: str = "CrossDevice") -> dict[str, Any]:
         """Create a new ODC app. kind ∈ {CrossDevice(→WebApplication), BusinessProcess, AIAgent,

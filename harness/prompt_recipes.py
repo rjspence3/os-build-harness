@@ -1221,12 +1221,17 @@ def workflow(params: dict) -> str:
     producer = _p(params, "producer_app", required=True)
     trigger = _p(params, "trigger_event", required=True)
     activities = _p(params, "activities", [], required=True)
-    sa_names = sorted({a["calls_service_action"] for a in activities})
+    # Accept either the snake_case (`calls_service_action`) or the camelCase (`callsServiceAction`, as
+    # expand.py emits) key — the spec factory + the hand-authored path use different casings.
+    def _sa(a):
+        return a.get("calls_service_action") or a.get("callsServiceAction") or ""
+    acts_ok = [a for a in activities if _sa(a)]
+    sa_names = sorted({_sa(a) for a in acts_ok})
     acts = "\n".join(
-        f"   - an Automatic Activity node '{a['name']}' whose ActionToTrigger is the referenced PUBLIC Service "
-        f"Action {a['calls_service_action']} (an auto-activity can call ONLY a Public Service Action; set its "
+        f"   - an Automatic Activity node '{a.get('name', _sa(a))}' whose ActionToTrigger is the referenced PUBLIC "
+        f"Service Action {_sa(a)} (an auto-activity can call ONLY a Public Service Action; set its "
         f"arguments — e.g. NullIdentifier() for an Identifier input when no business value is needed)"
-        for a in activities)
+        for a in acts_ok)
     return (f"{_PREAMBLE}\n\n"
             f"This is a Workflow (BusinessProcess-kind) app with ZERO processes; it has NEVER been published and "
             f"must NOT be published until it has a process (a 0-process Workflow app corrupts its verify cache). "
