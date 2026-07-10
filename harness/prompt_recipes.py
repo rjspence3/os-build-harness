@@ -672,18 +672,31 @@ def _attr_line(a: dict) -> str:
 
 def data_model(params: dict) -> str:
     """Author ALL entities in ONE turn (seam 3d). Interdependent entities must be created
-    together (a later separate turn that references an earlier one can roll it back)."""
+    together (a later separate turn that references an earlier one can roll it back).
+
+    `public` (modular topology): when True, EXPOSE every entity (Public=Yes) so CONSUMER apps can
+    reference AND READ its data across the app boundary. A modular Core owns the data; if its entities
+    are left private (the ODC default), a consumer's `app-reference` imports NOTHING from it and every
+    consumer screen renders empty — the silent killer of the producer→consumer data flow."""
     entities = _p(params, "entities", [], required=True)
+    public = _p(params, "public", False)
     lines = []
     for e in entities:
         attrs = [a for a in e.get("attributes", []) if not a.get("isIdentifier")]
         lines.append(f"- {e['name']}: " + "; ".join(_attr_line(a) for a in attrs))
     body = "\n".join(lines)
     enames = ", ".join(e["name"] for e in entities)
+    public_txt = (
+        f"EXPOSE FOR CROSS-APP USE — set EVERY entity's Public property = Yes (exposed in this app's public "
+        f"interface) so other apps can add this app as a dependency and READ its data. This app is a data-owning "
+        f"producer (Core); leaving its entities private (the default) means consumers reference nothing and render "
+        f"empty. After authoring, CONFIRM each entity reports Public=Yes.\n"
+        if public else "")
     return (
         f"{_PREAMBLE}\n\n"
         f"Create the app's data model. Author ALL of these entities in THIS ONE turn (they may reference each "
         f"other, so they must be created together). Do NOT create any screens or UI in this turn.\n{body}\n"
+        f"{public_txt}"
         f"IDENTIFIER — settle it in THIS turn, before any publish (this is load-bearing: the create/edit form's "
         f"Save action later needs {entities[0]['name'] if entities else 'each entity'}.CreateAction and .Id, which "
         f"do not exist if the entity has no identifier). Every entity MUST end this turn with exactly ONE identifier "
@@ -1650,8 +1663,11 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                                                 if not a.get("isIdentifier") and a.get("name") != "Label"]}})
     entities = [e for e in all_entities if not e.get("isStatic")]
     if entities:
+        # Expose entities (Public=Yes) when the spec marks this app a data-owning producer, so consumer
+        # apps can reference + read them (else the modular producer→consumer data flow is silently empty).
+        public = bool((spec.get("dataModel") or {}).get("public") or (spec.get("app") or {}).get("exposesData"))
         steps.append({"recipe": "data-model", "why": "spec.dataModel.entities (all in one turn)",
-                      "params": {"entities": entities}})
+                      "params": {"entities": entities, "public": public}})
     # Batch B: entity indexes (after the entities exist).
     for e in all_entities:
         for idx in e.get("indexes", []) or []:

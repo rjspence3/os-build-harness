@@ -102,7 +102,10 @@ def _core_spec(app: dict, domain_entities: dict) -> dict:
         "specVersion": "0.2",
         "app": {"name": app["name"], "roles": ["User"],
                 "description": f"Core service ({app.get('context', '?')} context)"},
-        "dataModel": {"entities": entities},
+        # A Core is a data-owning producer: EXPOSE its entities (Public=Yes) so the consumer apps that
+        # reference it can actually READ its data. Without this, app-reference imports nothing and every
+        # consumer screen renders empty (the modular producer→consumer data flow silently breaks).
+        "dataModel": {"entities": entities, "public": True},
         "screens": [],
     }
     if logic:

@@ -54,6 +54,10 @@
             "$ref": "#/$defs/entity"
           },
           "minItems": 0
+        },
+        "public": {
+          "type": "boolean",
+          "description": "Producer/Core: expose every entity Public=Yes so consumer apps that reference this app can READ its data across the app boundary. Without it, app-reference imports nothing and consumer screens render empty. Set by expand.py for core-layer apps."
         }
       }
     },

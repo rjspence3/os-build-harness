@@ -562,7 +562,32 @@ def test_data_model_recipe_authors_all_entities_one_turn_with_fks():
     # report success yet silently drop the Id, detonating only at the first write-path).
     assert "CONFIRM it has an Id identifier" in p
     assert "OS-DPL-RDBS-40020" in p
-    assert "report each entity's identifier attribute by name" in p
+    # default (non-producer): entities stay private — no exposure instruction
+    assert "Public property = Yes" not in p
+
+
+def test_data_model_public_exposes_entities_for_cross_app_read():
+    # A producer/Core marks dataModel.public -> entities are exposed Public so consumers can reference
+    # + READ them (else the modular producer->consumer data flow is silently empty).
+    ents = [{"name": "Supplier", "attributes": [
+        {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+        {"name": "Code", "dataType": "Text", "mandatory": True}]}]
+    pub = pr.render("data-model", {"entities": ents, "public": True})
+    assert "Public property = Yes" in pub and "read its data" in pub.lower()
+    priv = pr.render("data-model", {"entities": ents})
+    assert "Public property = Yes" not in priv                # default stays private (back-compat)
+
+
+def test_plan_marks_core_datamodel_public():
+    # plan_from_spec passes public=True to the data-model step when the spec marks the app a producer.
+    from harness.prompt_recipes import plan_from_spec
+    spec = {"specVersion": "0.2", "app": {"name": "Core"},
+            "dataModel": {"public": True, "entities": [{"name": "Supplier", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                {"name": "Code", "dataType": "Text", "mandatory": True}]}]},
+            "screens": []}
+    dm = next(s for s in plan_from_spec(spec) if s["recipe"] == "data-model")
+    assert dm["params"]["public"] is True
 
 
 def test_screen_recipe_bakes_anonymous_and_input_params():

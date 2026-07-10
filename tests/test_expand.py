@@ -55,6 +55,8 @@ def test_core_owns_entities_exposes_logic_no_screens():
     logic = {(u["kind"], u["name"]) for u in oc["logic"]}
     assert ("serviceAction", "PlaceOrder") in logic
     assert ("globalEvent", "OrderPlaced") in logic
+    # a Core exposes its entities so consumer apps can reference + READ them (else portals render empty)
+    assert oc["dataModel"].get("public") is True
 
 
 def test_domain_attributes_flow_into_core_entities():
