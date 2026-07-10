@@ -107,6 +107,27 @@ and B3 (401 transient) so a clean build doesn't self-wedge.
 **Sequencing:** B1 + B3 (harness) FIRST — they make a clean build possible without self-wedging. Then B2c
 (deterministic seed) so data is guaranteed. Then C1→C6. B5/B4 are polish; B8 is cleanup/unblock.
 
+## C2 — Step optimization / MCP budget (measured + decided)
+
+`harness-build-cost` (the non-greedy diagnostic) quantifies a build's MCP load offline. Rivian 5-app,
+enriched: **43 authoring turns · 43 publishes (→33 batched) · 5 cap-sessions (1/app) vs 43 greedy · ~43
+reads.**
+
+- **The greedy problem that hurt — cap saturation — is SOLVED by session-reuse** (5 vs 43 slots, 8.6×).
+  The diagnostic makes that visible and is the regression guard (break reuse → cap-sessions jumps to 43).
+- **Authoring turns are FIXED** — atomicity is a reliability requirement (fat turns hang/phantom;
+  STEP_ATOMICITY.md). Do NOT merge authoring to save turns.
+- **Publishes are the only remaining lever** (~23–30% via batching): a run of pure STRUCTURAL-UI steps
+  (screen/nav/place-nav/list-screen/dashboard/detail/row-actions) doesn't gate a downstream verify, so it
+  can author into the reused session and publish ONCE. But data-model/seed/write-paths/theme/app-reference
+  each need their OWN publish (verify boundary) — batching them loses per-step landing granularity AND
+  widens the B1 compile-wedge blast radius (a failed batch wedges several steps' authoring, un-isolatable).
+
+**DECISION (2026-07-10): keep per-unit publish as the DEFAULT** (precise landing + tight wedge isolation
+are worth more than a ~25% publish speedup now that the cap pain is gone). A `--publish-mode batched`
+opt-in for trusted specs is a deferred nice-to-have, NOT a blocker. Re-open only if publish wall-clock
+becomes the bottleneck.
+
 ## D. Measure of progress
 Not "recipes written" but **# of distinct app SHAPES built clean-room, first-try, gate-green.** The
 single-app shape is proven (R8). The **modular multi-app shape is NOT yet** — one clean rich portal
