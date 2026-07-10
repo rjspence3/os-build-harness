@@ -1128,5 +1128,22 @@ def test_kpi_rebind_flag_gates_model_api_step():
     rebind_step = next(s for s in steps_flag if s["recipe"] == "kpi-rebind")
     prompt = pr.render("kpi-rebind", rebind_step["params"])
     assert "applyModelApiCode" in prompt
-    assert "CountSupplier.Count" in prompt
+    assert "CountSuppliers.Count" in prompt          # per-card name (Count + PascalCase(label))
     assert "data-spec-id" in prompt
+
+
+def test_dashboard_aggregates_are_uniquely_named_per_card():
+    # Regression (OS-BEW-COMP-50008): two cards over the SAME entity must get DISTINCT aggregate names
+    # (else two same-named screen aggregates on one screen fail compilation). Name by card label.
+    import re
+    agg = pr.render("dashboard", {"screen": "dash", "phase": "aggregate", "cards": [
+        {"label": "Open Cases", "entity": "QualificationCase"},
+        {"label": "Overdue", "entity": "QualificationCase", "filter": 'SlaState = "OVERDUE"'},
+        {"label": "Suppliers", "entity": "Supplier"}]})
+    names = re.findall(r"aggregate named (\w+)", agg)
+    assert len(names) == 3 and len(set(names)) == 3     # all distinct — no CountQualificationCase collision
+    # the bind phase must reference the SAME per-card names
+    bind = pr.render("dashboard", {"screen": "dash", "phase": "bind", "cards": [
+        {"label": "Open Cases", "entity": "QualificationCase"},
+        {"label": "Overdue", "entity": "QualificationCase", "filter": 'SlaState = "OVERDUE"'}]})
+    assert "CountOpenCases.Count" in bind and "CountOverdue.Count" in bind

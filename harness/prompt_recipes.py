@@ -74,6 +74,13 @@ def _slug(text: str) -> str:
     return "".join(c if c.isalnum() else "-" for c in str(text).lower()).strip("-")
 
 
+def _pascal(text: str) -> str:
+    """An identifier-safe PascalCase token (for a per-card aggregate name, e.g. 'Open Cases' -> 'OpenCases')."""
+    parts = [p for p in "".join(c if c.isalnum() else " " for c in str(text)).split() if p]
+    tok = "".join(p[:1].upper() + p[1:] for p in parts) or "Card"
+    return tok if tok[0].isalpha() else "A" + tok
+
+
 def _cell_instruction(col, entity: str) -> str:
     """One column's cell-authoring instruction for the list_screen table, keyed on the
     columnSpec `kind`. A plain string column (back-compat) renders as a text cell.
@@ -868,19 +875,26 @@ def dashboard(params: dict) -> str:
 
     # W5b: phase-split path for COUNT cards.
     count_cards = [c for c in cards if c.get("entity") or c.get("aggregate")]
+    # UNIQUE aggregate name PER CARD (by label slug), not per entity: two cards over the SAME entity
+    # (e.g. "Open Cases" + "Overdue", both QualificationCase) would otherwise both be named
+    # CountQualificationCase — two same-named screen aggregates on one screen is a compile collision
+    # (OS-BEW-COMP-50008). Naming by the card keeps them distinct.
+    def _agg_name(card):
+        return "Count" + _pascal(card.get("label") or (card.get("entity") or card.get("aggregate")))
     if phase == "aggregate" and count_cards:
         agg_lines = []
         for c in count_cards:
             ent = c.get("entity") or c.get("aggregate")
             filt = f' filtered where {c["filter"]}' if c.get("filter") else ""
-            agg_name = f"Count{ent}"
             agg_lines.append(
-                f'  - Add a screen aggregate named {agg_name} over {ent}{filt}, '
+                f'  - Add a screen aggregate named {_agg_name(c)} over {ent}{filt}, '
                 f'Max Records = 1 (count-only query). Do NOT bind it to any widget yet.'
             )
         return (
             f"{_PREAMBLE}\n\n"
-            f"On the {screen} screen, author ONLY the COUNT screen aggregate(s) — no widgets, no bindings.\n"
+            f"On the {screen} screen, author ONLY the COUNT screen aggregate(s) — no widgets, no bindings. "
+            f"Give EACH aggregate the DISTINCT name below (never reuse one name for two aggregates — a "
+            f"duplicate screen-aggregate name fails compilation, OS-BEW-COMP-50008).\n"
             + "\n".join(agg_lines)
             + "\nDo not publish."
         )
@@ -888,13 +902,12 @@ def dashboard(params: dict) -> str:
     if phase == "bind" and count_cards:
         bind_lines = []
         for c in count_cards:
-            ent = c.get("entity") or c.get("aggregate")
-            label = c.get("label", "")
-            slug = _slug(label)
+            agg = _agg_name(c)
+            slug = _slug(c.get("label", ""))
             bind_lines.append(
                 f'  - Set the Expression Value inside [data-spec-id="kpi{slug}"] .kpi-value '
-                f'to Count{ent}.Count (the aggregate\'s total-count output). '
-                f'Do NOT bind to Count{ent}.List.Length (wrong: page-size, not count).'
+                f'to {agg}.Count (the aggregate\'s total-count output). '
+                f'Do NOT bind to {agg}.List.Length (wrong: page-size, not count).'
             )
         return (
             f"{_PREAMBLE}\n\n"
@@ -1290,10 +1303,11 @@ def kpi_rebind(params: dict) -> str:
             continue
         label = c.get("label", "")
         slug = _slug(label)
+        agg = "Count" + _pascal(label or ent)      # per-card name (two cards on one entity must not collide)
         bind_lines.append(
             f'  - Find the Expression inside [data-spec-id="kpi{slug}"] .kpi-value. '
-            f'Set its Value to the screen aggregate Count{ent}.Count. '
-            f'Count{ent} must be a screen aggregate over {ent} with Max Records=1. '
+            f'Set its Value to the screen aggregate {agg}.Count. '
+            f'{agg} must be a screen aggregate over {ent} with Max Records=1. '
             f'Use applyModelApiCode to make this change directly — do NOT use NL authoring for this rebind.'
         )
     body = "\n".join(bind_lines)
