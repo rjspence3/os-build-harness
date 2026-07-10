@@ -239,7 +239,7 @@ class SpecDriver:
 
     def __init__(self, mcp, prompts_dir: Path, *, per_call_timeout: int = 400,
                  publish_timeout: int = 600, db=None, env_key: str = "", max_attempts: int = 3,
-                 cap_wait_seconds: float = 8.0, cap_retries: int = 6):
+                 cap_wait_seconds: float = 8.0, cap_retries: int = 6, reuse_session: bool = True):
         self.mcp = mcp
         self.prompts_dir = Path(prompts_dir)
         self.per_call_timeout = per_call_timeout
@@ -252,6 +252,14 @@ class SpecDriver:
         # through consecutive steps in one invocation instead of one-step-per-poller-tick.
         self.cap_wait_seconds = max(0.0, cap_wait_seconds)
         self.cap_retries = max(0, cap_retries)
+        # SESSION ECONOMY: reuse ONE Mentor session (one per-tenant slot) across a build's steps via
+        # fresh_context resume turns, instead of opening a new session per step (greedy — saturates the
+        # 100-cap on a big build). `_session` holds the live (id, token) for the current build; it is
+        # DROPPED on any step failure so a write-wedged session self-heals into a fresh one, and the
+        # per-step independent _verify_step catches a silent rollback. Cancelled once at build end.
+        self.reuse_session = reuse_session
+        self._session: Optional[tuple[str, str]] = None
+        self._last_run_id: Optional[str] = None
 
     async def build(self, spec: dict, app_key: str, *, app_name: str = "app",
                     max_steps: Optional[int] = None) -> BuildReport:
@@ -289,6 +297,11 @@ class SpecDriver:
                 report.halted_at = target
                 print(f"          ✗ {target}: {res.outcome} — HALT")
                 break
+        # Release the ONE session this build held (best-effort; if cancel is a no-op on a terminal run
+        # the single session still reaps in 24h — but we spent 1 slot for the whole build, not N).
+        if self._session is not None and self._last_run_id is not None:
+            await self._safe_cancel(self._last_run_id)
+            self._session = None
         return report
 
     def _already_succeeded(self, app: str, index: int, target: str) -> bool:
@@ -352,6 +365,7 @@ class SpecDriver:
                                            session_id=result.session_id, session_token=result.session_token)
                 return StepResult(index, recipe, target, "succeeded", run_id=last_run_id)
             last = defect
+            self._session = None        # verify failed (possible silent rollback) — re-author fresh
             print(f"          ↻ attempt {attempt}/{self.max_attempts}: verification failed — {defect}")
         if row_id is not None:
             self.db.mark_failed(row_id, f"exhausted {self.max_attempts} attempts: {last}")
@@ -360,20 +374,31 @@ class SpecDriver:
 
     async def _attempt_step(self, prompt: str, app_key: str, row_id):
         """One fire→poll→(publish) cycle. Returns (action, reason, result|None) per §Recovery.
-        Each attempt is a FRESH mentor_start (R7: a cancelled/wedged session is unpublishable)."""
+        Reuses the build's live session (fresh_context resume — one slot for many steps) when we have
+        one; else opens a fresh session on app_key. On ANY non-VERIFY outcome the session is DROPPED so
+        the next attempt re-authors clean (self-heals a write-wedge). One slot, not one-per-step."""
         from harness.mcp_client import MentorError
+        reuse = self.reuse_session and self._session is not None
         try:
-            run_id = await self.mcp.mentor_start(app_key, prompt)
+            if reuse:
+                sid, tok = self._session
+                run_id = await self.mcp.mentor_start(prompt=prompt, session_id=sid,
+                                                     session_token=tok, fresh_context=True)
+            else:
+                run_id = await self.mcp.mentor_start(app_key, prompt)
+            self._last_run_id = run_id
             if row_id is not None:
                 self.db.mark_running(row_id, run_id)
             result = await self.mcp.mentor_poll(run_id, timeout_seconds=self.per_call_timeout)
         except MentorError as exc:
+            self._session = None            # a start/poll error may have wedged the session — drop it
             return RETRY, f"mentor error: {exc}", None
 
         action, reason = classify_terminal(result)
         if action != VERIFY:
             if result.status == "running":       # R1: cancel the hung run before a fresh re-author
                 await self._safe_cancel(result.run_id)
+            self._session = None            # non-terminal-success ⇒ abandon this session, re-author fresh
             return action, reason, result
         try:
             pub_id = await self.mcp.publish_start(result.session_id, result.session_token,
@@ -382,12 +407,14 @@ class SpecDriver:
             paction, preason = classify_publish(payload)
         except MentorError as exc:
             paction, preason = RETRY, f"publish error: {exc}"
-        # Cancel-after-publish: the turn reached terminal and we've published (or abandoned it on a
-        # publish failure). Release the Mentor session slot NOW — an idle session keeps holding the
-        # per-tenant cap until its 24h inactivity reap, and the harness never resumes a session (each
-        # step re-authors fresh), so nothing downstream needs it. Post-publish there is no unpublished
-        # OML to roll back, so this is safe (unlike cancelling a mutation before terminal).
-        await self._safe_cancel(result.run_id)
+        # Session economy: KEEP this session's slot for the next step (capture its refreshed creds) —
+        # do NOT cancel per-step. The token rotates each turn, so store the fresh pair. On a publish
+        # RETRY, drop the session so the re-author is clean; the build cancels the one live session at
+        # the end (build()) to release its single slot.
+        if paction == VERIFY and result.session_id and result.session_token:
+            self._session = (result.session_id, result.session_token)
+        else:
+            self._session = None
         return paction, preason, result
 
     async def _safe_cancel(self, run_id) -> None:

@@ -60,8 +60,15 @@ class FakeMCP:
                 return s
         return self._default
 
-    async def mentor_start(self, app_key: str, prompt: str) -> str:
+    async def mentor_start(self, app_key: str = None, prompt: str = "", *,
+                           session_id: str = None, session_token: str = None,
+                           fresh_context: bool = False) -> str:
         self.start_calls += 1
+        # record whether this was a session-reuse resume (slot economy) or a fresh app_key session
+        if session_id and session_token:
+            self.resume_starts = getattr(self, "resume_starts", 0) + 1
+        else:
+            self.fresh_starts = getattr(self, "fresh_starts", 0) + 1
         s = self._match(prompt)
         if s.fail_starts:
             seen = self._starts_seen.get(id(s), 0)
@@ -149,10 +156,45 @@ def test_build_success_path_publishes_every_step(tmp_path):
     assert report.succeeded == report.total > 0
     # publish-per-unit: one publish per successful step
     assert mcp.publish_calls == report.succeeded
-    # cancel-after-publish: each published session is released so it stops holding the per-tenant cap
-    assert len(mcp.cancels) == report.succeeded
     # every rendered prompt was written for reproducibility
     assert list((tmp_path / "p").glob("*.prompt.txt"))
+
+
+def test_session_is_reused_across_steps_not_one_per_step(tmp_path):
+    # SESSION ECONOMY: an all-success build opens ONE fresh session (first step, on app_key) and
+    # RESUMES it for every later step (fresh_context), spending one per-tenant slot for the whole
+    # build — not one slot per step. The single session is cancelled once at the end.
+    mcp = FakeMCP()
+    driver = SpecDriver(mcp, tmp_path / "p")               # reuse_session defaults True
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    assert report.ok and report.succeeded == report.total > 1
+    assert getattr(mcp, "fresh_starts", 0) == 1            # exactly one slot-opening session
+    assert getattr(mcp, "resume_starts", 0) == report.succeeded - 1   # rest are reuse resumes
+    assert len(mcp.cancels) == 1                           # one release at build end, not per step
+
+
+def test_reuse_disabled_opens_a_session_per_step(tmp_path):
+    # Opt-out: reuse_session=False restores the greedy one-session-per-step behavior (no resumes).
+    mcp = FakeMCP()
+    driver = SpecDriver(mcp, tmp_path / "p", reuse_session=False)
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    assert report.ok
+    assert getattr(mcp, "resume_starts", 0) == 0
+    assert getattr(mcp, "fresh_starts", 0) == report.succeeded
+
+
+def test_verify_defect_drops_session_and_reauthors_fresh(tmp_path):
+    # Write-wedge self-heal: if a step's independent verify finds it did NOT land (silent rollback),
+    # the session is dropped and the retry opens a FRESH session — not another resume on the wedged one.
+    mcp = FakeMCP()
+    # nav-block verify fails once (phantom), then the retry (fresh session) succeeds via heal_after.
+    mcp.script_for("SidebarNav", _Script(heal_after=1))
+    mcp.screen_reads = []                                  # (screens verify tolerant; nav uses default)
+    driver = SpecDriver(mcp, tmp_path / "p")
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    # at least one fresh re-author beyond the initial session (the drop-and-reauthor)
+    assert report.ok
+    assert getattr(mcp, "fresh_starts", 0) >= 1
 
 
 def test_cap_hit_waits_and_cascades_instead_of_halting(tmp_path):

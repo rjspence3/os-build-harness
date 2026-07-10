@@ -106,9 +106,23 @@ class MentorMCP:
 
     # ─── Mentor: applyModelApiCode flow ───────────────────────────────────────
 
-    async def mentor_start(self, app_key: str, prompt: str) -> str:
-        """Start a Mentor run. Returns run_id."""
-        payload = await self._call("mentor_start", {"app_key": app_key, "prompt": prompt})
+    async def mentor_start(self, app_key: Optional[str] = None, prompt: str = "", *,
+                           session_id: Optional[str] = None, session_token: Optional[str] = None,
+                           fresh_context: bool = False) -> str:
+        """Start a Mentor run. Returns run_id.
+
+        First turn of a session: pass `app_key`. RESUME turn (reuse the SAME session + its
+        per-tenant slot — the session-economy path): pass `session_id` + `session_token` (from the
+        prior turn's terminal result) and `fresh_context=True` to start a clean conversation over the
+        session's current OML WITHOUT opening a new slot. This is how a build spends ONE slot for many
+        steps instead of one-per-step (the greedy default that saturates the 100-cap)."""
+        if session_id and session_token:
+            args = {"mentor_session_id": session_id, "mentor_session_token": session_token, "prompt": prompt}
+            if fresh_context:
+                args["fresh_context"] = True
+        else:
+            args = {"app_key": app_key, "prompt": prompt}
+        payload = await self._call("mentor_start", args)
         run_id = payload.get("runId") or payload.get("run_id")
         if not run_id:
             raise MentorError(f"mentor_start returned no runId: {payload}")
