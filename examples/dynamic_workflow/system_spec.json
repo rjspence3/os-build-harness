@@ -1,0 +1,192 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "dynamic_workflow_engine",
+    "apps": [
+      {
+        "name": "WorkflowDesignSystem",
+        "kind": "Library",
+        "layer": "foundation",
+        "exposes": {}
+      },
+      {
+        "name": "WorkflowCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "workflow",
+        "owns": [
+          "TaskTemplate",
+          "Scenario",
+          "ScenarioStep",
+          "TransitionRule",
+          "DecisionRow",
+          "WorkflowInstance",
+          "TaskInstance",
+          "AuditEvent"
+        ],
+        "exposes": {
+          "serviceActions": [
+            "SubmitIntake",
+            "AdvanceInstance",
+            "CompleteTask",
+            "ClaimTask",
+            "SaveLibraryElement"
+          ],
+          "events": [
+            "InstanceStarted"
+          ],
+          "staticEntities": []
+        },
+        "foreignKeys": [
+          {
+            "from": "ScenarioStep",
+            "target": "Scenario"
+          },
+          {
+            "from": "ScenarioStep",
+            "target": "TaskTemplate"
+          },
+          {
+            "from": "TransitionRule",
+            "target": "Scenario"
+          },
+          {
+            "from": "DecisionRow",
+            "target": "Scenario"
+          },
+          {
+            "from": "WorkflowInstance",
+            "target": "Scenario"
+          },
+          {
+            "from": "TaskInstance",
+            "target": "WorkflowInstance"
+          },
+          {
+            "from": "TaskInstance",
+            "target": "TaskTemplate"
+          },
+          {
+            "from": "AuditEvent",
+            "target": "WorkflowInstance"
+          }
+        ],
+        "consumes": []
+      },
+      {
+        "name": "EscalateOverdueWorkflow",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {
+          "triggerEvent": "SlaSweep",
+          "startProcessOn": "SlaSweep"
+        },
+        "activities": [
+          {
+            "name": "Escalate",
+            "callsServiceAction": "AdvanceInstance"
+          }
+        ],
+        "consumes": [
+          {
+            "app": "WorkflowCore",
+            "serviceActions": [
+              "AdvanceInstance"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AdminApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "admin",
+        "exposes": {
+          "screens": [
+            "AuthorLibrary"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "WorkflowCore",
+            "entities": [
+              "DecisionRow",
+              "Scenario",
+              "ScenarioStep",
+              "TaskTemplate",
+              "TransitionRule"
+            ],
+            "serviceActions": [
+              "SaveLibraryElement"
+            ]
+          },
+          {
+            "app": "WorkflowDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "RequesterApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "requester",
+        "exposes": {
+          "screens": [
+            "SubmitIntake",
+            "ResolveScenario",
+            "TrackInstance"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "WorkflowCore",
+            "entities": [
+              "AuditEvent",
+              "DecisionRow",
+              "Scenario",
+              "TaskInstance",
+              "WorkflowInstance"
+            ],
+            "serviceActions": [
+              "SubmitIntake"
+            ]
+          },
+          {
+            "app": "WorkflowDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "WorkerApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "worker",
+        "exposes": {
+          "screens": [
+            "CompleteTask",
+            "ClaimTask",
+            "MyWork"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "WorkflowCore",
+            "entities": [
+              "AuditEvent",
+              "TaskInstance",
+              "TaskTemplate",
+              "WorkflowInstance"
+            ],
+            "serviceActions": [
+              "ClaimTask",
+              "CompleteTask"
+            ]
+          },
+          {
+            "app": "WorkflowDesignSystem"
+          }
+        ]
+      }
+    ]
+  }
+}
