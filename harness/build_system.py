@@ -113,16 +113,25 @@ async def _trigger_seed(mcp, app_key: str, env_key: str) -> None:
 
 async def build_system(system: dict, domain: Optional[dict], *, prefix: str, tenant: Optional[str] = None,
                        env_key: Optional[str] = None, state_dir: Optional[Path] = None,
-                       prompts_dir: Optional[Path] = None, mcp=None,
+                       prompts_dir: Optional[Path] = None, specs_dir: Optional[Path] = None, mcp=None,
                        per_call_timeout: int = 700, max_wedge_rebuilds: int = 1) -> SystemResult:
     """Execute a modular topology to built apps, topo order, producer-before-consumer. Pass `mcp` to
-    inject a client (tests); else opens a live MentorMCP. Libraries are skipped (recipe path)."""
+    inject a client (tests); else opens a live MentorMCP. Libraries are skipped (recipe path).
+
+    `specs_dir`: prefer an ENRICHED on-disk spec `<specs_dir>/<Logical>.app_spec.json` over expand's
+    in-memory output — so the design/portal enrichment (gen_portal_specs.py) flows through with no hand
+    step. Falls back to expand's spec for any app without an on-disk file."""
     rows = architecture.check_system(system)
     if not architecture.verdict(rows):
         return SystemResult(modular=False)
 
     exp = expand.expand_system(system, domain)
-    specs, libraries = exp["specs"], set(exp["libraries"])
+    specs, libraries = dict(exp["specs"]), set(exp["libraries"])
+    if specs_dir:
+        for logical in list(specs):
+            p = Path(specs_dir) / f"{logical}.app_spec.json"
+            if p.exists():
+                specs[logical] = json.loads(p.read_text())   # enriched spec wins
     by_name = {a["name"]: a for a in _apps(system)}
     order = topo_order(system)
     result = SystemResult(modular=True, order=order)
@@ -207,6 +216,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--env-key", default=None, help="ODC environment key (default: auto-resolve Dev)")
     ap.add_argument("--state-dir", type=Path, default=None, help="dir for per-app StateDBs (resumable)")
     ap.add_argument("--prompts-dir", type=Path, default=None, help="dir for rendered prompts")
+    ap.add_argument("--specs-dir", type=Path, default=None,
+                    help="prefer enriched on-disk <Logical>.app_spec.json here over expand's output (design overlay)")
     ap.add_argument("--plan-only", action="store_true", help="print the topo order + per-app step counts and exit")
     args = ap.parse_args(argv)
 
@@ -223,7 +234,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     result = asyncio.run(build_system(system, domain, prefix=args.prefix, tenant=args.tenant,
-                                      env_key=args.env_key, state_dir=args.state_dir, prompts_dir=args.prompts_dir))
+                                      env_key=args.env_key, state_dir=args.state_dir,
+                                      prompts_dir=args.prompts_dir, specs_dir=args.specs_dir))
     print(f"\nSystem build {'OK' if result.ok else 'INCOMPLETE'} — modular={result.modular}")
     for a in result.apps:
         mark = "✓" if a.ok else "✗"

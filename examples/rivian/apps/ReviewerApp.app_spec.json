@@ -281,7 +281,7 @@
   ],
   "appReferences": [
     {
-      "producerApp": "RivianCoreV2",
+      "producerApp": "OnboardingCore",
       "elements": [
         {
           "name": "AuditEvent",
