@@ -111,8 +111,61 @@ domain_spec.json → decompose → system_gate (MODULAR) → expand → gen_port
 - **Where the definitions come from** — client migration (ETL), an admin authoring UI, or both.
 - **Field-type set** — a fixed ~10 types (makes G2 tractable) or arbitrary? Fixed is strongly preferred.
 
+## Agentic intake — compose the workflow, don't select it (the headline)
+
+The coolest version replaces the static resolver (questionnaire → `ResolveScenario` decision-table match
+over N pre-authored scenarios) with an **AI agent that COMPOSES the workflow from governed building blocks.**
+The agent interviews the requester, reasons about their situation, and **assembles the task graph on the
+fly** — selecting, ordering, and routing `TaskTemplate`s into a valid instance-specific plan, then
+instantiating it. "The agent executes the build" = it *builds the workflow*, per instance.
+
+**This takes N-invariance to its conclusion: N → emergent.** You no longer pre-author scenarios at all.
+You author the reusable **TaskTemplate building blocks + the governance rules**; the agent composes
+unbounded scenarios from them at runtime. `Scenario`/`ScenarioStep`/`DecisionRow` collapse from a hand-
+maintained library to **governed primitives + runtime output**. Stronger than the static library, and it
+is the same recursion the harness is built on: **a spec composes an app; an intake composes a workflow.**
+
+### Buildable with today's recipes + a bit
+Rivian's ScreeningAgent already proved the harness builds ODC **AIAgent apps** (the `agent` recipe:
+systemPrompt / model / tools grounded on public entities). So the composer is just another AIAgent app —
+**additive**, not a rebuild. The engine (`AdvanceInstance`), the dynamic forms, and the queue are unchanged.
+
+- **IntakeAgent** (AIAgent app), tools bound to WorkflowCore's PUBLIC service actions:
+  - `GetTaskTemplates` — read the governed building blocks (+ their routing/dependency metadata)
+  - `ComposeInstance` — create a `WorkflowInstance` + its dynamic `ScenarioStep` graph from selected templates
+  - `AdvanceInstance` — the fixed engine (unchanged)
+- System prompt: *interview → select + sequence TaskTemplates into a valid graph honoring roles/dependencies
+  → hand the candidate graph to the validator → instantiate on approval.*
+
+### The compose → validate → gate → run pipeline (the part that makes it shippable)
+Agentic composition of business-critical, regulated workflows (the Pega/Appian/P&G/Silvomo territory) has
+three governance problems a naive "LLM builds workflows" version cannot survive. The real design:
+
+1. **Compose from GOVERNED blocks only.** The agent may select/sequence/route existing `TaskTemplate`s — it
+   may NOT invent a task, skip a mandatory control, or route to a non-existent role. Composition is a
+   constrained assembly, not free generation.
+2. **Hard VALIDATOR between propose and run.** A deterministic `ValidateComposition` action gates every
+   agent-proposed graph: every step resolves to a real TaskTemplate; every routing role exists; required
+   controls (approvals, screenings) are present; no orphan step, no cycle; SLAs sane. Invalid → reject +
+   ask the agent to revise. Nothing runs unvalidated.
+3. **Risk-tiered human-in-the-loop.** Low-risk intake → agent composes + auto-runs. High-risk (large $,
+   regulated, novel shape) → agent composes a *candidate*, a human confirms. The agent ACCELERATES;
+   governance GATES.
+4. **Fully audited + reproducible.** The agent's selection + reasoning is written to `AuditEvent` so a
+   composed instance is explainable and repeatable — the non-negotiable for compliance. (Pin the model +
+   record inputs so a composition can be re-derived.)
+
+Get this boundary wrong and it is a demo no compliance team approves. Get it right and it is both novel and
+shippable: **agent composes from governed primitives → validator enforces invariants → risk-tiered approval
+→ the fixed engine runs it, audited.**
+
+### Harness gap delta (small)
+On top of G1–G3, agentic intake adds: (G4) the `IntakeAgent` AIAgent app (existing `agent` recipe, tools =
+the engine SAs), (G5) `ComposeInstance` + `ValidateComposition` service actions on WorkflowCore (part of the
+canonical engine recipe — fixed code, N-invariant), and the risk-tier/approval policy as data. Still bounded.
+
 ## Honest assessment
 
 More than Rivian, but **bounded, not open-ended** — precisely because it is an engine. ≈ 1 UX spike + 3
-write-once recipes away from harness-buildable. The engine, the UI machinery, and the loader are all
-N-invariant. Scenarios are data.
+write-once recipes (+ the additive agent) away from harness-buildable. The engine, the UI machinery, the
+loader, and the intake agent are all N-invariant. Scenarios are data — or, with agentic intake, *emergent*.

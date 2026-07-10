@@ -97,6 +97,25 @@
        "service": "SaveLibraryElement",
        "note": "the client maintains the scenario library (any N) without code."},
 
+      {"name": "ComposeInstance",
+       "reads": ["TaskTemplate", "WorkflowInstance"],
+       "writes": ["WorkflowInstance", "ScenarioStep", "AuditEvent"],
+       "service": "ComposeInstance", "engine": true,
+       "note": "FIXED (G5): assemble an instance-specific ScenarioStep graph from GOVERNED TaskTemplates (select/order/route). Called by the IntakeAgent. Composition only — never invents a task."},
+
+      {"name": "ValidateComposition",
+       "reads": ["ScenarioStep", "TaskTemplate", "WorkflowInstance"],
+       "writes": ["AuditEvent"],
+       "service": "ValidateComposition", "engine": true,
+       "note": "FIXED (G5): deterministic gate BEFORE an instance runs — every step resolves to a real TaskTemplate, routing roles exist, required controls present, no orphan/cycle, SLAs sane. Invalid -> reject for agent revision. Nothing runs unvalidated."},
+
+      {"name": "AgenticIntake", "orchestrates": true, "triggerEvent": "IntakeStarted",
+       "steps": [
+         {"name": "Compose", "ai": "IntakeComposer", "reads": ["TaskTemplate"], "writes": ["ScenarioStep"]},
+         {"name": "Validate", "callsService": "ValidateComposition"},
+         {"name": "Instantiate", "callsService": "InstantiateWorkflow"}],
+       "note": "G4: the agentic intake as a short compose->validate->instantiate orchestration. The Compose step is an AIAgent (IntakeComposer) that assembles the workflow from GOVERNED TaskTemplates; Validate is the deterministic gate; Instantiate spawns the first tasks. Replaces the static ResolveScenario for emergent (N->0 pre-authored) scenarios; the fixed engine + dynamic UI are unchanged. The orchestration SHELL is static (one process); the DYNAMISM is the agent's composed output. Risk-tiered approval sits between Validate and Instantiate; fully audited + reproducible."},
+
       {"name": "EscalateOverdue", "orchestrates": true, "triggerEvent": "SlaSweep",
        "steps": [
          {"name": "FindOverdue", "reads": ["TaskInstance"]},

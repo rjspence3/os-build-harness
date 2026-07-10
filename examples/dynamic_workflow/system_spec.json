@@ -30,7 +30,9 @@
             "AdvanceInstance",
             "CompleteTask",
             "ClaimTask",
-            "SaveLibraryElement"
+            "SaveLibraryElement",
+            "ComposeInstance",
+            "ValidateComposition"
           ],
           "events": [
             "InstanceStarted"
@@ -74,6 +76,43 @@
         "consumes": []
       },
       {
+        "name": "AgenticIntakeWorkflow",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {
+          "triggerEvent": "IntakeStarted",
+          "startProcessOn": "IntakeStarted"
+        },
+        "activities": [
+          {
+            "name": "Compose",
+            "callsServiceAction": "IntakeComposer"
+          },
+          {
+            "name": "Validate",
+            "callsServiceAction": "ValidateComposition"
+          },
+          {
+            "name": "Instantiate",
+            "callsServiceAction": "InstantiateWorkflow"
+          }
+        ],
+        "consumes": [
+          {
+            "app": "IntakeComposerAgent",
+            "serviceActions": [
+              "IntakeComposer"
+            ]
+          },
+          {
+            "app": "WorkflowCore",
+            "serviceActions": [
+              "ValidateComposition"
+            ]
+          }
+        ]
+      },
+      {
         "name": "EscalateOverdueWorkflow",
         "kind": "BusinessProcess",
         "layer": "orchestration",
@@ -92,6 +131,24 @@
             "app": "WorkflowCore",
             "serviceActions": [
               "AdvanceInstance"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "IntakeComposerAgent",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {
+          "serviceActions": [
+            "IntakeComposer"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "WorkflowCore",
+            "entities": [
+              "TaskTemplate"
             ]
           }
         ]
