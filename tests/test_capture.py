@@ -365,6 +365,17 @@ def test_kpi_check_flags_list_length_bug():
     assert capture._classify_verdict(result_none["verdict"]) == "defect"
 
 
+def test_kpi_all_zero_on_seeded_entity_is_unverified_not_vacuous_ok():
+    # B5: shown=0/expected=0 on a SEEDED entity is a suspect empty data layer (seed/reference not
+    # populated), not a vacuous KPI_OK — report UNVERIFIED so it blocks DONE.
+    r = capture._check_kpi_card(shown=0, expected=0, screen="dashboard", slug="cases", seeded=True)
+    assert r["verdict"].startswith("KPI_UNVERIFIED")
+    assert capture._classify_verdict(r["verdict"]) == "unverified"
+    # a genuinely-empty NON-seeded entity showing 0==0 is still a legit OK (not every entity has data)
+    r2 = capture._check_kpi_card(shown=0, expected=0, screen="dashboard", slug="cases", seeded=False)
+    assert r2["verdict"] == "KPI_OK"
+
+
 # ── T-W5a: live-count fallback (no sampleData) ───────────────────────────────
 def test_true_count_for_entity_live_count_fallback():
     """T-W5a: when an entity has no sampleData, _true_count_for_entity must navigate to the

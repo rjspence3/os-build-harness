@@ -66,6 +66,7 @@ _VERDICT_CLASS: dict[str, str] = {
     "EDIT_FORM_NOT_FOUND": "unverified",
     "SAVE_NOT_FOUND":   "unverified",
     "NO_ROWS":          "unverified",
+    "KPI_UNVERIFIED":   "unverified",   # all-zero KPI on a seeded entity — data layer empty
     # confirmed-ok verdicts
     "PERSISTS":         "ok",
     "UPDATES":          "ok",
@@ -812,10 +813,17 @@ _KPI_VALUE_JS = r"""(specId) => {
 }"""
 
 
-def _check_kpi_card(shown, expected: int, screen: str, slug: str) -> dict:
+def _check_kpi_card(shown, expected: int, screen: str, slug: str, seeded: bool = False) -> dict:
     """Build a KPI check result dict comparing `shown` (live DOM value) to `expected`
-    (the true row count). Returns verdict KPI_OK or KPI_WRONG (defect)."""
-    if shown is None or shown != expected:
+    (the true row count). Returns KPI_OK, KPI_WRONG (defect), or KPI_UNVERIFIED.
+
+    B5: when the spec DECLARES seed data for this entity but BOTH shown and expected are 0, the
+    KPI 'agrees with itself' vacuously — the real story is an EMPTY data layer (seed didn't populate,
+    or the cross-app reference carries no rows). Report UNVERIFIED (blocks DONE, routes the fix to the
+    data/reference), not a false KPI_OK."""
+    if seeded and (shown in (0, None)) and expected == 0:
+        verdict = "KPI_UNVERIFIED (shows 0 on a seeded entity — data layer empty; seed/reference not populated)"
+    elif shown is None or shown != expected:
         verdict = f"KPI_WRONG (shows {shown}, expected {expected})"
     else:
         verdict = "KPI_OK"
@@ -913,8 +921,15 @@ def run_render(spec: dict, base_url: str, login: dict) -> list[dict]:
                 expected = _true_count_for_entity(spec, entity, page, base)
                 if expected is None:
                     continue  # no true count available — skip, do not emit a false verdict
+                # 'expect rows' when the app OWNS seed data for the entity, OR (consumer case) the
+                # entity is REFERENCED from a producer that owns/seeds it — so an all-zero KPI is a
+                # suspect data-layer/reference gap, not a vacuous OK.
+                seeded = any(e.get("name") == entity and e.get("sampleData")
+                             for e in (spec.get("dataModel", {}) or {}).get("entities", [])) or \
+                    any(el.get("name") == entity for ref in (spec.get("appReferences") or [])
+                        for el in (ref.get("elements") or []))
                 results.append(_check_kpi_card(shown=shown, expected=expected,
-                                               screen=s["id"], slug=slug))
+                                               screen=s["id"], slug=slug, seeded=seeded))
         browser.close()
     return results
 

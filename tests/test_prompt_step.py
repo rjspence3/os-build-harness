@@ -720,6 +720,26 @@ def test_plan_scaffolds_but_no_list_or_write_for_bare_spec():
     assert [s["recipe"] for s in pr.plan_from_spec(bare)] == ["data-model", "screen"]
 
 
+def test_headless_core_with_sampledata_gets_bootstrap_screen_and_seed():
+    # B2a: a data-owning app (sampleData) with NO screens must get a synthetic bootstrap screen so the
+    # seed's OnReady fires — else a headless Core silently ships un-seeded (consumers render empty).
+    core = {"specVersion": "0.2", "app": {"name": "Core"},
+            "dataModel": {"public": True, "entities": [{"name": "Supplier", "naturalKey": "Code",
+                "sampleData": [{"Code": "A", "Name": "X"}], "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Code", "dataType": "Text", "mandatory": True},
+                    {"name": "Name", "dataType": "Text", "mandatory": True}]}]},
+            "screens": []}
+    recipes = [s["recipe"] for s in pr.plan_from_spec(core)]
+    assert "screen" in recipes and any("seed" in r for r in recipes)
+    # a headless app with NO sampleData stays screenless (safeguard only fires when there's data to seed)
+    core_nodata = {"specVersion": "0.2", "app": {"name": "Core"},
+                   "dataModel": {"entities": [{"name": "E", "attributes": [
+                       {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}]}]},
+                   "screens": []}
+    assert "screen" not in [s["recipe"] for s in pr.plan_from_spec(core_nodata)]
+
+
 # ── Phase 4 Batch A: static entity / structure / input validation / exception handling ──
 
 def test_static_entity_recipe_manual_pk_and_explicit_record_ids():

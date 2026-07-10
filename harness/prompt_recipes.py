@@ -1649,9 +1649,20 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
     step after each dashboard bind step — a deterministic Model-API corrective for
     the KPI rebind if the NL bind still produces .List.Length.  Off by default."""
     steps: list[dict] = []
-    screens = spec.get("screens", [])
+    screens = list(spec.get("screens", []) or [])
     auth = spec.get("auth") or {}
     login = auth.get("loginScreen") or "Login"
+
+    # B2a — headless data-owner seed safeguard: a spec that OWNS seed data (sampleData) but has NO
+    # screens (a modular Core) can never RUN its seed — the seed is triggered by a screen's OnReady, and
+    # the WhenPublished timer is unreliable. Synthesize a minimal bootstrap Home screen so the seed fires
+    # on first load. (A consumer app owns no entities, so this only affects data-owning producers.)
+    _owns_seed = any(e.get("sampleData") for e in (spec.get("dataModel", {}) or {}).get("entities", []))
+    if _owns_seed and not screens:
+        screens = [{"id": "home", "name": "Home", "isDefault": True,
+                    "components": [{"id": "coreHealth", "type": "Container",
+                                    "label": (spec.get("app", {}) or {}).get("name", "Core") + " — data service"}],
+                    "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "coreHealth"}]}}]
 
     # Scaffold FIRST (seam 3d): the data model, then all screens with Anonymous baked. list-screen
     # and create-form steps below assume the entities + screens already exist.
