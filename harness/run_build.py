@@ -405,6 +405,14 @@ class SpecDriver:
                                                   env_key=self.env_key)
             payload = await self.mcp.publish_wait(pub_id, timeout_seconds=self.publish_timeout)
             paction, preason = classify_publish(payload)
+            # On a publish FAILURE, fetch the build-engine messages so the REAL per-element compile
+            # error (behind a generic OS-BEW/OS-DPL code) is surfaced + printed — not just the code.
+            if paction != VERIFY:
+                pk = payload.get("publication_key") or payload.get("publicationKey") or pub_id
+                msgs = await self._publish_failure_detail(pk)
+                if msgs:
+                    preason = f"{preason} :: {msgs}"
+                    print(f"          ⓘ build-engine messages: {msgs}")
         except MentorError as exc:
             paction, preason = RETRY, f"publish error: {exc}"
         # Session economy: KEEP this session's slot for the next step (capture its refreshed creds) —
@@ -416,6 +424,31 @@ class SpecDriver:
         else:
             self._session = None
         return paction, preason, result
+
+    async def _publish_failure_detail(self, pub_key) -> str:
+        """Extract the human-readable build-engine messages behind a failed publish (the actual
+        per-element compile errors). Best-effort; '' when unavailable."""
+        fn = getattr(self.mcp, "publish_logs", None)
+        if fn is None or not pub_key:
+            return ""
+        try:
+            payload = await fn(pub_key)
+        except Exception:
+            return ""
+        msgs = []
+        rows = payload if isinstance(payload, list) else (
+            payload.get("messages") or payload.get("results") or payload.get("data") or [])
+        for m in (rows or [])[:8]:
+            if isinstance(m, dict):
+                txt = m.get("message") or m.get("text") or m.get("detail") or ""
+                el = m.get("element") or m.get("elementName") or m.get("target") or ""
+                sev = m.get("severity") or m.get("level") or ""
+                line = " ".join(str(x) for x in (sev, el, txt) if x).strip()
+                if line:
+                    msgs.append(line)
+            elif isinstance(m, str):
+                msgs.append(m)
+        return " | ".join(msgs)[:600]
 
     async def _safe_cancel(self, run_id) -> None:
         cancel = getattr(self.mcp, "mentor_cancel", None)

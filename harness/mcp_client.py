@@ -199,6 +199,14 @@ class MentorMCP:
     async def publish_status(self, publication_id: str) -> dict[str, Any]:
         return await self._call("publish_status", {"publication_id": publication_id})
 
+    async def publish_logs(self, pub_key: str) -> dict[str, Any]:
+        """The build-engine publication MESSAGES for a publication (the real per-element compile
+        errors behind a generic OS-BEW/OS-DPL code). Best-effort — returns {} if unavailable."""
+        try:
+            return await self._call("publish_logs", {"pub_key": pub_key})
+        except Exception:
+            return {}
+
     # Terminal publish states (live contract): `state` ∈ pending|succeeded|failed. A legacy
     # `status` ∈ Finished|Failed|Cancelled is also accepted for stdio/older transports.
     _PUBLISH_TERMINAL = {"succeeded", "failed", "cancelled"}
