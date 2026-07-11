@@ -2,124 +2,418 @@
   "specVersion": "0.1",
   "domain": {
     "name": "coding_testgen",
-    "description": "Coding & test generation (use case #5). A CodeGenAgent grounds on a WorkItem + its Repository context, drafts a code change, and generates a covering test suite. It never merges to the main branch directly — it PROPOSES a ChangeProposal + TestSuite, which the OpenPullRequest service turns into a PullRequest. The PR review IS the approval workflow: a human reviewer must approve/merge before the change lands. Every action is audited. The bounded action space the agent proposes (draft-change | generate-tests | open-pull-request) + the human-at-the-write-step (the PR gate) is what makes it ship, not just reason.",
-
+    "description": "Coding & test generation (use case #5). A CodeGenAgent grounds on a WorkItem + its Repository context, drafts a code change, and generates a covering test suite. It never merges to the main branch directly \u2014 it PROPOSES a ChangeProposal + TestSuite, which the OpenPullRequest service turns into a PullRequest. The PR review IS the approval workflow: a human reviewer must approve/merge before the change lands. Every action is audited. The bounded action space the agent proposes (draft-change | generate-tests | open-pull-request) + the human-at-the-write-step (the PR gate) is what makes it ship, not just reason.",
     "entities": [
-      {"name": "Repository", "context": "devtasks", "naturalKey": "Slug",
-       "attributes": [
-         {"name": "Slug", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "DefaultBranch", "dataType": "Text"},
-         {"name": "Language", "dataType": "Text"},
-         {"name": "GitUrl", "dataType": "Text"},
-         {"name": "Owner", "dataType": "Text"}]},
-
-      {"name": "WorkItem", "context": "devtasks", "naturalKey": "ItemNo", "references": ["Repository", "AuditEvent"],
-       "attributes": [
-         {"name": "ItemNo", "dataType": "Text", "mandatory": true},
-         {"name": "Title", "dataType": "Text", "mandatory": true},
-         {"name": "Description", "dataType": "Text"},
-         {"name": "Type", "dataType": "Text"},
-         {"name": "Priority", "dataType": "Integer"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "AssignedTo", "dataType": "Text"}]},
-
-      {"name": "ChangeProposal", "context": "devtasks", "references": ["WorkItem", "Repository"],
-       "attributes": [
-         {"name": "ActionType", "dataType": "Text", "mandatory": true},
-         {"name": "Summary", "dataType": "Text"},
-         {"name": "Diff", "dataType": "Text"},
-         {"name": "BranchName", "dataType": "Text"},
-         {"name": "Rationale", "dataType": "Text"},
-         {"name": "RiskTier", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "ApprovedBy", "dataType": "Text"}]},
-
-      {"name": "TestSuite", "context": "devtasks", "references": ["ChangeProposal", "WorkItem"],
-       "attributes": [
-         {"name": "Framework", "dataType": "Text"},
-         {"name": "TestCode", "dataType": "Text"},
-         {"name": "CaseCount", "dataType": "Integer"},
-         {"name": "CoveragePct", "dataType": "Decimal"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "PullRequest", "context": "devtasks", "naturalKey": "PrNo", "references": ["ChangeProposal", "Repository", "WorkItem"],
-       "attributes": [
-         {"name": "PrNo", "dataType": "Text", "mandatory": true},
-         {"name": "Title", "dataType": "Text", "mandatory": true},
-         {"name": "SourceBranch", "dataType": "Text"},
-         {"name": "TargetBranch", "dataType": "Text"},
-         {"name": "BuildStatus", "dataType": "Text"},
-         {"name": "ReviewState", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "MergedBy", "dataType": "Text"}]},
-
-      {"name": "ReviewComment", "context": "devtasks", "references": ["PullRequest"],
-       "attributes": [
-         {"name": "Body", "dataType": "Text", "mandatory": true},
-         {"name": "Author", "dataType": "Text"},
-         {"name": "Verdict", "dataType": "Text"},
-         {"name": "At", "dataType": "DateTime"}]},
-
-      {"name": "AuditEvent", "context": "devtasks",
-       "attributes": [
-         {"name": "Description", "dataType": "Text", "mandatory": true},
-         {"name": "Actor", "dataType": "Text"},
-         {"name": "At", "dataType": "Text"}]}
+      {
+        "name": "Repository",
+        "context": "devtasks",
+        "naturalKey": "Slug",
+        "attributes": [
+          {
+            "name": "Slug",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "DefaultBranch",
+            "dataType": "Text"
+          },
+          {
+            "name": "Language",
+            "dataType": "Text"
+          },
+          {
+            "name": "GitUrl",
+            "dataType": "Text"
+          },
+          {
+            "name": "Owner",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "WorkItem",
+        "context": "devtasks",
+        "naturalKey": "ItemNo",
+        "references": [
+          "Repository",
+          "AuditEvent"
+        ],
+        "attributes": [
+          {
+            "name": "ItemNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "Type",
+            "dataType": "Text"
+          },
+          {
+            "name": "Priority",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "AssignedTo",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ChangeProposal",
+        "context": "devtasks",
+        "references": [
+          "WorkItem",
+          "Repository"
+        ],
+        "attributes": [
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Summary",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "Diff",
+            "dataType": "Text"
+          },
+          {
+            "name": "BranchName",
+            "dataType": "Text"
+          },
+          {
+            "name": "Rationale",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "TestSuite",
+        "context": "devtasks",
+        "references": [
+          "ChangeProposal",
+          "WorkItem"
+        ],
+        "attributes": [
+          {
+            "name": "Framework",
+            "dataType": "Text"
+          },
+          {
+            "name": "TestCode",
+            "dataType": "Text"
+          },
+          {
+            "name": "CaseCount",
+            "dataType": "Integer"
+          },
+          {
+            "name": "CoveragePct",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "PullRequest",
+        "context": "devtasks",
+        "naturalKey": "PrNo",
+        "references": [
+          "ChangeProposal",
+          "Repository",
+          "WorkItem"
+        ],
+        "attributes": [
+          {
+            "name": "PrNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "SourceBranch",
+            "dataType": "Text"
+          },
+          {
+            "name": "TargetBranch",
+            "dataType": "Text"
+          },
+          {
+            "name": "BuildStatus",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReviewState",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "MergedBy",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ReviewComment",
+        "context": "devtasks",
+        "references": [
+          "PullRequest"
+        ],
+        "attributes": [
+          {
+            "name": "Body",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Author",
+            "dataType": "Text"
+          },
+          {
+            "name": "Verdict",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "context": "devtasks",
+        "attributes": [
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      }
     ],
-
-    "actors": ["developer", "reviewer", "admin"],
-
+    "actors": [
+      "developer",
+      "reviewer",
+      "admin"
+    ],
     "capabilities": [
-      {"name": "AssignWorkItem", "actor": "developer",
-       "reads": ["Repository"], "writes": ["WorkItem", "AuditEvent"],
-       "service": "AssignWorkItem", "raisesEvent": "WorkItemAssigned",
-       "note": "Developer intake — assigns a work item (bug/feature/chore) against a repository and kicks off the coding/test-gen flow."},
-
-      {"name": "DraftChange", "ai": "CodeGenAgent",
-       "reads": ["WorkItem", "Repository", "ChangeProposal"],
-       "writes": ["WorkItem", "ChangeProposal", "TestSuite", "AuditEvent"],
-       "service": "DraftChange",
-       "note": "THE AGENT. Grounds on the WorkItem + Repository context (native retrieval tool over the repo/tree), drafts a code change and generates a covering TestSuite, and PROPOSES a ChangeProposal (draft-change | generate-tests | open-pull-request) with a RiskTier. It never merges to main directly — it writes a ChangeProposal + TestSuite and proposes."},
-
-      {"name": "OpenPullRequest", "actor": "developer",
-       "reads": ["ChangeProposal", "TestSuite", "Repository"], "writes": ["PullRequest", "ChangeProposal", "AuditEvent"],
-       "service": "OpenPullRequest",
-       "note": "The bounded WRITE that turns an approved ChangeProposal into a PullRequest against the repo (source branch → default branch), audited. Called by the workflow after the draft/tests are ready; the PR itself is the human gate."},
-
-      {"name": "RecordReview", "actor": "reviewer",
-       "reads": ["PullRequest", "ChangeProposal"], "writes": ["PullRequest", "ReviewComment", "AuditEvent"],
-       "service": "RecordReview",
-       "note": "The other bounded write: record a reviewer's verdict (approve | request-changes | comment) on the PullRequest and set its ReviewState, audited. Merge only proceeds on approve."},
-
-      {"name": "TestGenWorkflow", "orchestrates": true, "triggerEvent": "WorkItemAssigned",
-       "steps": [
-         {"name": "Draft", "ai": "CodeGenAgent", "reads": ["WorkItem", "Repository"], "writes": ["ChangeProposal"]},
-         {"name": "GenerateTests", "ai": "CodeGenAgent", "reads": ["ChangeProposal", "WorkItem"], "writes": ["TestSuite"]},
-         {"name": "Review", "callsService": "OpenPullRequest"}],
-       "note": "HITL via OutSystems BPT: on WorkItemAssigned the workflow runs the CodeGenAgent to draft a ChangeProposal, then to generate a covering TestSuite; it then calls OpenPullRequest to raise the PR and HOLDS at a Human Approval activity — the PullRequest review — until a reviewer approves (RecordReview verdict=approve), THEN the merge lands. The PR review + audit is native workflow, not custom code."},
-
-      {"name": "MyWork", "actor": "developer",
-       "reads": ["WorkItem", "ChangeProposal", "TestSuite", "PullRequest"]},
-
-      {"name": "ReviewInbox", "actor": "reviewer",
-       "reads": ["PullRequest", "ChangeProposal", "TestSuite"], "writes": ["PullRequest", "ReviewComment", "AuditEvent"],
-       "service": "ApprovePullRequest",
-       "note": "Where a reviewer approves/rejects/merges a held PullRequest — the write-step sign-off. Approving lets the workflow land the merge."},
-
-      {"name": "ManageRepositories", "actor": "admin",
-       "reads": ["Repository"], "writes": ["Repository"],
-       "service": "SaveRepository",
-       "note": "Admin maintains the repository registry + config the agent grounds on (default branch, language, git url, owner)."},
-
-      {"name": "BuildDashboard", "actor": "admin", "reads": ["PullRequest", "AuditEvent", "WorkItem"]}
+      {
+        "name": "AssignWorkItem",
+        "actor": "developer",
+        "reads": [
+          "Repository"
+        ],
+        "writes": [
+          "WorkItem",
+          "AuditEvent"
+        ],
+        "service": "AssignWorkItem",
+        "raisesEvent": "WorkItemAssigned",
+        "note": "Developer intake \u2014 assigns a work item (bug/feature/chore) against a repository and kicks off the coding/test-gen flow."
+      },
+      {
+        "name": "DraftChange",
+        "ai": "CodeGenAgent",
+        "reads": [
+          "WorkItem",
+          "Repository",
+          "ChangeProposal"
+        ],
+        "writes": [
+          "WorkItem",
+          "ChangeProposal",
+          "TestSuite",
+          "AuditEvent"
+        ],
+        "service": "DraftChange",
+        "note": "THE AGENT. Grounds on the WorkItem + Repository context (native retrieval tool over the repo/tree), drafts a code change and generates a covering TestSuite, and PROPOSES a ChangeProposal (draft-change | generate-tests | open-pull-request) with a RiskTier. It never merges to main directly \u2014 it writes a ChangeProposal + TestSuite and proposes."
+      },
+      {
+        "name": "OpenPullRequest",
+        "actor": "developer",
+        "reads": [
+          "ChangeProposal",
+          "TestSuite",
+          "Repository"
+        ],
+        "writes": [
+          "PullRequest",
+          "ChangeProposal",
+          "AuditEvent"
+        ],
+        "service": "OpenPullRequest",
+        "note": "The bounded WRITE that turns an approved ChangeProposal into a PullRequest against the repo (source branch \u2192 default branch), audited. Called by the workflow after the draft/tests are ready; the PR itself is the human gate."
+      },
+      {
+        "name": "RecordReview",
+        "actor": "reviewer",
+        "reads": [
+          "PullRequest",
+          "ChangeProposal"
+        ],
+        "writes": [
+          "PullRequest",
+          "ReviewComment",
+          "AuditEvent"
+        ],
+        "service": "RecordReview",
+        "note": "The other bounded write: record a reviewer's verdict (approve | request-changes | comment) on the PullRequest and set its ReviewState, audited. Merge only proceeds on approve."
+      },
+      {
+        "name": "TestGenWorkflow",
+        "orchestrates": true,
+        "triggerEvent": "WorkItemAssigned",
+        "steps": [
+          {
+            "name": "Draft",
+            "ai": "CodeGenAgent",
+            "reads": [
+              "WorkItem",
+              "Repository"
+            ],
+            "writes": [
+              "ChangeProposal"
+            ]
+          },
+          {
+            "name": "GenerateTests",
+            "ai": "CodeGenAgent",
+            "reads": [
+              "ChangeProposal",
+              "WorkItem"
+            ],
+            "writes": [
+              "TestSuite"
+            ]
+          },
+          {
+            "name": "Review",
+            "callsService": "OpenPullRequest"
+          }
+        ],
+        "note": "HITL via OutSystems BPT: on WorkItemAssigned the workflow runs the CodeGenAgent to draft a ChangeProposal, then to generate a covering TestSuite; it then calls OpenPullRequest to raise the PR and HOLDS at a Human Approval activity \u2014 the PullRequest review \u2014 until a reviewer approves (RecordReview verdict=approve), THEN the merge lands. The PR review + audit is native workflow, not custom code."
+      },
+      {
+        "name": "MyWork",
+        "actor": "developer",
+        "reads": [
+          "WorkItem",
+          "ChangeProposal",
+          "TestSuite",
+          "PullRequest"
+        ]
+      },
+      {
+        "name": "ReviewInbox",
+        "actor": "reviewer",
+        "reads": [
+          "PullRequest",
+          "ChangeProposal",
+          "TestSuite"
+        ],
+        "writes": [
+          "PullRequest",
+          "ReviewComment",
+          "AuditEvent"
+        ],
+        "service": "ApprovePullRequest",
+        "note": "Where a reviewer approves/rejects/merges a held PullRequest \u2014 the write-step sign-off. Approving lets the workflow land the merge."
+      },
+      {
+        "name": "ManageRepositories",
+        "actor": "admin",
+        "reads": [
+          "Repository"
+        ],
+        "writes": [
+          "Repository"
+        ],
+        "service": "SaveRepository",
+        "note": "Admin maintains the repository registry + config the agent grounds on (default branch, language, git url, owner)."
+      },
+      {
+        "name": "BuildDashboard",
+        "actor": "admin",
+        "reads": [
+          "PullRequest",
+          "AuditEvent",
+          "WorkItem"
+        ]
+      }
     ],
-
     "integrations": [
-      {"name": "GitHost", "kind": "consume", "purpose": "external Git host (GitHub/GitLab-style REST) the OpenPullRequest service pushes the branch + raises the PR against, and the CodeGenAgent retrieves repo/tree context from as a tool", "stub": true},
-      {"name": "CiPipeline", "kind": "consume", "purpose": "CI provider (GitHub Actions/Jenkins-style REST) that runs the generated TestSuite and reports the PullRequest BuildStatus back", "stub": true}
+      {
+        "name": "GitHost",
+        "kind": "consume",
+        "purpose": "external Git host (GitHub/GitLab-style REST) the OpenPullRequest service pushes the branch + raises the PR against, and the CodeGenAgent retrieves repo/tree context from as a tool",
+        "stub": true
+      },
+      {
+        "name": "CiPipeline",
+        "kind": "consume",
+        "purpose": "CI provider (GitHub Actions/Jenkins-style REST) that runs the generated TestSuite and reports the PullRequest BuildStatus back",
+        "stub": true
+      }
     ],
-
-    "libraries": ["DevToolsDesignSystem"]
+    "libraries": [
+      "DevToolsDesignSystem"
+    ]
   }
 }

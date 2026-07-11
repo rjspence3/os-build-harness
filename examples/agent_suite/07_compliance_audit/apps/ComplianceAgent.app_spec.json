@@ -15,10 +15,10 @@
     {
       "name": "ComplianceAgent",
       "modelConnection": "TrialClaudeHaiku4_5",
-      "systemPrompt": "You are ComplianceAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Control, Framework) \u2014 never answer without first retrieving it.",
+      "systemPrompt": "You are ComplianceAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Framework, Control) \u2014 never answer without first retrieving it.",
       "grounding": [
-        "Control",
-        "Framework"
+        "Framework",
+        "Control"
       ],
       "tools": []
     }
@@ -28,11 +28,11 @@
       "producerApp": "ComplianceCore",
       "elements": [
         {
-          "name": "Control",
+          "name": "Framework",
           "kind": "Entity"
         },
         {
-          "name": "Framework",
+          "name": "Control",
           "kind": "Entity"
         }
       ]

@@ -34,7 +34,8 @@
           },
           {
             "name": "Description",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           }
         ]
       },
@@ -146,7 +147,8 @@
           {
             "name": "Summary",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Severity",
@@ -154,7 +156,8 @@
           },
           {
             "name": "Rationale",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "Status",
@@ -188,7 +191,8 @@
           },
           {
             "name": "DraftBody",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "Owner",
@@ -262,7 +266,8 @@
           {
             "name": "Description",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Actor",
@@ -270,7 +275,7 @@
           },
           {
             "name": "At",
-            "dataType": "Text"
+            "dataType": "DateTime"
           }
         ]
       }

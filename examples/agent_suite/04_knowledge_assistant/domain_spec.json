@@ -2,103 +2,322 @@
   "specVersion": "0.1",
   "domain": {
     "name": "knowledge_assistant",
-    "description": "Internal knowledge assistant (use case #4). A KnowledgeAssistAgent answers HR/IT/policy questions grounded on an internal corpus — it retrieves the governing documents (native retrieval tool, optionally fed by an EXTERNAL SharePoint/Confluence corpus via a Consumed REST API, exactly like the live KnowledgeAgent example), composes an Answer, and writes the supporting Citations. This is primarily a READ/retrieve agent: the bounded action space is answer-with-citation | escalate-to-human, and escalate is the only real write. When the corpus does not ground a confident answer, the agent PROPOSES an Escalation and a HITL routing workflow hands the question to a subject_expert queue. Every question, answer, citation, and escalation is audited. The grounded-citation contract + the human-at-the-escalation-step is what makes it trustworthy, not just fluent.",
-
+    "description": "Internal knowledge assistant (use case #4). A KnowledgeAssistAgent answers HR/IT/policy questions grounded on an internal corpus \u2014 it retrieves the governing documents (native retrieval tool, optionally fed by an EXTERNAL SharePoint/Confluence corpus via a Consumed REST API, exactly like the live KnowledgeAgent example), composes an Answer, and writes the supporting Citations. This is primarily a READ/retrieve agent: the bounded action space is answer-with-citation | escalate-to-human, and escalate is the only real write. When the corpus does not ground a confident answer, the agent PROPOSES an Escalation and a HITL routing workflow hands the question to a subject_expert queue. Every question, answer, citation, and escalation is audited. The grounded-citation contract + the human-at-the-escalation-step is what makes it trustworthy, not just fluent.",
     "entities": [
-      {"name": "KnowledgeDoc", "context": "knowledge", "naturalKey": "DocKey",
-       "attributes": [
-         {"name": "DocKey", "dataType": "Text", "mandatory": true},
-         {"name": "Title", "dataType": "Text", "mandatory": true},
-         {"name": "Category", "dataType": "Text"},
-         {"name": "Source", "dataType": "Text"},
-         {"name": "Url", "dataType": "Text"},
-         {"name": "Content", "dataType": "Text"}]},
-
-      {"name": "AuditEvent", "context": "knowledge",
-       "attributes": [
-         {"name": "Description", "dataType": "Text", "mandatory": true},
-         {"name": "Actor", "dataType": "Text"},
-         {"name": "At", "dataType": "DateTime"}]},
-
-      {"name": "Question", "context": "knowledge", "naturalKey": "QuestionNo", "references": ["AuditEvent"],
-       "attributes": [
-         {"name": "QuestionNo", "dataType": "Text", "mandatory": true},
-         {"name": "Body", "dataType": "Text", "mandatory": true},
-         {"name": "AskedBy", "dataType": "Text"},
-         {"name": "Topic", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "ConfidenceScore", "dataType": "Integer"}]},
-
-      {"name": "Answer", "context": "knowledge", "references": ["Question"],
-       "attributes": [
-         {"name": "Body", "dataType": "Text", "mandatory": true},
-         {"name": "Grounded", "dataType": "Boolean"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "Citation", "context": "knowledge", "references": ["Answer", "KnowledgeDoc"],
-       "attributes": [
-         {"name": "Snippet", "dataType": "Text"},
-         {"name": "Rank", "dataType": "Integer"}]},
-
-      {"name": "Escalation", "context": "knowledge", "references": ["Question"],
-       "attributes": [
-         {"name": "Reason", "dataType": "Text", "mandatory": true},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "AssignedTo", "dataType": "Text"},
-         {"name": "Resolution", "dataType": "Text"}]}
+      {
+        "name": "KnowledgeDoc",
+        "context": "knowledge",
+        "naturalKey": "DocKey",
+        "attributes": [
+          {
+            "name": "DocKey",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Category",
+            "dataType": "Text"
+          },
+          {
+            "name": "Source",
+            "dataType": "Text"
+          },
+          {
+            "name": "Url",
+            "dataType": "Text"
+          },
+          {
+            "name": "Content",
+            "dataType": "Text",
+            "length": 2000
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "context": "knowledge",
+        "attributes": [
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      },
+      {
+        "name": "Question",
+        "context": "knowledge",
+        "naturalKey": "QuestionNo",
+        "references": [
+          "AuditEvent"
+        ],
+        "attributes": [
+          {
+            "name": "QuestionNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Body",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "AskedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "Topic",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConfidenceScore",
+            "dataType": "Integer"
+          }
+        ]
+      },
+      {
+        "name": "Answer",
+        "context": "knowledge",
+        "references": [
+          "Question"
+        ],
+        "attributes": [
+          {
+            "name": "Body",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Grounded",
+            "dataType": "Boolean"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Citation",
+        "context": "knowledge",
+        "references": [
+          "Answer",
+          "KnowledgeDoc"
+        ],
+        "attributes": [
+          {
+            "name": "Snippet",
+            "dataType": "Text"
+          },
+          {
+            "name": "Rank",
+            "dataType": "Integer"
+          }
+        ]
+      },
+      {
+        "name": "Escalation",
+        "context": "knowledge",
+        "references": [
+          "Question"
+        ],
+        "attributes": [
+          {
+            "name": "Reason",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "AssignedTo",
+            "dataType": "Text"
+          },
+          {
+            "name": "Resolution",
+            "dataType": "Text"
+          }
+        ]
+      }
     ],
-
-    "actors": ["employee", "subject_expert", "admin"],
-
+    "actors": [
+      "employee",
+      "subject_expert",
+      "admin"
+    ],
     "capabilities": [
-      {"name": "AskQuestion", "actor": "employee",
-       "reads": ["KnowledgeDoc"], "writes": ["Question", "AuditEvent"],
-       "service": "AskQuestion", "raisesEvent": "QuestionAsked",
-       "note": "Employee intake — records the Question and kicks off the answer workflow."},
-
-      {"name": "AnswerQuestion", "ai": "KnowledgeAssistAgent",
-       "reads": ["Question", "KnowledgeDoc"],
-       "writes": ["Answer", "Citation", "Escalation", "AuditEvent"],
-       "service": "AnswerQuestion",
-       "note": "THE AGENT. Grounds on KnowledgeDoc via a native retrieval tool (optionally backed by an EXTERNAL SharePoint/Confluence corpus through a Consumed REST API, like the live KnowledgeAgent example), composes an Answer and writes its supporting Citations. When the corpus does not yield a confident, grounded answer it sets Grounded=false and PROPOSES an Escalation — it never answers ungrounded."},
-
-      {"name": "RecordAnswer", "actor": "subject_expert",
-       "reads": ["Question", "Answer", "Citation"], "writes": ["Answer", "Citation", "Question", "AuditEvent"],
-       "service": "RecordAnswer",
-       "note": "The bounded WRITE to the system of record for a grounded answer: mark the Answer published + the Question answered with its Citations, audited. Called by the workflow when the agent returns a grounded answer."},
-
-      {"name": "RaiseEscalation", "actor": "subject_expert",
-       "reads": ["Question"], "writes": ["Escalation", "Question", "AuditEvent"],
-       "service": "RaiseEscalation",
-       "note": "The other bounded write: route an unanswerable/low-confidence Question to the subject_expert queue, audited. Called by the workflow when the agent could not ground an answer."},
-
-      {"name": "AnswerWorkflow", "orchestrates": true, "triggerEvent": "QuestionAsked",
-       "steps": [
-         {"name": "Answer", "ai": "KnowledgeAssistAgent", "reads": ["Question", "KnowledgeDoc"], "writes": ["Answer", "Citation"]},
-         {"name": "RecordOrEscalate", "callsService": "RecordAnswer"}],
-       "note": "HITL via OutSystems BPT: on QuestionAsked the workflow runs the KnowledgeAssistAgent to produce a grounded Answer + Citations; a grounded, high-confidence result auto-calls RecordAnswer, while a low-confidence/ungrounded result holds at a Human activity and calls RaiseEscalation to route the Question to a subject_expert. The routing + audit is native workflow, not custom code."},
-
-      {"name": "ExpertInbox", "actor": "subject_expert",
-       "reads": ["Escalation", "Question", "Answer"], "writes": ["Escalation", "Answer", "Question", "AuditEvent"],
-       "service": "ResolveEscalation",
-       "note": "Where a subject_expert resolves an escalated Question — writes the expert Answer, closes the Escalation, audited. The human-in-the-loop resolution step."},
-
-      {"name": "ManageCorpus", "actor": "admin",
-       "reads": ["KnowledgeDoc"], "writes": ["KnowledgeDoc"],
-       "service": "SaveKnowledgeDoc",
-       "note": "Admin maintains the KnowledgeDoc corpus the agent grounds on (and configures the external corpus sync)."},
-
-      {"name": "QAHistory", "actor": "employee",
-       "reads": ["Question", "Answer", "Citation"]},
-
-      {"name": "AuditTrail", "actor": "admin", "reads": ["AuditEvent", "Question"]}
+      {
+        "name": "AskQuestion",
+        "actor": "employee",
+        "reads": [
+          "KnowledgeDoc"
+        ],
+        "writes": [
+          "Question",
+          "AuditEvent"
+        ],
+        "service": "AskQuestion",
+        "raisesEvent": "QuestionAsked",
+        "note": "Employee intake \u2014 records the Question and kicks off the answer workflow."
+      },
+      {
+        "name": "AnswerQuestion",
+        "ai": "KnowledgeAssistAgent",
+        "reads": [
+          "Question",
+          "KnowledgeDoc"
+        ],
+        "writes": [
+          "Answer",
+          "Citation",
+          "Escalation",
+          "AuditEvent"
+        ],
+        "service": "AnswerQuestion",
+        "note": "THE AGENT. Grounds on KnowledgeDoc via a native retrieval tool (optionally backed by an EXTERNAL SharePoint/Confluence corpus through a Consumed REST API, like the live KnowledgeAgent example), composes an Answer and writes its supporting Citations. When the corpus does not yield a confident, grounded answer it sets Grounded=false and PROPOSES an Escalation \u2014 it never answers ungrounded."
+      },
+      {
+        "name": "RecordAnswer",
+        "actor": "subject_expert",
+        "reads": [
+          "Question",
+          "Answer",
+          "Citation"
+        ],
+        "writes": [
+          "Answer",
+          "Citation",
+          "Question",
+          "AuditEvent"
+        ],
+        "service": "RecordAnswer",
+        "note": "The bounded WRITE to the system of record for a grounded answer: mark the Answer published + the Question answered with its Citations, audited. Called by the workflow when the agent returns a grounded answer."
+      },
+      {
+        "name": "RaiseEscalation",
+        "actor": "subject_expert",
+        "reads": [
+          "Question"
+        ],
+        "writes": [
+          "Escalation",
+          "Question",
+          "AuditEvent"
+        ],
+        "service": "RaiseEscalation",
+        "note": "The other bounded write: route an unanswerable/low-confidence Question to the subject_expert queue, audited. Called by the workflow when the agent could not ground an answer."
+      },
+      {
+        "name": "AnswerWorkflow",
+        "orchestrates": true,
+        "triggerEvent": "QuestionAsked",
+        "steps": [
+          {
+            "name": "Answer",
+            "ai": "KnowledgeAssistAgent",
+            "reads": [
+              "Question",
+              "KnowledgeDoc"
+            ],
+            "writes": [
+              "Answer",
+              "Citation"
+            ]
+          },
+          {
+            "name": "RecordOrEscalate",
+            "callsService": "RecordAnswer"
+          }
+        ],
+        "note": "HITL via OutSystems BPT: on QuestionAsked the workflow runs the KnowledgeAssistAgent to produce a grounded Answer + Citations; a grounded, high-confidence result auto-calls RecordAnswer, while a low-confidence/ungrounded result holds at a Human activity and calls RaiseEscalation to route the Question to a subject_expert. The routing + audit is native workflow, not custom code."
+      },
+      {
+        "name": "ExpertInbox",
+        "actor": "subject_expert",
+        "reads": [
+          "Escalation",
+          "Question",
+          "Answer"
+        ],
+        "writes": [
+          "Escalation",
+          "Answer",
+          "Question",
+          "AuditEvent"
+        ],
+        "service": "ResolveEscalation",
+        "note": "Where a subject_expert resolves an escalated Question \u2014 writes the expert Answer, closes the Escalation, audited. The human-in-the-loop resolution step."
+      },
+      {
+        "name": "ManageCorpus",
+        "actor": "admin",
+        "reads": [
+          "KnowledgeDoc"
+        ],
+        "writes": [
+          "KnowledgeDoc"
+        ],
+        "service": "SaveKnowledgeDoc",
+        "note": "Admin maintains the KnowledgeDoc corpus the agent grounds on (and configures the external corpus sync)."
+      },
+      {
+        "name": "QAHistory",
+        "actor": "employee",
+        "reads": [
+          "Question",
+          "Answer",
+          "Citation"
+        ]
+      },
+      {
+        "name": "AuditTrail",
+        "actor": "admin",
+        "reads": [
+          "AuditEvent",
+          "Question"
+        ]
+      }
     ],
-
     "integrations": [
-      {"name": "CorpusSource", "kind": "consume", "purpose": "external internal-knowledge corpus (SharePoint/Confluence-style REST) the KnowledgeAssistAgent retrieves from as a tool — mirrors the live KnowledgeAgent SharePointKB.SearchText consume", "stub": true},
-      {"name": "IdentityProvider", "kind": "consume", "purpose": "corporate IdP for employee/expert identity and directory lookup on escalation routing", "stub": true}
+      {
+        "name": "CorpusSource",
+        "kind": "consume",
+        "purpose": "external internal-knowledge corpus (SharePoint/Confluence-style REST) the KnowledgeAssistAgent retrieves from as a tool \u2014 mirrors the live KnowledgeAgent SharePointKB.SearchText consume",
+        "stub": true
+      },
+      {
+        "name": "IdentityProvider",
+        "kind": "consume",
+        "purpose": "corporate IdP for employee/expert identity and directory lookup on escalation routing",
+        "stub": true
+      }
     ],
-
-    "libraries": ["KnowledgeDesignSystem"]
+    "libraries": [
+      "KnowledgeDesignSystem"
+    ]
   }
 }

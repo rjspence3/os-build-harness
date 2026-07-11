@@ -15,11 +15,11 @@
     {
       "name": "PoMatchAgent",
       "modelConnection": "TrialClaudeHaiku4_5",
-      "systemPrompt": "You are PoMatchAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (GoodsReceipt, PurchaseOrder, Invoice) \u2014 never answer without first retrieving it.",
+      "systemPrompt": "You are PoMatchAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (GoodsReceipt, Invoice, PurchaseOrder) \u2014 never answer without first retrieving it.",
       "grounding": [
         "GoodsReceipt",
-        "PurchaseOrder",
-        "Invoice"
+        "Invoice",
+        "PurchaseOrder"
       ],
       "tools": []
     }
@@ -33,11 +33,11 @@
           "kind": "Entity"
         },
         {
-          "name": "PurchaseOrder",
+          "name": "Invoice",
           "kind": "Entity"
         },
         {
-          "name": "Invoice",
+          "name": "PurchaseOrder",
           "kind": "Entity"
         }
       ]

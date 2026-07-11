@@ -80,8 +80,8 @@
             "app": "DocprocCore",
             "entities": [
               "Vendor",
-              "Document",
-              "ValidationRule"
+              "ValidationRule",
+              "Document"
             ]
           }
         ]

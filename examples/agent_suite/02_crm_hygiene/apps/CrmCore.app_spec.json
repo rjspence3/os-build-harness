@@ -149,7 +149,8 @@
           },
           {
             "name": "Summary",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "OccurredAt",
@@ -195,7 +196,8 @@
           },
           {
             "name": "Body",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "Status",
@@ -243,7 +245,8 @@
           },
           {
             "name": "Rationale",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "RiskTier",
@@ -283,7 +286,8 @@
           {
             "name": "Description",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Actor",
@@ -291,7 +295,7 @@
           },
           {
             "name": "At",
-            "dataType": "Text"
+            "dataType": "DateTime"
           },
           {
             "name": "AccountId",

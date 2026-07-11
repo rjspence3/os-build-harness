@@ -2,132 +2,430 @@
   "specVersion": "0.1",
   "domain": {
     "name": "document_processing",
-    "description": "Document processing & straight-through posting (use case #3 — the hardest write case). A DocExtractAgent OCRs an inbound document (invoice / claim / contract / onboarding packet), extracts its fields, retrieves the vendor record + the governing validation rules, and PROPOSES a ledger posting — it never posts directly. The proposal carries a ConfidenceScore and a RiskTier. Clean, low-value, high-confidence docs auto-post to the system of record; anything above a $ threshold OR below an extraction-confidence threshold holds at an OutSystems Human Approval activity (BPT) until a finance_approver signs off before the write lands. The bounded action space (post-to-ledger | route-for-review | flag-exception) + the human-at-the-write-step is what makes it ship, not just reason. Every action is audited.",
-
+    "description": "Document processing & straight-through posting (use case #3 \u2014 the hardest write case). A DocExtractAgent OCRs an inbound document (invoice / claim / contract / onboarding packet), extracts its fields, retrieves the vendor record + the governing validation rules, and PROPOSES a ledger posting \u2014 it never posts directly. The proposal carries a ConfidenceScore and a RiskTier. Clean, low-value, high-confidence docs auto-post to the system of record; anything above a $ threshold OR below an extraction-confidence threshold holds at an OutSystems Human Approval activity (BPT) until a finance_approver signs off before the write lands. The bounded action space (post-to-ledger | route-for-review | flag-exception) + the human-at-the-write-step is what makes it ship, not just reason. Every action is audited.",
     "entities": [
-      {"name": "Vendor", "context": "docproc", "naturalKey": "VendorCode",
-       "attributes": [
-         {"name": "VendorCode", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "TaxId", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "PaymentTerms", "dataType": "Text"}]},
-
-      {"name": "ValidationRule", "context": "docproc", "naturalKey": "Code",
-       "attributes": [
-         {"name": "Code", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "DocType", "dataType": "Text"},
-         {"name": "FieldName", "dataType": "Text"},
-         {"name": "Expression", "dataType": "Text"},
-         {"name": "Severity", "dataType": "Text"},
-         {"name": "Active", "dataType": "Boolean"}]},
-
-      {"name": "Document", "context": "docproc", "naturalKey": "DocNo", "references": ["Vendor"],
-       "attributes": [
-         {"name": "DocNo", "dataType": "Text", "mandatory": true},
-         {"name": "DocType", "dataType": "Text", "mandatory": true},
-         {"name": "SourceUri", "dataType": "Text"},
-         {"name": "ReceivedAt", "dataType": "DateTime"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "Amount", "dataType": "Decimal"},
-         {"name": "Currency", "dataType": "Text"},
-         {"name": "ExtractionConfidence", "dataType": "Integer"}]},
-
-      {"name": "ExtractedField", "context": "docproc", "references": ["Document"],
-       "attributes": [
-         {"name": "FieldName", "dataType": "Text", "mandatory": true},
-         {"name": "FieldValue", "dataType": "Text"},
-         {"name": "Confidence", "dataType": "Integer"},
-         {"name": "IsValid", "dataType": "Boolean"}]},
-
-      {"name": "ProposedPosting", "context": "docproc", "references": ["Document"],
-       "attributes": [
-         {"name": "ActionType", "dataType": "Text", "mandatory": true},
-         {"name": "Amount", "dataType": "Decimal"},
-         {"name": "GlAccount", "dataType": "Text"},
-         {"name": "ConfidenceScore", "dataType": "Integer"},
-         {"name": "RiskTier", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "ApprovedBy", "dataType": "Text"}]},
-
-      {"name": "LedgerEntry", "context": "docproc", "references": ["Document", "Vendor"],
-       "attributes": [
-         {"name": "EntryNo", "dataType": "Text", "mandatory": true},
-         {"name": "Amount", "dataType": "Decimal", "mandatory": true},
-         {"name": "GlAccount", "dataType": "Text"},
-         {"name": "PostedAt", "dataType": "DateTime"},
-         {"name": "PostedBy", "dataType": "Text"},
-         {"name": "ErpReference", "dataType": "Text"}]},
-
-      {"name": "AuditEvent", "context": "docproc", "references": ["Document"],
-       "attributes": [
-         {"name": "Description", "dataType": "Text", "mandatory": true},
-         {"name": "Actor", "dataType": "Text"},
-         {"name": "At", "dataType": "Text"}]}
+      {
+        "name": "Vendor",
+        "context": "docproc",
+        "naturalKey": "VendorCode",
+        "attributes": [
+          {
+            "name": "VendorCode",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "TaxId",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "PaymentTerms",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ValidationRule",
+        "context": "docproc",
+        "naturalKey": "Code",
+        "attributes": [
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "DocType",
+            "dataType": "Text"
+          },
+          {
+            "name": "FieldName",
+            "dataType": "Text"
+          },
+          {
+            "name": "Expression",
+            "dataType": "Text"
+          },
+          {
+            "name": "Severity",
+            "dataType": "Text"
+          },
+          {
+            "name": "Active",
+            "dataType": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "Document",
+        "context": "docproc",
+        "naturalKey": "DocNo",
+        "references": [
+          "Vendor"
+        ],
+        "attributes": [
+          {
+            "name": "DocNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "DocType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "SourceUri",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReceivedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "Amount",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "Currency",
+            "dataType": "Text"
+          },
+          {
+            "name": "ExtractionConfidence",
+            "dataType": "Integer"
+          }
+        ]
+      },
+      {
+        "name": "ExtractedField",
+        "context": "docproc",
+        "references": [
+          "Document"
+        ],
+        "attributes": [
+          {
+            "name": "FieldName",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "FieldValue",
+            "dataType": "Text"
+          },
+          {
+            "name": "Confidence",
+            "dataType": "Integer"
+          },
+          {
+            "name": "IsValid",
+            "dataType": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "ProposedPosting",
+        "context": "docproc",
+        "references": [
+          "Document"
+        ],
+        "attributes": [
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Amount",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "GlAccount",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConfidenceScore",
+            "dataType": "Integer"
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "LedgerEntry",
+        "context": "docproc",
+        "references": [
+          "Document",
+          "Vendor"
+        ],
+        "attributes": [
+          {
+            "name": "EntryNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Amount",
+            "dataType": "Decimal",
+            "mandatory": true
+          },
+          {
+            "name": "GlAccount",
+            "dataType": "Text"
+          },
+          {
+            "name": "PostedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "PostedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "ErpReference",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "context": "docproc",
+        "references": [
+          "Document"
+        ],
+        "attributes": [
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      }
     ],
-
-    "actors": ["ap_clerk", "finance_approver", "admin"],
-
+    "actors": [
+      "ap_clerk",
+      "finance_approver",
+      "admin"
+    ],
     "capabilities": [
-      {"name": "IngestDocument", "actor": "ap_clerk",
-       "reads": ["Vendor"], "writes": ["Document", "AuditEvent"],
-       "service": "IngestDocument", "raisesEvent": "DocumentReceived",
-       "note": "Intake — registers an inbound document (invoice/claim/contract/onboarding packet) against a vendor and kicks off extraction + posting. Raises DocumentReceived to start the workflow."},
-
-      {"name": "ExtractDocument", "ai": "DocExtractAgent",
-       "reads": ["Document", "Vendor", "ValidationRule"],
-       "writes": ["Document", "ExtractedField", "ProposedPosting", "AuditEvent"],
-       "service": "ExtractDocument",
-       "note": "THE AGENT. Grounds on the Document (OCR via native retrieval tool), the Vendor record, and the active ValidationRules. Extracts fields (writes ExtractedField rows with per-field Confidence), computes an ExtractionConfidence, validates against the rules, and PROPOSES a ProposedPosting (post_to_ledger|route_for_review|flag_exception) carrying a ConfidenceScore + RiskTier. It never writes a LedgerEntry directly — it proposes; the write-step lands elsewhere."},
-
-      {"name": "PostToLedger", "actor": "ap_clerk",
-       "reads": ["Document", "ProposedPosting", "Vendor"], "writes": ["LedgerEntry", "Document", "ProposedPosting", "AuditEvent"],
-       "service": "PostToLedger",
-       "note": "The bounded WRITE to the system of record: create the LedgerEntry (push to the ERP stub), mark the ProposedPosting executed + the Document posted, audited. Called by the workflow — auto for low-risk/low-$, or after human approval."},
-
-      {"name": "RouteForReview", "actor": "ap_clerk",
-       "reads": ["Document", "ProposedPosting"], "writes": ["Document", "ProposedPosting", "AuditEvent"],
-       "service": "RouteForReview",
-       "note": "The second bounded write: send the proposal to the finance_approver review queue, audited."},
-
-      {"name": "FlagException", "actor": "ap_clerk",
-       "reads": ["Document", "ProposedPosting"], "writes": ["Document", "ProposedPosting", "AuditEvent"],
-       "service": "FlagException",
-       "note": "The third bounded write: mark the document an exception (failed validation / low confidence) for manual handling, audited."},
-
-      {"name": "PostingWorkflow", "orchestrates": true, "triggerEvent": "DocumentReceived",
-       "steps": [
-         {"name": "Extract", "ai": "DocExtractAgent", "reads": ["Document", "Vendor", "ValidationRule"], "writes": ["ProposedPosting"]},
-         {"name": "Validate", "callsService": "RouteForReview"},
-         {"name": "Post", "callsService": "PostToLedger"}],
-       "note": "HITL via OutSystems BPT: on DocumentReceived the workflow runs the DocExtractAgent to produce a ProposedPosting; a decision gate reads its RiskTier + Amount + ConfidenceScore — low RiskTier AND under the $ threshold AND above the confidence threshold auto-calls PostToLedger (straight-through post); otherwise it holds at a Human Approval activity (RouteForReview) until a finance_approver signs off, THEN calls PostToLedger; a failed validation calls FlagException. The approval + audit is native workflow, not custom code."},
-
-      {"name": "MyQueue", "actor": "ap_clerk",
-       "reads": ["Document", "ProposedPosting", "Vendor"]},
-
-      {"name": "ApprovalInbox", "actor": "finance_approver",
-       "reads": ["ProposedPosting", "Document", "ExtractedField"], "writes": ["ProposedPosting", "AuditEvent"],
-       "service": "ApprovePosting",
-       "note": "Where a human approves/rejects a held posting above the $ threshold or below the confidence threshold — the write-step sign-off before the LedgerEntry lands."},
-
-      {"name": "ManageRules", "actor": "admin",
-       "reads": ["ValidationRule"], "writes": ["ValidationRule"],
-       "service": "SaveRule",
-       "note": "Admin maintains the validation-rule corpus the agent grounds on."},
-
-      {"name": "LedgerDashboard", "actor": "finance_approver",
-       "reads": ["LedgerEntry", "Document", "Vendor"]},
-
-      {"name": "AuditTrail", "actor": "admin", "reads": ["AuditEvent", "Document"]}
+      {
+        "name": "IngestDocument",
+        "actor": "ap_clerk",
+        "reads": [
+          "Vendor"
+        ],
+        "writes": [
+          "Document",
+          "AuditEvent"
+        ],
+        "service": "IngestDocument",
+        "raisesEvent": "DocumentReceived",
+        "note": "Intake \u2014 registers an inbound document (invoice/claim/contract/onboarding packet) against a vendor and kicks off extraction + posting. Raises DocumentReceived to start the workflow."
+      },
+      {
+        "name": "ExtractDocument",
+        "ai": "DocExtractAgent",
+        "reads": [
+          "Document",
+          "Vendor",
+          "ValidationRule"
+        ],
+        "writes": [
+          "Document",
+          "ExtractedField",
+          "ProposedPosting",
+          "AuditEvent"
+        ],
+        "service": "ExtractDocument",
+        "note": "THE AGENT. Grounds on the Document (OCR via native retrieval tool), the Vendor record, and the active ValidationRules. Extracts fields (writes ExtractedField rows with per-field Confidence), computes an ExtractionConfidence, validates against the rules, and PROPOSES a ProposedPosting (post_to_ledger|route_for_review|flag_exception) carrying a ConfidenceScore + RiskTier. It never writes a LedgerEntry directly \u2014 it proposes; the write-step lands elsewhere."
+      },
+      {
+        "name": "PostToLedger",
+        "actor": "ap_clerk",
+        "reads": [
+          "Document",
+          "ProposedPosting",
+          "Vendor"
+        ],
+        "writes": [
+          "LedgerEntry",
+          "Document",
+          "ProposedPosting",
+          "AuditEvent"
+        ],
+        "service": "PostToLedger",
+        "note": "The bounded WRITE to the system of record: create the LedgerEntry (push to the ERP stub), mark the ProposedPosting executed + the Document posted, audited. Called by the workflow \u2014 auto for low-risk/low-$, or after human approval."
+      },
+      {
+        "name": "RouteForReview",
+        "actor": "ap_clerk",
+        "reads": [
+          "Document",
+          "ProposedPosting"
+        ],
+        "writes": [
+          "Document",
+          "ProposedPosting",
+          "AuditEvent"
+        ],
+        "service": "RouteForReview",
+        "note": "The second bounded write: send the proposal to the finance_approver review queue, audited."
+      },
+      {
+        "name": "FlagException",
+        "actor": "ap_clerk",
+        "reads": [
+          "Document",
+          "ProposedPosting"
+        ],
+        "writes": [
+          "Document",
+          "ProposedPosting",
+          "AuditEvent"
+        ],
+        "service": "FlagException",
+        "note": "The third bounded write: mark the document an exception (failed validation / low confidence) for manual handling, audited."
+      },
+      {
+        "name": "PostingWorkflow",
+        "orchestrates": true,
+        "triggerEvent": "DocumentReceived",
+        "steps": [
+          {
+            "name": "Extract",
+            "ai": "DocExtractAgent",
+            "reads": [
+              "Document",
+              "Vendor",
+              "ValidationRule"
+            ],
+            "writes": [
+              "ProposedPosting"
+            ]
+          },
+          {
+            "name": "Validate",
+            "callsService": "RouteForReview"
+          },
+          {
+            "name": "Post",
+            "callsService": "PostToLedger"
+          }
+        ],
+        "note": "HITL via OutSystems BPT: on DocumentReceived the workflow runs the DocExtractAgent to produce a ProposedPosting; a decision gate reads its RiskTier + Amount + ConfidenceScore \u2014 low RiskTier AND under the $ threshold AND above the confidence threshold auto-calls PostToLedger (straight-through post); otherwise it holds at a Human Approval activity (RouteForReview) until a finance_approver signs off, THEN calls PostToLedger; a failed validation calls FlagException. The approval + audit is native workflow, not custom code."
+      },
+      {
+        "name": "MyQueue",
+        "actor": "ap_clerk",
+        "reads": [
+          "Document",
+          "ProposedPosting",
+          "Vendor"
+        ]
+      },
+      {
+        "name": "ApprovalInbox",
+        "actor": "finance_approver",
+        "reads": [
+          "ProposedPosting",
+          "Document",
+          "ExtractedField"
+        ],
+        "writes": [
+          "ProposedPosting",
+          "AuditEvent"
+        ],
+        "service": "ApprovePosting",
+        "note": "Where a human approves/rejects a held posting above the $ threshold or below the confidence threshold \u2014 the write-step sign-off before the LedgerEntry lands."
+      },
+      {
+        "name": "ManageRules",
+        "actor": "admin",
+        "reads": [
+          "ValidationRule"
+        ],
+        "writes": [
+          "ValidationRule"
+        ],
+        "service": "SaveRule",
+        "note": "Admin maintains the validation-rule corpus the agent grounds on."
+      },
+      {
+        "name": "LedgerDashboard",
+        "actor": "finance_approver",
+        "reads": [
+          "LedgerEntry",
+          "Document",
+          "Vendor"
+        ]
+      },
+      {
+        "name": "AuditTrail",
+        "actor": "admin",
+        "reads": [
+          "AuditEvent",
+          "Document"
+        ]
+      }
     ],
-
     "integrations": [
-      {"name": "OcrService", "kind": "consume", "purpose": "external OCR / document-extraction service the DocExtractAgent retrieves page text + field candidates from as a tool", "stub": true},
-      {"name": "ErpLedger", "kind": "consume", "purpose": "system-of-record ERP / general-ledger API PostToLedger writes the confirmed LedgerEntry into", "stub": true},
-      {"name": "Notify", "kind": "consume", "purpose": "clerk/approver notifications on posting, review-routing, or exception", "stub": true}
+      {
+        "name": "OcrService",
+        "kind": "consume",
+        "purpose": "external OCR / document-extraction service the DocExtractAgent retrieves page text + field candidates from as a tool",
+        "stub": true
+      },
+      {
+        "name": "ErpLedger",
+        "kind": "consume",
+        "purpose": "system-of-record ERP / general-ledger API PostToLedger writes the confirmed LedgerEntry into",
+        "stub": true
+      },
+      {
+        "name": "Notify",
+        "kind": "consume",
+        "purpose": "clerk/approver notifications on posting, review-routing, or exception",
+        "stub": true
+      }
     ],
-
-    "libraries": ["DocProcDesignSystem"]
+    "libraries": [
+      "DocProcDesignSystem"
+    ]
   }
 }

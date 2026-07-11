@@ -100,10 +100,10 @@
           {
             "app": "FieldserviceCore",
             "entities": [
-              "Asset",
-              "Symptom",
               "Part",
-              "ServiceRequest"
+              "Symptom",
+              "ServiceRequest",
+              "Asset"
             ]
           }
         ]

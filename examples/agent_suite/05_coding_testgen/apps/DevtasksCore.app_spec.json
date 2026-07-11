@@ -67,7 +67,8 @@
           },
           {
             "name": "Description",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "Type",
@@ -115,7 +116,8 @@
           },
           {
             "name": "Summary",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "Diff",
@@ -127,7 +129,8 @@
           },
           {
             "name": "Rationale",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "RiskTier",
@@ -273,7 +276,8 @@
           {
             "name": "Body",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Author",
@@ -307,7 +311,8 @@
           {
             "name": "Description",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Actor",
@@ -315,7 +320,7 @@
           },
           {
             "name": "At",
-            "dataType": "Text"
+            "dataType": "DateTime"
           }
         ]
       }

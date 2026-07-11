@@ -2,118 +2,392 @@
   "specVersion": "0.1",
   "domain": {
     "name": "crm_hygiene",
-    "description": "Sales/CRM hygiene & prep (use case #2). A CrmAssistAgent summarizes a logged sales call, drafts an account-research brief, and PROPOSES CRM field updates + a recommended next step. It never mutates the system-of-record directly — it writes a ProposedUpdate. Low-risk hygiene updates auto-apply; writes on key/large accounts enter an OutSystems approval workflow (BPT) for a sales_manager to sign off before the write lands. Every action is audited. The bounded action space (update-field | log-next-step | draft-brief) + the human-at-the-write-step is what makes it ship, not just reason.",
-
+    "description": "Sales/CRM hygiene & prep (use case #2). A CrmAssistAgent summarizes a logged sales call, drafts an account-research brief, and PROPOSES CRM field updates + a recommended next step. It never mutates the system-of-record directly \u2014 it writes a ProposedUpdate. Low-risk hygiene updates auto-apply; writes on key/large accounts enter an OutSystems approval workflow (BPT) for a sales_manager to sign off before the write lands. Every action is audited. The bounded action space (update-field | log-next-step | draft-brief) + the human-at-the-write-step is what makes it ship, not just reason.",
     "entities": [
-      {"name": "Account", "context": "crm", "naturalKey": "AccountNo",
-       "attributes": [
-         {"name": "AccountNo", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "Segment", "dataType": "Text"},
-         {"name": "AnnualRevenue", "dataType": "Decimal"},
-         {"name": "IsKeyAccount", "dataType": "Boolean"},
-         {"name": "Owner", "dataType": "Text"}]},
-
-      {"name": "Contact", "context": "crm", "naturalKey": "Email", "references": ["Account"],
-       "attributes": [
-         {"name": "Email", "dataType": "Text", "mandatory": true},
-         {"name": "FullName", "dataType": "Text", "mandatory": true},
-         {"name": "Title", "dataType": "Text"},
-         {"name": "Phone", "dataType": "Text"}]},
-
-      {"name": "Opportunity", "context": "crm", "naturalKey": "OppNo", "references": ["Account"],
-       "attributes": [
-         {"name": "OppNo", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "Stage", "dataType": "Text"},
-         {"name": "Amount", "dataType": "Decimal"},
-         {"name": "CloseDate", "dataType": "DateTime"},
-         {"name": "NextStep", "dataType": "Text"}]},
-
-      {"name": "CallLog", "context": "crm", "naturalKey": "CallNo", "references": ["Account", "Contact", "Opportunity"],
-       "attributes": [
-         {"name": "CallNo", "dataType": "Text", "mandatory": true},
-         {"name": "Subject", "dataType": "Text", "mandatory": true},
-         {"name": "TranscriptUrl", "dataType": "Text"},
-         {"name": "Summary", "dataType": "Text"},
-         {"name": "OccurredAt", "dataType": "DateTime"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "ResearchBrief", "context": "crm", "references": ["Account", "CallLog"],
-       "attributes": [
-         {"name": "Title", "dataType": "Text", "mandatory": true},
-         {"name": "Body", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "ProposedUpdate", "context": "crm", "references": ["Account", "CallLog"],
-       "attributes": [
-         {"name": "ActionType", "dataType": "Text", "mandatory": true},
-         {"name": "TargetEntity", "dataType": "Text"},
-         {"name": "TargetField", "dataType": "Text"},
-         {"name": "ProposedValue", "dataType": "Text"},
-         {"name": "Rationale", "dataType": "Text"},
-         {"name": "RiskTier", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "ApprovedBy", "dataType": "Text"}]},
-
-      {"name": "AuditEvent", "context": "crm", "references": ["Account"],
-       "attributes": [
-         {"name": "Description", "dataType": "Text", "mandatory": true},
-         {"name": "Actor", "dataType": "Text"},
-         {"name": "At", "dataType": "Text"}]}
+      {
+        "name": "Account",
+        "context": "crm",
+        "naturalKey": "AccountNo",
+        "attributes": [
+          {
+            "name": "AccountNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Segment",
+            "dataType": "Text"
+          },
+          {
+            "name": "AnnualRevenue",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "IsKeyAccount",
+            "dataType": "Boolean"
+          },
+          {
+            "name": "Owner",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Contact",
+        "context": "crm",
+        "naturalKey": "Email",
+        "references": [
+          "Account"
+        ],
+        "attributes": [
+          {
+            "name": "Email",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "FullName",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text"
+          },
+          {
+            "name": "Phone",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Opportunity",
+        "context": "crm",
+        "naturalKey": "OppNo",
+        "references": [
+          "Account"
+        ],
+        "attributes": [
+          {
+            "name": "OppNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Stage",
+            "dataType": "Text"
+          },
+          {
+            "name": "Amount",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "CloseDate",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "NextStep",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "CallLog",
+        "context": "crm",
+        "naturalKey": "CallNo",
+        "references": [
+          "Account",
+          "Contact",
+          "Opportunity"
+        ],
+        "attributes": [
+          {
+            "name": "CallNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Subject",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "TranscriptUrl",
+            "dataType": "Text"
+          },
+          {
+            "name": "Summary",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "OccurredAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ResearchBrief",
+        "context": "crm",
+        "references": [
+          "Account",
+          "CallLog"
+        ],
+        "attributes": [
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Body",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ProposedUpdate",
+        "context": "crm",
+        "references": [
+          "Account",
+          "CallLog"
+        ],
+        "attributes": [
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "TargetEntity",
+            "dataType": "Text"
+          },
+          {
+            "name": "TargetField",
+            "dataType": "Text"
+          },
+          {
+            "name": "ProposedValue",
+            "dataType": "Text"
+          },
+          {
+            "name": "Rationale",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "context": "crm",
+        "references": [
+          "Account"
+        ],
+        "attributes": [
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      }
     ],
-
-    "actors": ["sales_rep", "sales_manager", "admin"],
-
+    "actors": [
+      "sales_rep",
+      "sales_manager",
+      "admin"
+    ],
     "capabilities": [
-      {"name": "LogCall", "actor": "sales_rep",
-       "reads": ["Account", "Contact", "Opportunity"], "writes": ["CallLog", "AuditEvent"],
-       "service": "LogCall", "raisesEvent": "CallLogged",
-       "note": "Sales rep intake — records the sales call (with transcript URL) and kicks off the hygiene/prep flow."},
-
-      {"name": "PrepAccount", "ai": "CrmAssistAgent",
-       "reads": ["CallLog", "Account", "Contact", "Opportunity"],
-       "writes": ["CallLog", "ProposedUpdate", "ResearchBrief", "AuditEvent"],
-       "service": "PrepAccount",
-       "note": "THE AGENT. Grounds on the CallLog transcript + Account/Contact/Opportunity (native retrieval tool), summarizes the call, drafts an account-research brief, and PROPOSES field updates + a next step as ProposedUpdate rows (update-field | log-next-step | draft-brief) each with a RiskTier. It never mutates the CRM record directly — it proposes."},
-
-      {"name": "ApplyUpdate", "actor": "sales_rep",
-       "reads": ["ProposedUpdate", "Account", "Opportunity"], "writes": ["Account", "Opportunity", "ProposedUpdate", "AuditEvent"],
-       "service": "ApplyUpdate",
-       "note": "The bounded WRITE to the system of record: apply a proposed field change to the Account/Opportunity, mark the ProposedUpdate applied, audited. Called by the workflow after approval (or auto for low-risk hygiene)."},
-
-      {"name": "LogNextStep", "actor": "sales_rep",
-       "reads": ["Opportunity", "ProposedUpdate"], "writes": ["Opportunity", "AuditEvent"],
-       "service": "LogNextStep",
-       "note": "The other bounded write: set the recommended next step on the Opportunity, audited."},
-
-      {"name": "HygieneWorkflow", "orchestrates": true, "triggerEvent": "CallLogged",
-       "steps": [
-         {"name": "Prep", "ai": "CrmAssistAgent", "reads": ["CallLog", "Account"], "writes": ["ProposedUpdate"]},
-         {"name": "Approve", "callsService": "ApplyUpdate"}],
-       "note": "HITL via OutSystems BPT: on CallLogged the workflow runs the CrmAssistAgent to summarize + propose ProposedUpdate rows; low RiskTier (routine hygiene) auto-calls ApplyUpdate, higher RiskTier (key/large accounts) holds at a Human Approval activity until a sales_manager approves, THEN calls ApplyUpdate/LogNextStep. The approval + audit is native workflow, not custom code."},
-
-      {"name": "MyAccounts", "actor": "sales_rep",
-       "reads": ["Account", "Opportunity", "CallLog", "ProposedUpdate"]},
-
-      {"name": "ApprovalInbox", "actor": "sales_manager",
-       "reads": ["ProposedUpdate", "Account", "CallLog"], "writes": ["ProposedUpdate", "AuditEvent"],
-       "service": "ApproveUpdate",
-       "note": "Where a sales_manager approves/rejects a held key-account proposal — the write-step sign-off."},
-
-      {"name": "ManageAccounts", "actor": "admin",
-       "reads": ["Account"], "writes": ["Account"],
-       "service": "SaveAccount",
-       "note": "Admin maintains the account master data the agent grounds on (segment, key-account flag, owner)."},
-
-      {"name": "AuditTrail", "actor": "admin", "reads": ["AuditEvent", "Account"]}
+      {
+        "name": "LogCall",
+        "actor": "sales_rep",
+        "reads": [
+          "Account",
+          "Contact",
+          "Opportunity"
+        ],
+        "writes": [
+          "CallLog",
+          "AuditEvent"
+        ],
+        "service": "LogCall",
+        "raisesEvent": "CallLogged",
+        "note": "Sales rep intake \u2014 records the sales call (with transcript URL) and kicks off the hygiene/prep flow."
+      },
+      {
+        "name": "PrepAccount",
+        "ai": "CrmAssistAgent",
+        "reads": [
+          "CallLog",
+          "Account",
+          "Contact",
+          "Opportunity"
+        ],
+        "writes": [
+          "CallLog",
+          "ProposedUpdate",
+          "ResearchBrief",
+          "AuditEvent"
+        ],
+        "service": "PrepAccount",
+        "note": "THE AGENT. Grounds on the CallLog transcript + Account/Contact/Opportunity (native retrieval tool), summarizes the call, drafts an account-research brief, and PROPOSES field updates + a next step as ProposedUpdate rows (update-field | log-next-step | draft-brief) each with a RiskTier. It never mutates the CRM record directly \u2014 it proposes."
+      },
+      {
+        "name": "ApplyUpdate",
+        "actor": "sales_rep",
+        "reads": [
+          "ProposedUpdate",
+          "Account",
+          "Opportunity"
+        ],
+        "writes": [
+          "Account",
+          "Opportunity",
+          "ProposedUpdate",
+          "AuditEvent"
+        ],
+        "service": "ApplyUpdate",
+        "note": "The bounded WRITE to the system of record: apply a proposed field change to the Account/Opportunity, mark the ProposedUpdate applied, audited. Called by the workflow after approval (or auto for low-risk hygiene)."
+      },
+      {
+        "name": "LogNextStep",
+        "actor": "sales_rep",
+        "reads": [
+          "Opportunity",
+          "ProposedUpdate"
+        ],
+        "writes": [
+          "Opportunity",
+          "AuditEvent"
+        ],
+        "service": "LogNextStep",
+        "note": "The other bounded write: set the recommended next step on the Opportunity, audited."
+      },
+      {
+        "name": "HygieneWorkflow",
+        "orchestrates": true,
+        "triggerEvent": "CallLogged",
+        "steps": [
+          {
+            "name": "Prep",
+            "ai": "CrmAssistAgent",
+            "reads": [
+              "CallLog",
+              "Account"
+            ],
+            "writes": [
+              "ProposedUpdate"
+            ]
+          },
+          {
+            "name": "Approve",
+            "callsService": "ApplyUpdate"
+          }
+        ],
+        "note": "HITL via OutSystems BPT: on CallLogged the workflow runs the CrmAssistAgent to summarize + propose ProposedUpdate rows; low RiskTier (routine hygiene) auto-calls ApplyUpdate, higher RiskTier (key/large accounts) holds at a Human Approval activity until a sales_manager approves, THEN calls ApplyUpdate/LogNextStep. The approval + audit is native workflow, not custom code."
+      },
+      {
+        "name": "MyAccounts",
+        "actor": "sales_rep",
+        "reads": [
+          "Account",
+          "Opportunity",
+          "CallLog",
+          "ProposedUpdate"
+        ]
+      },
+      {
+        "name": "ApprovalInbox",
+        "actor": "sales_manager",
+        "reads": [
+          "ProposedUpdate",
+          "Account",
+          "CallLog"
+        ],
+        "writes": [
+          "ProposedUpdate",
+          "AuditEvent"
+        ],
+        "service": "ApproveUpdate",
+        "note": "Where a sales_manager approves/rejects a held key-account proposal \u2014 the write-step sign-off."
+      },
+      {
+        "name": "ManageAccounts",
+        "actor": "admin",
+        "reads": [
+          "Account"
+        ],
+        "writes": [
+          "Account"
+        ],
+        "service": "SaveAccount",
+        "note": "Admin maintains the account master data the agent grounds on (segment, key-account flag, owner)."
+      },
+      {
+        "name": "AuditTrail",
+        "actor": "admin",
+        "reads": [
+          "AuditEvent",
+          "Account"
+        ]
+      }
     ],
-
     "integrations": [
-      {"name": "CrmSystem", "kind": "consume", "purpose": "optional external CRM system-of-record (Salesforce/Dynamics-style REST) the ApplyUpdate service can write back to and the agent can retrieve account context from", "stub": true},
-      {"name": "Transcription", "kind": "consume", "purpose": "call-transcription provider (Gong/Otter-style REST) that supplies the transcript the CrmAssistAgent summarizes", "stub": true}
+      {
+        "name": "CrmSystem",
+        "kind": "consume",
+        "purpose": "optional external CRM system-of-record (Salesforce/Dynamics-style REST) the ApplyUpdate service can write back to and the agent can retrieve account context from",
+        "stub": true
+      },
+      {
+        "name": "Transcription",
+        "kind": "consume",
+        "purpose": "call-transcription provider (Gong/Otter-style REST) that supplies the transcript the CrmAssistAgent summarizes",
+        "stub": true
+      }
     ],
-
-    "libraries": ["CrmDesignSystem"]
+    "libraries": [
+      "CrmDesignSystem"
+    ]
   }
 }

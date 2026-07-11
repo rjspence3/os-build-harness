@@ -15,12 +15,12 @@
     {
       "name": "DispatchAgent",
       "modelConnection": "TrialClaudeHaiku4_5",
-      "systemPrompt": "You are DispatchAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Asset, Symptom, Part, ServiceRequest) \u2014 never answer without first retrieving it.",
+      "systemPrompt": "You are DispatchAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Part, Symptom, ServiceRequest, Asset) \u2014 never answer without first retrieving it.",
       "grounding": [
-        "Asset",
-        "Symptom",
         "Part",
-        "ServiceRequest"
+        "Symptom",
+        "ServiceRequest",
+        "Asset"
       ],
       "tools": []
     }
@@ -30,7 +30,7 @@
       "producerApp": "FieldserviceCore",
       "elements": [
         {
-          "name": "Asset",
+          "name": "Part",
           "kind": "Entity"
         },
         {
@@ -38,11 +38,11 @@
           "kind": "Entity"
         },
         {
-          "name": "Part",
+          "name": "ServiceRequest",
           "kind": "Entity"
         },
         {
-          "name": "ServiceRequest",
+          "name": "Asset",
           "kind": "Entity"
         }
       ]

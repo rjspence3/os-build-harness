@@ -2,141 +2,469 @@
   "specVersion": "0.1",
   "domain": {
     "name": "field_service",
-    "description": "Field service & ops dispatch (use case #10). A DispatchAgent grounds on an inbound ServiceRequest, the reported Symptoms, the Asset's telemetry/service history, and the Part catalog, then PROPOSES a diagnosis + a parts list + a work order. The bounded action space the agent proposes is: diagnose | parts-lookup | create-work-order. Diagnosis and parts lookup are auto (read/propose only); the two write steps that touch the physical/financial world — dispatching a technician and committing parts inventory — require a dispatcher to approve in an OutSystems approval workflow (BPT) before they land. The agent never dispatches a technician or commits parts directly — it proposes a DispatchProposal that a human signs off. Every action is audited. The bounded action space + the human-at-the-write-step is what makes it ship, not just reason.",
-
+    "description": "Field service & ops dispatch (use case #10). A DispatchAgent grounds on an inbound ServiceRequest, the reported Symptoms, the Asset's telemetry/service history, and the Part catalog, then PROPOSES a diagnosis + a parts list + a work order. The bounded action space the agent proposes is: diagnose | parts-lookup | create-work-order. Diagnosis and parts lookup are auto (read/propose only); the two write steps that touch the physical/financial world \u2014 dispatching a technician and committing parts inventory \u2014 require a dispatcher to approve in an OutSystems approval workflow (BPT) before they land. The agent never dispatches a technician or commits parts directly \u2014 it proposes a DispatchProposal that a human signs off. Every action is audited. The bounded action space + the human-at-the-write-step is what makes it ship, not just reason.",
     "entities": [
-      {"name": "Asset", "context": "fieldservice", "naturalKey": "SerialNo",
-       "attributes": [
-         {"name": "SerialNo", "dataType": "Text", "mandatory": true},
-         {"name": "Model", "dataType": "Text", "mandatory": true},
-         {"name": "Location", "dataType": "Text"},
-         {"name": "InstalledOn", "dataType": "DateTime"},
-         {"name": "LastServicedOn", "dataType": "DateTime"}]},
-
-      {"name": "Part", "context": "fieldservice", "naturalKey": "PartNo",
-       "attributes": [
-         {"name": "PartNo", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "Category", "dataType": "Text"},
-         {"name": "UnitCost", "dataType": "Decimal"},
-         {"name": "QtyOnHand", "dataType": "Integer"}]},
-
-      {"name": "Technician", "context": "fieldservice", "naturalKey": "Badge",
-       "attributes": [
-         {"name": "Badge", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "Skill", "dataType": "Text"},
-         {"name": "Zone", "dataType": "Text"},
-         {"name": "Available", "dataType": "Boolean"}]},
-
-      {"name": "ServiceRequest", "context": "fieldservice", "naturalKey": "RequestNo",
-       "references": ["Asset", "AuditEvent"],
-       "attributes": [
-         {"name": "RequestNo", "dataType": "Text", "mandatory": true},
-         {"name": "ReportedBy", "dataType": "Text"},
-         {"name": "Channel", "dataType": "Text"},
-         {"name": "Description", "dataType": "Text"},
-         {"name": "Priority", "dataType": "Integer"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "LoggedAt", "dataType": "DateTime"}]},
-
-      {"name": "Symptom", "context": "fieldservice", "references": ["ServiceRequest"],
-       "attributes": [
-         {"name": "Code", "dataType": "Text", "mandatory": true},
-         {"name": "Description", "dataType": "Text"},
-         {"name": "Severity", "dataType": "Text"}]},
-
-      {"name": "Diagnosis", "context": "fieldservice", "references": ["ServiceRequest", "Asset"],
-       "attributes": [
-         {"name": "Summary", "dataType": "Text", "mandatory": true},
-         {"name": "RootCause", "dataType": "Text"},
-         {"name": "ConfidenceScore", "dataType": "Integer"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "WorkOrder", "context": "fieldservice", "references": ["ServiceRequest", "Diagnosis", "Technician"],
-       "attributes": [
-         {"name": "OrderNo", "dataType": "Text", "mandatory": true},
-         {"name": "Summary", "dataType": "Text"},
-         {"name": "PartsCsv", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "ScheduledFor", "dataType": "DateTime"}]},
-
-      {"name": "DispatchProposal", "context": "fieldservice",
-       "references": ["WorkOrder", "Diagnosis", "Technician"],
-       "attributes": [
-         {"name": "ProposedTech", "dataType": "Text"},
-         {"name": "PartsCsv", "dataType": "Text"},
-         {"name": "RiskTier", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "ApprovedBy", "dataType": "Text"}]},
-
-      {"name": "AuditEvent", "context": "fieldservice",
-       "attributes": [
-         {"name": "Description", "dataType": "Text", "mandatory": true},
-         {"name": "Actor", "dataType": "Text"},
-         {"name": "At", "dataType": "Text"}]}
+      {
+        "name": "Asset",
+        "context": "fieldservice",
+        "naturalKey": "SerialNo",
+        "attributes": [
+          {
+            "name": "SerialNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Model",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Location",
+            "dataType": "Text"
+          },
+          {
+            "name": "InstalledOn",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "LastServicedOn",
+            "dataType": "DateTime"
+          }
+        ]
+      },
+      {
+        "name": "Part",
+        "context": "fieldservice",
+        "naturalKey": "PartNo",
+        "attributes": [
+          {
+            "name": "PartNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Category",
+            "dataType": "Text"
+          },
+          {
+            "name": "UnitCost",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "QtyOnHand",
+            "dataType": "Integer"
+          }
+        ]
+      },
+      {
+        "name": "Technician",
+        "context": "fieldservice",
+        "naturalKey": "Badge",
+        "attributes": [
+          {
+            "name": "Badge",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Skill",
+            "dataType": "Text"
+          },
+          {
+            "name": "Zone",
+            "dataType": "Text"
+          },
+          {
+            "name": "Available",
+            "dataType": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "ServiceRequest",
+        "context": "fieldservice",
+        "naturalKey": "RequestNo",
+        "references": [
+          "Asset",
+          "AuditEvent"
+        ],
+        "attributes": [
+          {
+            "name": "RequestNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "ReportedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "Channel",
+            "dataType": "Text"
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "Priority",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "LoggedAt",
+            "dataType": "DateTime"
+          }
+        ]
+      },
+      {
+        "name": "Symptom",
+        "context": "fieldservice",
+        "references": [
+          "ServiceRequest"
+        ],
+        "attributes": [
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "Severity",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Diagnosis",
+        "context": "fieldservice",
+        "references": [
+          "ServiceRequest",
+          "Asset"
+        ],
+        "attributes": [
+          {
+            "name": "Summary",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "RootCause",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConfidenceScore",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "WorkOrder",
+        "context": "fieldservice",
+        "references": [
+          "ServiceRequest",
+          "Diagnosis",
+          "Technician"
+        ],
+        "attributes": [
+          {
+            "name": "OrderNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Summary",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "PartsCsv",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ScheduledFor",
+            "dataType": "DateTime"
+          }
+        ]
+      },
+      {
+        "name": "DispatchProposal",
+        "context": "fieldservice",
+        "references": [
+          "WorkOrder",
+          "Diagnosis",
+          "Technician"
+        ],
+        "attributes": [
+          {
+            "name": "ProposedTech",
+            "dataType": "Text"
+          },
+          {
+            "name": "PartsCsv",
+            "dataType": "Text"
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "context": "fieldservice",
+        "attributes": [
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      }
     ],
-
-    "actors": ["customer", "dispatcher", "technician", "admin"],
-
+    "actors": [
+      "customer",
+      "dispatcher",
+      "technician",
+      "admin"
+    ],
     "capabilities": [
-      {"name": "LogServiceRequest", "actor": "customer",
-       "reads": ["Asset"], "writes": ["ServiceRequest", "Symptom", "AuditEvent"],
-       "service": "LogServiceRequest", "raisesEvent": "ServiceRequestLogged",
-       "note": "Public intake — logs the request + reported symptoms against an asset and kicks off diagnosis + dispatch."},
-
-      {"name": "DiagnoseAndPropose", "ai": "DispatchAgent",
-       "reads": ["ServiceRequest", "Symptom", "Asset", "Part", "Technician"],
-       "writes": ["Diagnosis", "WorkOrder", "DispatchProposal", "AuditEvent"],
-       "service": "DiagnoseAndPropose",
-       "note": "THE AGENT. Grounds on the ServiceRequest + reported Symptoms + Asset service history (telemetry tool) + the Part catalog (parts-lookup tool). Bounded action space it PROPOSES: diagnose | parts-lookup | create-work-order — it writes a Diagnosis, drafts a WorkOrder, and PROPOSES a DispatchProposal (proposed technician + parts + RiskTier). It NEVER dispatches a technician or commits parts inventory directly — those are held for a dispatcher's approval."},
-
-      {"name": "DispatchTechnician", "actor": "dispatcher",
-       "reads": ["WorkOrder", "DispatchProposal", "Technician"],
-       "writes": ["WorkOrder", "DispatchProposal", "Technician", "AuditEvent"],
-       "service": "DispatchTechnician",
-       "note": "The bounded WRITE to the system of record: assign the proposed technician, mark the DispatchProposal executed + the WorkOrder dispatched, flip the tech unavailable, audited. Called by the workflow only AFTER a dispatcher approves."},
-
-      {"name": "CommitParts", "actor": "dispatcher",
-       "reads": ["WorkOrder", "DispatchProposal", "Part"],
-       "writes": ["Part", "DispatchProposal", "AuditEvent"],
-       "service": "CommitParts",
-       "note": "The other bounded write: decrement Part QtyOnHand for the approved parts list (commit inventory), audited. Also gated behind dispatcher approval — the agent may only PROPOSE the parts, never commit them."},
-
-      {"name": "DispatchWorkflow", "orchestrates": true, "triggerEvent": "ServiceRequestLogged",
-       "steps": [
-         {"name": "Diagnose", "ai": "DispatchAgent", "reads": ["ServiceRequest", "Symptom", "Asset", "Part"], "writes": ["Diagnosis"]},
-         {"name": "PartsLookup", "ai": "DispatchAgent", "reads": ["Part", "Diagnosis"], "writes": ["WorkOrder", "DispatchProposal"]},
-         {"name": "ApproveDispatch", "callsService": "DispatchTechnician"},
-         {"name": "CommitInventory", "callsService": "CommitParts"}],
-       "note": "HITL via OutSystems BPT: on ServiceRequestLogged the workflow runs the DispatchAgent to produce a Diagnosis (diagnose step) and then a proposed WorkOrder + DispatchProposal (parts-lookup step). It then HOLDS at a Human Approval activity — a dispatcher approves the proposal — and only THEN calls DispatchTechnician (assign + dispatch) and CommitParts (commit inventory). Diagnosis + parts lookup are auto; the two writes are dispatcher-approved. The approval + audit is native workflow, not custom code."},
-
-      {"name": "DispatcherInbox", "actor": "dispatcher",
-       "reads": ["DispatchProposal", "WorkOrder", "Diagnosis", "ServiceRequest", "Technician"],
-       "writes": ["DispatchProposal", "AuditEvent"],
-       "service": "ApproveDispatch",
-       "note": "Where a dispatcher approves/rejects a held DispatchProposal — the write-step sign-off before DispatchTechnician + CommitParts run."},
-
-      {"name": "TechWorkboard", "actor": "technician",
-       "reads": ["WorkOrder", "ServiceRequest", "Diagnosis", "Asset"]},
-
-      {"name": "WorkOrderDashboard", "actor": "admin",
-       "reads": ["WorkOrder", "Technician", "ServiceRequest", "Diagnosis"]},
-
-      {"name": "ManageCatalog", "actor": "admin",
-       "reads": ["Asset", "Part"], "writes": ["Asset", "Part"],
-       "service": "SaveCatalog",
-       "note": "Admin maintains the Asset registry + Part catalog the agent grounds on."},
-
-      {"name": "AuditTrail", "actor": "admin", "reads": ["AuditEvent", "ServiceRequest"]}
+      {
+        "name": "LogServiceRequest",
+        "actor": "customer",
+        "reads": [
+          "Asset"
+        ],
+        "writes": [
+          "ServiceRequest",
+          "Symptom",
+          "AuditEvent"
+        ],
+        "service": "LogServiceRequest",
+        "raisesEvent": "ServiceRequestLogged",
+        "note": "Public intake \u2014 logs the request + reported symptoms against an asset and kicks off diagnosis + dispatch."
+      },
+      {
+        "name": "DiagnoseAndPropose",
+        "ai": "DispatchAgent",
+        "reads": [
+          "ServiceRequest",
+          "Symptom",
+          "Asset",
+          "Part",
+          "Technician"
+        ],
+        "writes": [
+          "Diagnosis",
+          "WorkOrder",
+          "DispatchProposal",
+          "AuditEvent"
+        ],
+        "service": "DiagnoseAndPropose",
+        "note": "THE AGENT. Grounds on the ServiceRequest + reported Symptoms + Asset service history (telemetry tool) + the Part catalog (parts-lookup tool). Bounded action space it PROPOSES: diagnose | parts-lookup | create-work-order \u2014 it writes a Diagnosis, drafts a WorkOrder, and PROPOSES a DispatchProposal (proposed technician + parts + RiskTier). It NEVER dispatches a technician or commits parts inventory directly \u2014 those are held for a dispatcher's approval."
+      },
+      {
+        "name": "DispatchTechnician",
+        "actor": "dispatcher",
+        "reads": [
+          "WorkOrder",
+          "DispatchProposal",
+          "Technician"
+        ],
+        "writes": [
+          "WorkOrder",
+          "DispatchProposal",
+          "Technician",
+          "AuditEvent"
+        ],
+        "service": "DispatchTechnician",
+        "note": "The bounded WRITE to the system of record: assign the proposed technician, mark the DispatchProposal executed + the WorkOrder dispatched, flip the tech unavailable, audited. Called by the workflow only AFTER a dispatcher approves."
+      },
+      {
+        "name": "CommitParts",
+        "actor": "dispatcher",
+        "reads": [
+          "WorkOrder",
+          "DispatchProposal",
+          "Part"
+        ],
+        "writes": [
+          "Part",
+          "DispatchProposal",
+          "AuditEvent"
+        ],
+        "service": "CommitParts",
+        "note": "The other bounded write: decrement Part QtyOnHand for the approved parts list (commit inventory), audited. Also gated behind dispatcher approval \u2014 the agent may only PROPOSE the parts, never commit them."
+      },
+      {
+        "name": "DispatchWorkflow",
+        "orchestrates": true,
+        "triggerEvent": "ServiceRequestLogged",
+        "steps": [
+          {
+            "name": "Diagnose",
+            "ai": "DispatchAgent",
+            "reads": [
+              "ServiceRequest",
+              "Symptom",
+              "Asset",
+              "Part"
+            ],
+            "writes": [
+              "Diagnosis"
+            ]
+          },
+          {
+            "name": "PartsLookup",
+            "ai": "DispatchAgent",
+            "reads": [
+              "Part",
+              "Diagnosis"
+            ],
+            "writes": [
+              "WorkOrder",
+              "DispatchProposal"
+            ]
+          },
+          {
+            "name": "ApproveDispatch",
+            "callsService": "DispatchTechnician"
+          },
+          {
+            "name": "CommitInventory",
+            "callsService": "CommitParts"
+          }
+        ],
+        "note": "HITL via OutSystems BPT: on ServiceRequestLogged the workflow runs the DispatchAgent to produce a Diagnosis (diagnose step) and then a proposed WorkOrder + DispatchProposal (parts-lookup step). It then HOLDS at a Human Approval activity \u2014 a dispatcher approves the proposal \u2014 and only THEN calls DispatchTechnician (assign + dispatch) and CommitParts (commit inventory). Diagnosis + parts lookup are auto; the two writes are dispatcher-approved. The approval + audit is native workflow, not custom code."
+      },
+      {
+        "name": "DispatcherInbox",
+        "actor": "dispatcher",
+        "reads": [
+          "DispatchProposal",
+          "WorkOrder",
+          "Diagnosis",
+          "ServiceRequest",
+          "Technician"
+        ],
+        "writes": [
+          "DispatchProposal",
+          "AuditEvent"
+        ],
+        "service": "ApproveDispatch",
+        "note": "Where a dispatcher approves/rejects a held DispatchProposal \u2014 the write-step sign-off before DispatchTechnician + CommitParts run."
+      },
+      {
+        "name": "TechWorkboard",
+        "actor": "technician",
+        "reads": [
+          "WorkOrder",
+          "ServiceRequest",
+          "Diagnosis",
+          "Asset"
+        ]
+      },
+      {
+        "name": "WorkOrderDashboard",
+        "actor": "admin",
+        "reads": [
+          "WorkOrder",
+          "Technician",
+          "ServiceRequest",
+          "Diagnosis"
+        ]
+      },
+      {
+        "name": "ManageCatalog",
+        "actor": "admin",
+        "reads": [
+          "Asset",
+          "Part"
+        ],
+        "writes": [
+          "Asset",
+          "Part"
+        ],
+        "service": "SaveCatalog",
+        "note": "Admin maintains the Asset registry + Part catalog the agent grounds on."
+      },
+      {
+        "name": "AuditTrail",
+        "actor": "admin",
+        "reads": [
+          "AuditEvent",
+          "ServiceRequest"
+        ]
+      }
     ],
-
     "integrations": [
-      {"name": "Telemetry", "kind": "consume", "purpose": "IoT / device telemetry source (REST) the DispatchAgent can retrieve asset health + fault codes from as a grounding tool", "stub": true},
-      {"name": "InventorySystem", "kind": "consume", "purpose": "external inventory / warehouse system reconciled on CommitParts to reserve and draw down stock", "stub": true},
-      {"name": "Notify", "kind": "consume", "purpose": "customer / technician notifications on dispatch or completion", "stub": true}
+      {
+        "name": "Telemetry",
+        "kind": "consume",
+        "purpose": "IoT / device telemetry source (REST) the DispatchAgent can retrieve asset health + fault codes from as a grounding tool",
+        "stub": true
+      },
+      {
+        "name": "InventorySystem",
+        "kind": "consume",
+        "purpose": "external inventory / warehouse system reconciled on CommitParts to reserve and draw down stock",
+        "stub": true
+      },
+      {
+        "name": "Notify",
+        "kind": "consume",
+        "purpose": "customer / technician notifications on dispatch or completion",
+        "stub": true
+      }
     ],
-
-    "libraries": ["FieldServiceDesignSystem"]
+    "libraries": [
+      "FieldServiceDesignSystem"
+    ]
   }
 }

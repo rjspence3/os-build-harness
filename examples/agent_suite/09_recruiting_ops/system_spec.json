@@ -103,8 +103,8 @@
           {
             "app": "RecruitingCore",
             "entities": [
-              "Application",
-              "Role"
+              "Role",
+              "Application"
             ]
           }
         ]

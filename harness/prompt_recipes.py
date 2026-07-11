@@ -663,15 +663,23 @@ _DATATYPE_WORDS = {
 }
 
 
+# ODC defaults a new Text attribute to length 50 — too short for real data and a silent truncation risk
+# (Mentor review flagged it on every Text attribute). Emit a production default of 255 for plain Text when
+# the spec gives no explicit length; specs set `length` explicitly for free-text/content fields (1000-2000+).
+_DEFAULT_TEXT_LENGTH = 255
+
+
 def _attr_line(a: dict) -> str:
     if a.get("references"):
         return (f"{a['name']}: a {'mandatory ' if a.get('mandatory') else ''}foreign-key reference to "
                 f"{a['references']}")
-    seg = f"{a['name']}: {_DATATYPE_WORDS.get(a.get('dataType', 'Text'), a.get('dataType', 'Text'))}"
+    dtype = a.get("dataType", "Text")
+    seg = f"{a['name']}: {_DATATYPE_WORDS.get(dtype, dtype)}"
     if a.get("mandatory"):
         seg += ", mandatory"
-    if a.get("length"):
-        seg += f", length {a['length']}"
+    length = a.get("length") or (_DEFAULT_TEXT_LENGTH if dtype == "Text" else None)
+    if length:
+        seg += f", length {length}"
     if "default" in a:
         seg += f", default {a['default']}"
     return seg
@@ -712,6 +720,9 @@ def data_model(params: dict) -> str:
         f"attribute. For ANY entity ({enames}) missing one, explicitly create an auto-number Long-Integer attribute "
         f"named Id and set it as that entity's identifier. Never leave an entity without an identifier, and never "
         f"CHANGE an existing identifier (post-first-publish that is irreversible, OS-DPL-RDBS-40020).\n"
+        f"UPDATE BEHAVIOR — for any entity with more than 5 attributes, set its Update Behavior to \"Changed "
+        f"Attributes\" (not the default \"Full\") so an update rewrites only changed columns, not every column "
+        f"(a scalability win the platform review flags on wide entities).\n"
         f"After authoring, run model validation AND report each entity's identifier attribute by name (so a silent "
         f"drop is caught now, not at the first write-path). Do not publish.")
 

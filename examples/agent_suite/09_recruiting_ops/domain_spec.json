@@ -2,128 +2,427 @@
   "specVersion": "0.1",
   "domain": {
     "name": "recruiting_ops",
-    "description": "Recruiting operations — candidate screening, interview scheduling & structured notes (use case #9). A RecruitAgent grounds on a Role's requirements + a submitted Application/resume, PROPOSES a screening score, schedules interviews, and drafts structured interview notes. It never finalizes an advance/reject — it writes a proposed Decision. Scheduling and note drafting auto-apply; the advance/reject decision ALWAYS enters an OutSystems approval workflow (BPT) for a human recruiter/hiring_manager to sign off before the write lands — a candidate is never auto-rejected. Every action is audited. The bounded action space (screen-and-score | schedule-interview | draft-structured-notes) + the human-always-at-the-decision-step is the fairness contract that makes it ship, not just reason.",
-
+    "description": "Recruiting operations \u2014 candidate screening, interview scheduling & structured notes (use case #9). A RecruitAgent grounds on a Role's requirements + a submitted Application/resume, PROPOSES a screening score, schedules interviews, and drafts structured interview notes. It never finalizes an advance/reject \u2014 it writes a proposed Decision. Scheduling and note drafting auto-apply; the advance/reject decision ALWAYS enters an OutSystems approval workflow (BPT) for a human recruiter/hiring_manager to sign off before the write lands \u2014 a candidate is never auto-rejected. Every action is audited. The bounded action space (screen-and-score | schedule-interview | draft-structured-notes) + the human-always-at-the-decision-step is the fairness contract that makes it ship, not just reason.",
     "entities": [
-      {"name": "Role", "context": "recruiting", "naturalKey": "RoleCode",
-       "attributes": [
-         {"name": "RoleCode", "dataType": "Text", "mandatory": true},
-         {"name": "Title", "dataType": "Text", "mandatory": true},
-         {"name": "Department", "dataType": "Text"},
-         {"name": "Location", "dataType": "Text"},
-         {"name": "Requirements", "dataType": "Text"},
-         {"name": "Rubric", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "Candidate", "context": "recruiting", "naturalKey": "Email",
-       "attributes": [
-         {"name": "Email", "dataType": "Text", "mandatory": true},
-         {"name": "FullName", "dataType": "Text", "mandatory": true},
-         {"name": "Phone", "dataType": "Text"},
-         {"name": "ResumeUrl", "dataType": "Text"},
-         {"name": "Source", "dataType": "Text"}]},
-
-      {"name": "Application", "context": "recruiting", "naturalKey": "ApplicationNo", "references": ["Role", "Candidate", "AuditEvent"],
-       "attributes": [
-         {"name": "ApplicationNo", "dataType": "Text", "mandatory": true},
-         {"name": "SubmittedAt", "dataType": "DateTime"},
-         {"name": "Stage", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "CoverLetter", "dataType": "Text"}]},
-
-      {"name": "ScreeningResult", "context": "recruiting", "references": ["Application", "Role"],
-       "attributes": [
-         {"name": "Score", "dataType": "Integer"},
-         {"name": "MatchSummary", "dataType": "Text"},
-         {"name": "Strengths", "dataType": "Text"},
-         {"name": "Gaps", "dataType": "Text"},
-         {"name": "ConfidenceScore", "dataType": "Integer"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "Interview", "context": "recruiting", "references": ["Application", "Candidate"],
-       "attributes": [
-         {"name": "Round", "dataType": "Text"},
-         {"name": "Interviewer", "dataType": "Text"},
-         {"name": "ScheduledAt", "dataType": "DateTime"},
-         {"name": "Location", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "InterviewNote", "context": "recruiting", "references": ["Interview", "Application"],
-       "attributes": [
-         {"name": "Competency", "dataType": "Text", "mandatory": true},
-         {"name": "Rating", "dataType": "Integer"},
-         {"name": "Evidence", "dataType": "Text"},
-         {"name": "Recommendation", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "Decision", "context": "recruiting", "references": ["Application", "Role"],
-       "attributes": [
-         {"name": "ActionType", "dataType": "Text", "mandatory": true},
-         {"name": "Outcome", "dataType": "Text"},
-         {"name": "Rationale", "dataType": "Text"},
-         {"name": "RiskTier", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "ApprovedBy", "dataType": "Text"}]},
-
-      {"name": "AuditEvent", "context": "recruiting", "references": ["Application"],
-       "attributes": [
-         {"name": "Description", "dataType": "Text", "mandatory": true},
-         {"name": "Actor", "dataType": "Text"},
-         {"name": "At", "dataType": "Text"}]}
+      {
+        "name": "Role",
+        "context": "recruiting",
+        "naturalKey": "RoleCode",
+        "attributes": [
+          {
+            "name": "RoleCode",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Department",
+            "dataType": "Text"
+          },
+          {
+            "name": "Location",
+            "dataType": "Text"
+          },
+          {
+            "name": "Requirements",
+            "dataType": "Text"
+          },
+          {
+            "name": "Rubric",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Candidate",
+        "context": "recruiting",
+        "naturalKey": "Email",
+        "attributes": [
+          {
+            "name": "Email",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "FullName",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Phone",
+            "dataType": "Text"
+          },
+          {
+            "name": "ResumeUrl",
+            "dataType": "Text"
+          },
+          {
+            "name": "Source",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Application",
+        "context": "recruiting",
+        "naturalKey": "ApplicationNo",
+        "references": [
+          "Role",
+          "Candidate",
+          "AuditEvent"
+        ],
+        "attributes": [
+          {
+            "name": "ApplicationNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "SubmittedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Stage",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "CoverLetter",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ScreeningResult",
+        "context": "recruiting",
+        "references": [
+          "Application",
+          "Role"
+        ],
+        "attributes": [
+          {
+            "name": "Score",
+            "dataType": "Integer"
+          },
+          {
+            "name": "MatchSummary",
+            "dataType": "Text"
+          },
+          {
+            "name": "Strengths",
+            "dataType": "Text"
+          },
+          {
+            "name": "Gaps",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConfidenceScore",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Interview",
+        "context": "recruiting",
+        "references": [
+          "Application",
+          "Candidate"
+        ],
+        "attributes": [
+          {
+            "name": "Round",
+            "dataType": "Text"
+          },
+          {
+            "name": "Interviewer",
+            "dataType": "Text"
+          },
+          {
+            "name": "ScheduledAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Location",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "InterviewNote",
+        "context": "recruiting",
+        "references": [
+          "Interview",
+          "Application"
+        ],
+        "attributes": [
+          {
+            "name": "Competency",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Rating",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Evidence",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "Recommendation",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "Decision",
+        "context": "recruiting",
+        "references": [
+          "Application",
+          "Role"
+        ],
+        "attributes": [
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Outcome",
+            "dataType": "Text"
+          },
+          {
+            "name": "Rationale",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "context": "recruiting",
+        "references": [
+          "Application"
+        ],
+        "attributes": [
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true,
+            "length": 2000
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      }
     ],
-
-    "actors": ["recruiter", "hiring_manager", "admin"],
-
+    "actors": [
+      "recruiter",
+      "hiring_manager",
+      "admin"
+    ],
     "capabilities": [
-      {"name": "SubmitApplication", "actor": "recruiter",
-       "reads": ["Role", "Candidate"], "writes": ["Application", "AuditEvent"],
-       "service": "SubmitApplication", "raisesEvent": "ApplicationSubmitted",
-       "note": "Intake — records a candidate's application against a role and kicks off the screening/scheduling flow."},
-
-      {"name": "ScreenApplication", "ai": "RecruitAgent",
-       "reads": ["Application", "Role", "Candidate", "InterviewNote"],
-       "writes": ["ScreeningResult", "Interview", "InterviewNote", "Decision", "AuditEvent"],
-       "service": "ScreenApplication",
-       "note": "THE AGENT. Grounds on the Role's Requirements/Rubric + the Application/Candidate resume (native retrieval tool), PROPOSES a screening score (ScreeningResult), schedules interviews (Interview), and drafts structured interview notes (InterviewNote) — the bounded action space (screen-and-score | schedule-interview | draft-structured-notes). It also writes a PROPOSED Decision (advance|reject) with a RiskTier, but never finalizes it — a candidate is never auto-rejected; the human signs the advance/reject."},
-
-      {"name": "RecordDecision", "actor": "recruiter",
-       "reads": ["Decision", "Application", "Role"], "writes": ["Application", "Decision", "AuditEvent"],
-       "service": "RecordDecision",
-       "note": "The bounded WRITE to the system of record: finalize the proposed Decision (advance/reject), advance the Application stage, mark the Decision recorded, audited. Called by the workflow ONLY after a human approves — never auto for a reject."},
-
-      {"name": "ScheduleInterview", "actor": "recruiter",
-       "reads": ["Application", "Candidate", "Interview"], "writes": ["Interview", "AuditEvent"],
-       "service": "ScheduleInterview",
-       "note": "The other bounded write: confirm/persist a proposed interview slot on the calendar, audited. Auto-applies (scheduling is not the gated decision) but can be adjusted by a recruiter."},
-
-      {"name": "ScreeningWorkflow", "orchestrates": true, "triggerEvent": "ApplicationSubmitted",
-       "steps": [
-         {"name": "Screen", "ai": "RecruitAgent", "reads": ["Application", "Role"], "writes": ["ScreeningResult", "Decision"]},
-         {"name": "Schedule", "callsService": "ScheduleInterview"},
-         {"name": "Approve", "callsService": "RecordDecision"}],
-       "note": "HITL via OutSystems BPT: on ApplicationSubmitted the workflow runs the RecruitAgent to screen-and-score, propose a Decision, and draft notes; the Schedule step auto-calls ScheduleInterview (scheduling & note drafting are auto). The advance/reject Decision ALWAYS holds at a Human Approval activity until a recruiter/hiring_manager approves — a candidate is never auto-rejected — THEN calls RecordDecision. The approval + audit is native workflow, not custom code — the fairness gate."},
-
-      {"name": "MyPipeline", "actor": "recruiter",
-       "reads": ["Application", "Candidate", "Role", "ScreeningResult", "Interview", "Decision"]},
-
-      {"name": "ApprovalInbox", "actor": "hiring_manager",
-       "reads": ["Decision", "Application", "ScreeningResult", "InterviewNote"], "writes": ["Decision", "AuditEvent"],
-       "service": "ApproveDecision",
-       "note": "Where a recruiter/hiring_manager approves/rejects a held advance/reject proposal — the write-step sign-off. The agent proposes; a human always signs the advance/reject."},
-
-      {"name": "ManageRoles", "actor": "admin",
-       "reads": ["Role"], "writes": ["Role"],
-       "service": "SaveRole",
-       "note": "Admin maintains the roles + screening rubrics the agent grounds on (Requirements, Rubric, Status)."},
-
-      {"name": "AuditTrail", "actor": "admin", "reads": ["AuditEvent", "Application"]}
+      {
+        "name": "SubmitApplication",
+        "actor": "recruiter",
+        "reads": [
+          "Role",
+          "Candidate"
+        ],
+        "writes": [
+          "Application",
+          "AuditEvent"
+        ],
+        "service": "SubmitApplication",
+        "raisesEvent": "ApplicationSubmitted",
+        "note": "Intake \u2014 records a candidate's application against a role and kicks off the screening/scheduling flow."
+      },
+      {
+        "name": "ScreenApplication",
+        "ai": "RecruitAgent",
+        "reads": [
+          "Application",
+          "Role",
+          "Candidate",
+          "InterviewNote"
+        ],
+        "writes": [
+          "ScreeningResult",
+          "Interview",
+          "InterviewNote",
+          "Decision",
+          "AuditEvent"
+        ],
+        "service": "ScreenApplication",
+        "note": "THE AGENT. Grounds on the Role's Requirements/Rubric + the Application/Candidate resume (native retrieval tool), PROPOSES a screening score (ScreeningResult), schedules interviews (Interview), and drafts structured interview notes (InterviewNote) \u2014 the bounded action space (screen-and-score | schedule-interview | draft-structured-notes). It also writes a PROPOSED Decision (advance|reject) with a RiskTier, but never finalizes it \u2014 a candidate is never auto-rejected; the human signs the advance/reject."
+      },
+      {
+        "name": "RecordDecision",
+        "actor": "recruiter",
+        "reads": [
+          "Decision",
+          "Application",
+          "Role"
+        ],
+        "writes": [
+          "Application",
+          "Decision",
+          "AuditEvent"
+        ],
+        "service": "RecordDecision",
+        "note": "The bounded WRITE to the system of record: finalize the proposed Decision (advance/reject), advance the Application stage, mark the Decision recorded, audited. Called by the workflow ONLY after a human approves \u2014 never auto for a reject."
+      },
+      {
+        "name": "ScheduleInterview",
+        "actor": "recruiter",
+        "reads": [
+          "Application",
+          "Candidate",
+          "Interview"
+        ],
+        "writes": [
+          "Interview",
+          "AuditEvent"
+        ],
+        "service": "ScheduleInterview",
+        "note": "The other bounded write: confirm/persist a proposed interview slot on the calendar, audited. Auto-applies (scheduling is not the gated decision) but can be adjusted by a recruiter."
+      },
+      {
+        "name": "ScreeningWorkflow",
+        "orchestrates": true,
+        "triggerEvent": "ApplicationSubmitted",
+        "steps": [
+          {
+            "name": "Screen",
+            "ai": "RecruitAgent",
+            "reads": [
+              "Application",
+              "Role"
+            ],
+            "writes": [
+              "ScreeningResult",
+              "Decision"
+            ]
+          },
+          {
+            "name": "Schedule",
+            "callsService": "ScheduleInterview"
+          },
+          {
+            "name": "Approve",
+            "callsService": "RecordDecision"
+          }
+        ],
+        "note": "HITL via OutSystems BPT: on ApplicationSubmitted the workflow runs the RecruitAgent to screen-and-score, propose a Decision, and draft notes; the Schedule step auto-calls ScheduleInterview (scheduling & note drafting are auto). The advance/reject Decision ALWAYS holds at a Human Approval activity until a recruiter/hiring_manager approves \u2014 a candidate is never auto-rejected \u2014 THEN calls RecordDecision. The approval + audit is native workflow, not custom code \u2014 the fairness gate."
+      },
+      {
+        "name": "MyPipeline",
+        "actor": "recruiter",
+        "reads": [
+          "Application",
+          "Candidate",
+          "Role",
+          "ScreeningResult",
+          "Interview",
+          "Decision"
+        ]
+      },
+      {
+        "name": "ApprovalInbox",
+        "actor": "hiring_manager",
+        "reads": [
+          "Decision",
+          "Application",
+          "ScreeningResult",
+          "InterviewNote"
+        ],
+        "writes": [
+          "Decision",
+          "AuditEvent"
+        ],
+        "service": "ApproveDecision",
+        "note": "Where a recruiter/hiring_manager approves/rejects a held advance/reject proposal \u2014 the write-step sign-off. The agent proposes; a human always signs the advance/reject."
+      },
+      {
+        "name": "ManageRoles",
+        "actor": "admin",
+        "reads": [
+          "Role"
+        ],
+        "writes": [
+          "Role"
+        ],
+        "service": "SaveRole",
+        "note": "Admin maintains the roles + screening rubrics the agent grounds on (Requirements, Rubric, Status)."
+      },
+      {
+        "name": "AuditTrail",
+        "actor": "admin",
+        "reads": [
+          "AuditEvent",
+          "Application"
+        ]
+      }
     ],
-
     "integrations": [
-      {"name": "AtsSystem", "kind": "consume", "purpose": "optional external applicant-tracking system (Greenhouse/Lever-style REST) the SubmitApplication/RecordDecision services can sync to and the agent can retrieve candidate/resume context from", "stub": true},
-      {"name": "Calendar", "kind": "consume", "purpose": "calendar/scheduling provider (Google Calendar/Outlook-style REST) the ScheduleInterview service books interview slots on", "stub": true}
+      {
+        "name": "AtsSystem",
+        "kind": "consume",
+        "purpose": "optional external applicant-tracking system (Greenhouse/Lever-style REST) the SubmitApplication/RecordDecision services can sync to and the agent can retrieve candidate/resume context from",
+        "stub": true
+      },
+      {
+        "name": "Calendar",
+        "kind": "consume",
+        "purpose": "calendar/scheduling provider (Google Calendar/Outlook-style REST) the ScheduleInterview service books interview slots on",
+        "stub": true
+      }
     ],
-
-    "libraries": ["RecruitingDesignSystem"]
+    "libraries": [
+      "RecruitingDesignSystem"
+    ]
   }
 }

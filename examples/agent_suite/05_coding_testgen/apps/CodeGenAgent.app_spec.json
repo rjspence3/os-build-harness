@@ -15,10 +15,10 @@
     {
       "name": "CodeGenAgent",
       "modelConnection": "TrialClaudeHaiku4_5",
-      "systemPrompt": "You are CodeGenAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (WorkItem, Repository) \u2014 never answer without first retrieving it.",
+      "systemPrompt": "You are CodeGenAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Repository, WorkItem) \u2014 never answer without first retrieving it.",
       "grounding": [
-        "WorkItem",
-        "Repository"
+        "Repository",
+        "WorkItem"
       ],
       "tools": []
     }
@@ -28,11 +28,11 @@
       "producerApp": "DevtasksCore",
       "elements": [
         {
-          "name": "WorkItem",
+          "name": "Repository",
           "kind": "Entity"
         },
         {
-          "name": "Repository",
+          "name": "WorkItem",
           "kind": "Entity"
         }
       ]

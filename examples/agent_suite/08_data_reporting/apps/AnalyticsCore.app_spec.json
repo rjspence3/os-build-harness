@@ -67,7 +67,8 @@
           },
           {
             "name": "Description",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "Schedule",
@@ -106,7 +107,8 @@
           {
             "name": "Question",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "GeneratedSql",
@@ -157,7 +159,8 @@
           },
           {
             "name": "Narrative",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "ArtifactUri",
@@ -215,7 +218,8 @@
           },
           {
             "name": "Narrative",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           },
           {
             "name": "Severity",
@@ -283,7 +287,8 @@
           {
             "name": "Description",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Actor",
@@ -291,7 +296,7 @@
           },
           {
             "name": "At",
-            "dataType": "Text"
+            "dataType": "DateTime"
           },
           {
             "name": "ReportRunId",

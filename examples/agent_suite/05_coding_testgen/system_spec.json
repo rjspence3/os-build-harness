@@ -94,8 +94,8 @@
           {
             "app": "DevtasksCore",
             "entities": [
-              "WorkItem",
-              "Repository"
+              "Repository",
+              "WorkItem"
             ]
           }
         ]

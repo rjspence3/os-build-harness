@@ -82,8 +82,8 @@
           {
             "app": "ComplianceCore",
             "entities": [
-              "Control",
-              "Framework"
+              "Framework",
+              "Control"
             ]
           }
         ]

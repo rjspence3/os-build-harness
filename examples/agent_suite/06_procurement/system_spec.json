@@ -135,8 +135,8 @@
             "app": "ProcurementCore",
             "entities": [
               "GoodsReceipt",
-              "PurchaseOrder",
-              "Invoice"
+              "Invoice",
+              "PurchaseOrder"
             ]
           }
         ]

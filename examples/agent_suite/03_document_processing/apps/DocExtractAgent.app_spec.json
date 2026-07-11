@@ -15,11 +15,11 @@
     {
       "name": "DocExtractAgent",
       "modelConnection": "TrialClaudeHaiku4_5",
-      "systemPrompt": "You are DocExtractAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Vendor, Document, ValidationRule) \u2014 never answer without first retrieving it.",
+      "systemPrompt": "You are DocExtractAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Vendor, ValidationRule, Document) \u2014 never answer without first retrieving it.",
       "grounding": [
         "Vendor",
-        "Document",
-        "ValidationRule"
+        "ValidationRule",
+        "Document"
       ],
       "tools": []
     }
@@ -33,11 +33,11 @@
           "kind": "Entity"
         },
         {
-          "name": "Document",
+          "name": "ValidationRule",
           "kind": "Entity"
         },
         {
-          "name": "ValidationRule",
+          "name": "Document",
           "kind": "Entity"
         }
       ]

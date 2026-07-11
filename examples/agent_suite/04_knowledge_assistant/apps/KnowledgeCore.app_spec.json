@@ -42,7 +42,8 @@
           },
           {
             "name": "Content",
-            "dataType": "Text"
+            "dataType": "Text",
+            "length": 2000
           }
         ]
       },
@@ -58,7 +59,8 @@
           {
             "name": "Description",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Actor",
@@ -87,7 +89,8 @@
           {
             "name": "Body",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "AskedBy",
@@ -125,7 +128,8 @@
           {
             "name": "Body",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Grounded",
@@ -186,7 +190,8 @@
           {
             "name": "Reason",
             "dataType": "Text",
-            "mandatory": true
+            "mandatory": true,
+            "length": 2000
           },
           {
             "name": "Status",
