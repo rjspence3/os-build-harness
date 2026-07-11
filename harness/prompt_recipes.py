@@ -809,11 +809,14 @@ def agent(params: dict) -> str:
             f"over app data, add a GetGroundingData step that queries the referenced entities.)\n")
 
     # ── TOOLS = the agent's native Action calling (NOT a hand-orchestrated loop) ──
-    # Ground truth from the stock ABC boilerplate agent (inspected live 2026-07-10): the reasoning loop
-    # is NATIVE to the agent element. The LLM is invoked by the "Call Agent" widget inside AgentFlow;
-    # tools are Server Actions attached to the agent's Action-calling config; the loop (select tool ->
-    # runtime runs it -> feed result back -> continue) is executed by the agent runtime and BOUNDED by a
-    # Call Condition on the agent. The caller does NOT append tool outputs and re-call — that was the bug.
+    # Ground truth from the stock ABC boilerplate agent + a live tool-firing test (2026-07-11): the
+    # reasoning loop is NATIVE to the agent element. The LLM is invoked by the "Call Agent" widget inside
+    # AgentFlow; tools are Server Actions attached to the agent's Action-calling config; the loop (select
+    # tool -> runtime runs it -> feed result back -> continue) is executed by the agent runtime and BOUNDED
+    # by a Call Condition. The Call Condition is the BREAK/STOP condition (the loop continues while it is
+    # FALSE) and MUST be expressed on the runtime's built-in LoopCount so it is FALSE on the first
+    # iteration — `LoopCount >= N`. A custom static input (e.g. IterationCount) never increments, and
+    # `IterationCount <= N` is TRUE at start, so it breaks the loop at 0 calls (live-proven failure).
     if tools:
         lines = "\n".join(
             f"   - {t['name']}: {t['description']}"
@@ -821,12 +824,16 @@ def agent(params: dict) -> str:
             + (f" Required: {t['required']}." if t['required'] else "")
             for t in tools)
         tools_block = (
-            f"4b. TOOLS (native Action calling). Attach each of these EXISTING Server Actions to the agent's Action-calling "
-            f"config, each with a NAME + a clear DESCRIPTION (the model selects tools BY description) + its parameters:\n{lines}\n"
+            f"4b. TOOLS (native Action calling). Enable Action calling on the agent (EnableActionCalling=true) and attach "
+            f"each of these EXISTING Server Actions to its Action-calling config, each with a NAME + a clear DESCRIPTION "
+            f"(the model selects tools BY description) + its parameters (mark model-supplied args AI-filled):\n{lines}\n"
             f"    Do NOT hand-orchestrate a call/append/recall loop. The agent runtime runs the reasoning loop itself: the "
-            f"Call Agent widget selects a tool, the runtime executes that Server Action, feeds the result back, and continues "
-            f"— bounded by a Call Condition on the agent (cap it at {max_loops} iterations, e.g. TotalCallsCount/LoopCount). "
-            f"Each tool just needs to be ATTACHED with its description; the agent calls it dynamically.\n")
+            f"Call Agent widget selects a tool, the runtime executes that Server Action, feeds the result back, and continues. "
+            f"Bound it with the agent Call Condition set to EXACTLY `LoopCount >= {max_loops}` — LoopCount is the runtime's "
+            f"built-in counter (0 on the first iteration, so `0 >= {max_loops}` is FALSE and the loop proceeds to call a tool; "
+            f"it breaks once LoopCount reaches {max_loops}). Do NOT use a custom static input or a `<= N` form — that is TRUE "
+            f"at start and breaks the loop at 0 tool calls (live-proven). Each tool just needs to be ATTACHED with its "
+            f"description; the agent calls it dynamically.\n")
     else:
         tools_block = ""
 

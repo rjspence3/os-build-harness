@@ -413,7 +413,8 @@ def test_agent_recipe_tools_use_native_action_calling_not_a_manual_loop():
                                  "parameters": "SupplierCode (Text)"}]})
     assert "native Action calling" in p
     assert "Do NOT hand-orchestrate" in p                               # the anti-pattern is called out
-    assert "Call Condition" in p and "6 iterations" in p                # runtime-bounded loop
+    assert "Call Condition" in p and "LoopCount >= 6" in p              # native break-when-true bound, false at start
+    assert "`<= N` form" in p                                           # the live-proven wrong form is warned against
     assert "Look up denied-party screening" in p                        # tool DESCRIPTION (model chooses by it)
     # the OLD manual-loop language must be gone
     assert "APPEND its output to ChatMessages" not in p and "ToolSelection" not in p
