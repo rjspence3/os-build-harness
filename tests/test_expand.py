@@ -107,6 +107,15 @@ def test_agent_gets_agents_block_and_refs():
     assert any(r["producerApp"] == "OrderingCore" for r in ag["appReferences"])
 
 
+def test_agent_grounds_on_consumed_entities():
+    # The #1 agent failure is no grounding — an agent that consumes producer entities MUST retrieve them.
+    # expand derives grounding from `consumes.entities` so the built agent reasons over real data.
+    a = _specs()["ScoreOrderRiskAgent"]["agents"][0]
+    assert set(a["grounding"]) == {"Order", "OrderLine"}       # both consumed entities
+    assert "Ground every answer" in a["systemPrompt"]          # grounded prompt, not a bare reasoner
+    assert "Order" in a["systemPrompt"]
+
+
 # ── End-user wiring ──────────────────────────────────────────────────────────
 def test_enduser_owns_no_entities_has_refs_and_screens():
     sa = _specs()["ShopperApp"]

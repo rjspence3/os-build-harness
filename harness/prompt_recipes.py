@@ -747,20 +747,28 @@ def screen(params: dict) -> str:
 
 
 def agent(params: dict) -> str:
-    """Author a complete ODC AI Agent (kind=AIAgent shell) that does REAL function-calling — the
-    documented ODC pattern (ReAct reasoning loop), not a single-shot completion.
+    """Author a complete ODC AI Agent (kind=AIAgent shell) in the CANONICAL Agent-Builder boilerplate —
+    the exact 6-action shape of the stock ABC reference agent (inspected live 2026-07-10):
+    `LoadMemory -> GetGroundingData -> BuildMessages -> [Call Agent widget] -> StoreMemory -> Response`,
+    wrapped by a PUBLIC `Call<AgentName>` service action. The three steps a broken agent omits —
+    MEMORY-load (LoadMemory), GROUNDING (GetGroundingData), and MEMORY-store (StoreMemory) — are
+    first-class here. An agent with no grounding is the #1 failure: it 'reasons' but has no data
+    (live-proven — a screening agent answered "I do not have access to screening data" and screened
+    nothing; that agent had only 3 of these 6 actions and no grounding).
 
-    params: agent_name, system_prompt, model_connection?, max_loops?(default 8), expose_rest?(default
-    False — a DEV-ONLY verification endpoint, never production), tools?:[ str | {name, description,
-    parameters?, required?} ].
+    params: agent_name, system_prompt, model_connection?, grounding?:[ str | {entity, key?} ] (entities
+    the agent retrieves to ground its answer), max_loops?(default 8), expose_rest?(default True — a
+    verification endpoint, strip for production), tools?:[ str | {name, description, parameters?, required?} ]
+    (function-calling tools; grounding covers most needs, tools add multi-step action).
 
-    Why this shape (verified against ODC docs 2026-07-10): an ODC agent runs headless, consumes the
-    model via `Call<AIModelName>`, and exposes `Call<AgentName>` to consuming apps. Function-calling is a
-    REASONING LOOP — the model returns a `ToolSelection {Name, Parameters}`; you EXECUTE that Server
-    Action, append its output to the ChatMessages, and call AGAIN; repeat until the model returns a final
-    answer with no tool selected, BOUNDED by a loop guard (docs: `LoopCount`/`TotalCallsCount` Call
-    Conditions). A single call that ignores ToolSelection is the #1 mistake — the agent 'reasons' but its
-    tools never fire. The model chooses tools by their DESCRIPTION, so every tool needs one."""
+    Why this shape (the stock ABC boilerplate agent, inspected live 2026-07-10): an ODC agent runs
+    headless, and the LLM is invoked by the native "Call Agent" widget inside AgentFlow (Agent +
+    Messages) — NOT a hand-written model call. Function-calling is NATIVE: tools are Server Actions
+    attached to the agent's Action-calling config, and the reasoning loop (select tool -> runtime runs it
+    -> feed result back -> continue) is executed BY THE AGENT RUNTIME, bounded by a Call Condition on the
+    agent. The old "caller appends the tool output and calls again" orchestration was WRONG — the runtime
+    does the loop. The model chooses tools by their DESCRIPTION, so every tool needs one. The agent
+    exposes `Call<AgentName>` (SessionId + UserInput -> Response) as its consumption contract."""
     name = _p(params, "agent_name", required=True)
     prompt = _p(params, "system_prompt", "You are a helpful assistant.")
     model = _p(params, "model_connection", "TrialClaudeHaiku4_5")
@@ -771,13 +779,41 @@ def agent(params: dict) -> str:
     # real consumption path is the Call<AgentName> service action). Set expose_rest=False for a prod build.
     expose_rest = _p(params, "expose_rest", True)
 
+    def _ground(g):
+        return {"entity": g} if isinstance(g, str) else {"entity": g.get("entity", ""), "key": g.get("key", "")}
+    grounding = [_ground(g) for g in (_p(params, "grounding", []) or []) if (g if isinstance(g, str) else g.get("entity"))]
+
     def _tool(t):
         if isinstance(t, str):
             return {"name": t, "description": f"Calls the {t} server action.", "parameters": "", "required": ""}
         return {"name": t.get("name", ""), "description": t.get("description", f"Calls {t.get('name','')}."),
                 "parameters": t.get("parameters", ""), "required": t.get("required", "")}
     tools = [_tool(t) for t in (_p(params, "tools", []) or [])]
-    tools_block = ""
+
+    # ── MEMORY-load + GROUNDING (workbench: LoadMemory, GetGroundingData) — the steps a broken agent omits ──
+    loadmem_block = (
+        f"1. LoadMemory server action (SessionId -> Messages, an AIMessage list) — RETRIEVE prior conversation for this "
+        f"session so the agent has memory across turns. This is boilerplate action #1 of the stock agent; run it first.\n")
+    if grounding:
+        glines = "\n".join(f"   - query {g['entity']}" + (f" (filter/key: {g['key']})" if g.get("key") else "")
+                           for g in grounding)
+        ground_block = (
+            f"2. GetGroundingData server action (UserInput -> GroundingData text) — RETRIEVE the real data the answer must "
+            f"be grounded in, and return it as text/records to inject into the prompt. Query these REFERENCED entities via "
+            f"aggregates:\n{glines}\n"
+            f"   This is the step whose absence makes an agent say 'I don't have access to that data' — it MUST run "
+            f"before BuildMessages and its results MUST be put into the messages.\n")
+    else:
+        ground_block = (
+            f"2. (No grounding entities declared — this agent answers from the model + tools only. If it should reason "
+            f"over app data, add a GetGroundingData step that queries the referenced entities.)\n")
+
+    # ── TOOLS = the agent's native Action calling (NOT a hand-orchestrated loop) ──
+    # Ground truth from the stock ABC boilerplate agent (inspected live 2026-07-10): the reasoning loop
+    # is NATIVE to the agent element. The LLM is invoked by the "Call Agent" widget inside AgentFlow;
+    # tools are Server Actions attached to the agent's Action-calling config; the loop (select tool ->
+    # runtime runs it -> feed result back -> continue) is executed by the agent runtime and BOUNDED by a
+    # Call Condition on the agent. The caller does NOT append tool outputs and re-call — that was the bug.
     if tools:
         lines = "\n".join(
             f"   - {t['name']}: {t['description']}"
@@ -785,56 +821,58 @@ def agent(params: dict) -> str:
             + (f" Required: {t['required']}." if t['required'] else "")
             for t in tools)
         tools_block = (
-            f"\n5. TOOLS (function-calling). Each tool is an EXISTING Server Action. Register each as a tool the model "
-            f"can call, giving it a NAME + a clear DESCRIPTION (the model chooses tools by their description) + its "
-            f"parameter shape:\n{lines}\n"
-            f"   Wire each via the agent's action-calling (native: agent.CreateActionHandler(); handler.Action = the "
-            f"Server Action; set IsFilledByAI=false ONLY for system-supplied args). If the tenant has the "
-            f"AIAgentBuilder component, the `CallAgentV2` service action is the documented function-calling path — it "
-            f"takes the ChatMessages + the Tools list ({{Name, Description, Parameters, RequiredParameters}}) and "
-            f"returns Response + ToolSelection {{Name, Parameters}}; use whichever your model connection supports.\n"
-            f"6. THE REASONING LOOP (this is the part single-shot agents get wrong). AgentFlow must:\n"
-            f"   (a) call the agent with the current ChatMessages + the Tools;\n"
-            f"   (b) if the result selects a tool (ToolSelection.Name is non-empty): EXECUTE that Server Action with "
-            f"ToolSelection.Parameters, APPEND its output to ChatMessages, and GO BACK to (a);\n"
-            f"   (c) if no tool is selected: the response is final — return it.\n"
-            f"   BOUND the loop at {max_loops} iterations (a LoopCount / TotalCallsCount guard) so it always terminates. "
-            f"Author this as a bounded loop or a depth-limited recursive AgentFlow — never a single call that ignores "
-            f"ToolSelection (that leaves the tools dead).\n")
+            f"4b. TOOLS (native Action calling). Attach each of these EXISTING Server Actions to the agent's Action-calling "
+            f"config, each with a NAME + a clear DESCRIPTION (the model selects tools BY description) + its parameters:\n{lines}\n"
+            f"    Do NOT hand-orchestrate a call/append/recall loop. The agent runtime runs the reasoning loop itself: the "
+            f"Call Agent widget selects a tool, the runtime executes that Server Action, feeds the result back, and continues "
+            f"— bounded by a Call Condition on the agent (cap it at {max_loops} iterations, e.g. TotalCallsCount/LoopCount). "
+            f"Each tool just needs to be ATTACHED with its description; the agent calls it dynamically.\n")
     else:
-        tools_block = (
-            f"\n5. No tools — this is a direct-model agent (deterministic completion). AgentFlow: build the ChatMessages, "
-            f"call the agent once, return the Response. (No function-calling loop needed without tools.)\n")
+        tools_block = ""
 
     rest_block = (
-        f"\n{7 if tools else 6}. VERIFICATION endpoint (DEV/test — the harness invokes the agent through it; "
-        f"AUTH-GATE OR STRIP for production, since anonymous HTTP on an agent is a security smell and the real "
-        f"consumption path is the Call{name} service action above). Add a REST API named EXACTLY \"AgentAPI\", POST method \"Ask\", "
-        f"Authentication=None, Text input \"Question\" -> Text output \"Answer\"; inside call AgentFlow(Question) and "
-        f"Assign Response to Answer. ServerRequestTimeout=120. Resolves to POST /<module>/rest/AgentAPI/ask.\n"
+        f"6. VERIFICATION endpoint (DEV/test — the harness invokes the agent through it; AUTH-GATE OR STRIP for "
+        f"production, anonymous HTTP on an agent is a security smell; the real consumption path is Call{name}). Add a "
+        f"REST API named EXACTLY \"AgentAPI\", POST method \"Ask\", Authentication=None, Text input \"Question\" -> Text "
+        f"output \"Answer\"; inside call AgentFlow(Question) and Assign Response to Answer. ServerRequestTimeout=120. "
+        f"Resolves to POST /<module>/rest/AgentAPI/ask.\n"
         if expose_rest else "")
 
     return (
         f"{_PREAMBLE}\n\n"
-        f"This is a blank ODC AI Agent app (app_create kind=AIAgent ships an empty shell). Author a COMPLETE working, "
-        f"FUNCTION-CALLING agent named {name} entirely in-model. An ODC agent runs headless; it consumes the model via "
-        f"Call<AIModelName> and exposes Call{name} to consuming apps.\n"
-        f"1. Create the agent element{' with action-calling ENABLED (EnableActionCalling=true)' if tools else ''}.\n"
-        f"2. A BuildMessages server action that builds the ChatMessages (AIMessage list): a System message whose "
-        f'SystemMessageContent.ContentText is exactly "{prompt}", and a User message from a UserInput text parameter '
-        f"(build each record with a typed local + Assign per attribute; an inline [{{Role:...}}] literal is rejected by "
-        f"the parser).\n"
-        f"3. Bind the agent's AIModel slot to the EXISTING AIModelConnection named \"{model}\" (a Trial model is fine for "
-        f"dev — Trial connections ARE reference-able + bindable via MCP and publish clean; do NOT expect OS-APPS-40028. "
-        f"Parameterize this to the client's own model connection for production).\n"
-        f"4. An AgentFlow server action (SessionId + UserInput -> Response) implementing the flow below."
-        f"{tools_block}{rest_block}"
-        f"{7 if (tools and expose_rest) else 6 if (tools or expose_rest) else 5}. A PUBLIC service action Call{name} "
-        f"(SessionId + UserInput -> Response) that calls AgentFlow — the standard, documented consumption contract for "
-        f"any consuming app. Set ServerRequestTimeout=120 on the call node (LLM + tool-loop latency).\n"
-        f"After authoring, confirm change_applied=true and report: the AIModel binding, the registered tool names, and "
-        f"that AgentFlow implements the execute-tool-and-continue LOOP (not a single call). The app MUST then publish to "
-        f"`succeeded` with NO OS-APPS-40028. Do not publish.")
+        f"This is a blank ODC AI Agent app (kind=AIAgent). Author a COMPLETE working agent named {name} in the CANONICAL "
+        f"Agent-Builder BOILERPLATE — the exact 6-action shape of the stock ABC reference agent: LoadMemory -> "
+        f"GetGroundingData -> BuildMessages -> [Call Agent widget] -> StoreMemory -> Response, wrapped by a PUBLIC "
+        f"Call{name} service action. An ODC agent runs headless; the LLM is invoked by the native \"Call Agent\" widget "
+        f"(Agent + Messages) inside AgentFlow, and it exposes Call{name} to consuming apps.\n"
+        f"0. Create the agent element and bind its AIModel slot to the EXISTING AIModelConnection \"{model}\" (Trial is "
+        f"fine for dev — bindable via MCP, publishes clean, no OS-APPS-40028; parameterize to the client's model for "
+        f"production).{' Attach the tools (step 4b) to its Action-calling config and set a Call Condition to bound the loop.' if tools else ''}\n"
+        f"{loadmem_block}"
+        f"{ground_block}"
+        f"3. BuildMessages server action (UserInput + GroundingData + SessionId -> Messages, MessageToStoreInMemory) — "
+        f"build the ChatMessages (AIMessage list): a System message whose SystemMessageContent.ContentText is exactly "
+        f'"{prompt}"'
+        f", plus the LoadMemory Messages prepended so prior turns are in context"
+        f"{' PLUS the GetGroundingData results injected as context so the model answers FROM the data' if grounding else ''}"
+        f", and a User message from the UserInput text parameter (typed local + Assign per attribute; an inline "
+        f"[{{Role:...}}] literal is rejected by the parser).\n"
+        f"4. AgentFlow server action (SessionId + UserInput -> Response) that runs the flow in order: LoadMemory -> "
+        f"{'GetGroundingData -> ' if grounding else ''}BuildMessages -> the \"Call Agent\" widget (Agent={name}, "
+        f"Messages=BuildMessages.Messages){' which runs the native tool loop below' if tools else ''} -> StoreMemory -> "
+        f"return the Call Agent Response. Do NOT hand-write a model call — the Call Agent widget IS the model invocation.\n"
+        f"{tools_block}"
+        f"5. StoreMemory server action (MessageToStoreInMemory + the response message + SessionId) — persist this turn so "
+        f"the agent has conversation memory across turns; call it after the Call Agent widget returns, before returning.\n"
+        f"{rest_block}"
+        f"7. A PUBLIC service action Call{name} (SessionId + UserInput -> Response) that calls AgentFlow — the standard, "
+        f"documented consumption contract for any consuming app. ServerRequestTimeout=120 (LLM + tool-loop latency).\n"
+        f"After authoring, confirm change_applied=true and report: the AIModel binding, that the flow has all "
+        f"6 boilerplate actions (LoadMemory, GetGroundingData, BuildMessages, AgentFlow, "
+        f"StoreMemory, Call{name}), that GetGroundingData "
+        f"{'queries ' + ', '.join(g['entity'] for g in grounding) if grounding else 'is absent (no grounding declared)'}, "
+        f"the attached tool names, and that AgentFlow invokes the model via the Call Agent widget (not a hand-written "
+        f"call). The app MUST then publish to `succeeded` with NO OS-APPS-40028. Do not publish.")
 
 
 def chart(params: dict) -> str:
@@ -2048,6 +2086,7 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
         steps.append({"recipe": "agent", "why": f"AI agent {ag['name']} (separate AIAgent app)",
                       "params": {"agent_name": ag["name"], "system_prompt": ag["systemPrompt"],
                                  "model_connection": ag.get("modelConnection", "TrialClaudeHaiku4_5"),
+                                 "grounding": ag.get("grounding", []),
                                  "tools": ag.get("tools", [])}})
     # Batch B: standalone logic units (emitted last — a service action may wrap a write-path server action).
     _LOGIC_KIND = {"serviceAction": "service-action", "clientAction": "client-action",

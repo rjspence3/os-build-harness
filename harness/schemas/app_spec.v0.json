@@ -1193,7 +1193,14 @@
           "items": {
             "type": "string"
           },
-          "description": "Server Action names the agent may call as tools (each wired via a parameterless CreateActionHandler)."
+          "description": "Server Action names the agent may call as tools (each attached to the agent's native Action-calling config; the runtime runs the tool loop, bounded by a Call Condition)."
+        },
+        "grounding": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Entity names the agent retrieves in GetGroundingData to ground its answer in real data. An agent with no grounding is the #1 failure mode: it reasons but has no data."
         }
       }
     },

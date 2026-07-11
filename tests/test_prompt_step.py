@@ -386,35 +386,43 @@ def test_cli_plan(capsys, tmp_path):
     assert "build plan" in out and "nav-block" in out and "role-gate" in out
 
 
-def test_agent_recipe_binds_trial_model_and_gates_publish():
+def test_agent_recipe_authors_the_six_action_boilerplate():
+    # Ground truth = the stock ABC agent: LoadMemory -> GetGroundingData -> BuildMessages ->
+    # [Call Agent widget] -> StoreMemory -> Response, wrapped by a public Call<Name>. All 6 present.
     p = pr.render("agent", {"agent_name": "HelperAgent", "system_prompt": "You are terse.",
-                            "tools": ["LookupOrder"]})
-    assert "kind=AIAgent" in p and "BuildMessages" in p
-    assert "You are terse." in p and "AIModelConnection named \"TrialClaudeHaiku4_5\"" in p
+                            "grounding": ["Order"], "tools": ["LookupOrder"]})
+    assert "kind=AIAgent" in p
+    for action in ("LoadMemory", "GetGroundingData", "BuildMessages", "AgentFlow", "StoreMemory"):
+        assert action in p
+    assert "You are terse." in p and 'AIModelConnection "TrialClaudeHaiku4_5"' in p
     assert "OS-APPS-40028" in p and "ServerRequestTimeout=120" in p
     assert "CallHelperAgent" in p                                        # public consumption contract
+    # The LLM is invoked by the native Call Agent widget, NOT a hand-written model call.
+    assert "Call Agent" in p and "IS the model invocation" in p
     # REST verification endpoint is ON by default (the gate invokes through it) but labeled dev/strip-for-prod
     assert "AgentAPI" in p and ("AUTH-GATE OR STRIP for production" in p or "VERIFICATION endpoint" in p)
 
 
-def test_agent_recipe_authors_the_function_calling_loop_not_single_shot():
-    # The #1 ODC agent mistake: a single call that ignores ToolSelection -> tools never fire. The recipe
-    # must author the execute-tool-and-continue REASONING LOOP, tool DESCRIPTIONS, and a bound.
+def test_agent_recipe_tools_use_native_action_calling_not_a_manual_loop():
+    # The mechanism correction (ABC ground truth): the reasoning loop is NATIVE to the agent runtime,
+    # bounded by a Call Condition. The recipe must NOT tell the caller to append tool output and re-call.
     p = pr.render("agent", {"agent_name": "ScreeningAgent", "system_prompt": "Screen suppliers.",
                             "max_loops": 6, "tools": [
                                 {"name": "GetScreeningResult",
                                  "description": "Look up denied-party screening for a supplier code.",
                                  "parameters": "SupplierCode (Text)"}]})
-    assert "REASONING LOOP" in p
-    assert "ToolSelection" in p and "APPEND its output to ChatMessages" in p and "GO BACK" in p
-    assert "BOUND the loop at 6" in p                                    # terminates
+    assert "native Action calling" in p
+    assert "Do NOT hand-orchestrate" in p                               # the anti-pattern is called out
+    assert "Call Condition" in p and "6 iterations" in p                # runtime-bounded loop
     assert "Look up denied-party screening" in p                        # tool DESCRIPTION (model chooses by it)
-    assert "single call that ignores ToolSelection" in p               # the anti-pattern is called out
+    # the OLD manual-loop language must be gone
+    assert "APPEND its output to ChatMessages" not in p and "ToolSelection" not in p
 
 
-def test_agent_no_tools_is_direct_model_no_loop():
+def test_agent_no_tools_has_no_action_calling_block():
     p = pr.render("agent", {"agent_name": "Summarizer", "system_prompt": "Summarize.", "tools": []})
-    assert "direct-model agent" in p and "REASONING LOOP" not in p       # no tools -> no loop
+    assert "native Action calling" not in p and "Do NOT hand-orchestrate" not in p  # no tools -> no loop
+    assert "Call Agent" in p                                            # still invokes the model natively
     assert "CallSummarizer" in p
 
 

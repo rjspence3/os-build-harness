@@ -56,6 +56,8 @@ _VERDICT_CLASS: dict[str, str] = {
     "NOT_APPLIED":      "defect",
     "NO_CHART":         "defect",
     "KPI_WRONG":        "defect",
+    "NOT_GROUNDED":     "defect",   # agent reasons but retrieved no real data — never ship
+    "NO_ANSWER":        "defect",
     # reachability / driver gaps → INCOMPLETE (blocks DONE, routes fix to harness)
     "NO_LIST_SCREEN":   "unverified",
     "NO_CREATE_ENTRY":  "unverified",
@@ -74,6 +76,7 @@ _VERDICT_CLASS: dict[str, str] = {
     "APPLIED":          "ok",
     "RENDERS":          "ok",
     "KPI_OK":           "ok",
+    "GROUNDED":         "ok",       # agent answered from real retrieved data (workbench grounding + tools)
 }
 
 
@@ -934,9 +937,23 @@ def run_render(spec: dict, base_url: str, login: dict) -> list[dict]:
     return results
 
 
-def run_agent(agent_base_url: str, question: str) -> dict:
-    """Phase 2 agent gate: POST a question to a deployed agent's AgentAPI/ask endpoint and assert a
-    non-empty answer — so an agent that built + published but does not actually REASON FAILS."""
+# A non-grounded agent (no GetGroundingData / no tools) returns a generic disclaimer instead of data —
+# the exact failure proven live: a screening agent answered "I do not have access to screening data" and
+# screened nothing. The gate must FAIL that, not pass it for being non-empty.
+_NOT_GROUNDED_TELLS = (
+    "do not have access", "don't have access", "i cannot access", "can't access", "no access to",
+    "don't have real-time", "do not have real-time", "cannot verify", "i'm not able to access",
+    "i am not able to access", "unable to access", "i cannot provide", "consult official",
+    "through official channels", "i don't have the ability",
+)
+
+
+def run_agent(agent_base_url: str, question: str, must_contain: str = "") -> dict:
+    """Agent gate: POST a question to a deployed agent's AgentAPI/ask and assert it is actually GROUNDED
+    — not just non-empty. Verdicts: GROUNDED (ok) / NOT_GROUNDED (defect — the answer disclaims data
+    access or, when `must_contain` is given, omits the tool-sourced fact) / NO_ANSWER (defect) /
+    HTTP_*/ERROR (unverified). `must_contain` is a grounding probe: a substring that ONLY real tool/
+    data grounding could produce (e.g. a seeded status the agent must retrieve)."""
     import urllib.request
     import urllib.error
     url = agent_base_url.rstrip("/") + "/rest/AgentAPI/ask"
@@ -946,15 +963,26 @@ def run_agent(agent_base_url: str, question: str) -> dict:
         with urllib.request.urlopen(req, timeout=130) as resp:
             raw, status = resp.read().decode(), resp.status
     except urllib.error.HTTPError as e:
-        return {"kind": "agent", "verdict": f"HTTP_{e.code}", "detail": e.read().decode()[:200]}
+        return _finalize({"kind": "agent", "verdict": f"HTTP_{e.code}", "detail": e.read().decode()[:200]})
     except Exception as e:
-        return {"kind": "agent", "verdict": "ERROR " + repr(e)[:120]}
+        return _finalize({"kind": "agent", "verdict": "ERROR " + repr(e)[:120]})
     try:
         answer = (json.loads(raw).get("Answer") or "").strip()
     except Exception:
         answer = raw.strip()
-    return {"kind": "agent", "status": status, "answer": answer[:300], "question": question,
-            "verdict": "REASONS" if len(answer) > 1 else "NO_ANSWER (empty response)"}
+    low = answer.lower()
+    if len(answer) <= 1:
+        verdict = "NO_ANSWER (empty response)"
+    elif must_contain and must_contain.lower() not in low:
+        verdict = (f"NOT_GROUNDED (answer omits the tool-sourced fact '{must_contain}' — the grounding/tool "
+                   f"step did not run; the agent answered from the model alone)")
+    elif not must_contain and any(t in low for t in _NOT_GROUNDED_TELLS):
+        verdict = ("NOT_GROUNDED (answer disclaims data access — no GetGroundingData/tool step; the agent "
+                   "'reasons' but retrieved no real data)")
+    else:
+        verdict = "GROUNDED"
+    return _finalize({"kind": "agent", "status": status, "answer": answer[:300], "question": question,
+                      "verdict": verdict})
 
 
 def _gated_screens(spec: dict) -> list[dict]:

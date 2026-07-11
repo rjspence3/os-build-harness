@@ -194,15 +194,31 @@ def _workflow_spec(app: dict) -> dict:
     return spec
 
 
+def _consumed_service_actions(app: dict) -> list[str]:
+    out = []
+    for c in app.get("consumes", []) or []:
+        out.extend(c.get("serviceActions", []) or [])
+    return out
+
+
 def _agent_spec(app: dict) -> dict:
     svc = (app.get("exposes") or {}).get("serviceActions", ["Answer"])[0]
+    # An agent that consumes producer entities MUST ground on them, and consumed producer service actions
+    # become its tools — otherwise it 'reasons' with no data / no actions (the #1 agent failure mode).
+    grounding = _consumed_entities(app)
+    tools = _consumed_service_actions(app)
+    ground_line = (f" Ground every answer in the referenced data ({', '.join(grounding)}) — never answer "
+                   f"without first retrieving it." if grounding else "")
+    tool_line = (f" Use your tools ({', '.join(tools)}) to take actions when needed." if tools else "")
     spec = {
         "specVersion": "0.2",
         "app": {"name": app["name"], "roles": ["User"], "description": "AI Agent (reasoning)"},
         "dataModel": {"entities": []},
         "screens": [],
         "agents": [{"name": svc, "modelConnection": "TrialClaudeHaiku4_5",
-                    "systemPrompt": f"You are {app['name']}. Reason over the referenced inputs and return a result."}],
+                    "systemPrompt": (f"You are {app['name']}. Reason over the referenced inputs and return a "
+                                     f"result.{ground_line}{tool_line}"),
+                    "grounding": grounding, "tools": tools}],
     }
     refs = _app_references(app.get("consumes", []))
     if refs:
