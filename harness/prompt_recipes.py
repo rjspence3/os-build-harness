@@ -747,41 +747,94 @@ def screen(params: dict) -> str:
 
 
 def agent(params: dict) -> str:
-    """Author a complete AI Agent from a blank `app_create kind=AIAgent` shell — internals AND
-    model binding, entirely via MCP (wall lifted + runtime-proven 2026-07-05). params: agent_name,
-    system_prompt, model_connection?(default a Trial connection), tools?:[server_action_name]."""
+    """Author a complete ODC AI Agent (kind=AIAgent shell) that does REAL function-calling — the
+    documented ODC pattern (ReAct reasoning loop), not a single-shot completion.
+
+    params: agent_name, system_prompt, model_connection?, max_loops?(default 8), expose_rest?(default
+    False — a DEV-ONLY verification endpoint, never production), tools?:[ str | {name, description,
+    parameters?, required?} ].
+
+    Why this shape (verified against ODC docs 2026-07-10): an ODC agent runs headless, consumes the
+    model via `Call<AIModelName>`, and exposes `Call<AgentName>` to consuming apps. Function-calling is a
+    REASONING LOOP — the model returns a `ToolSelection {Name, Parameters}`; you EXECUTE that Server
+    Action, append its output to the ChatMessages, and call AGAIN; repeat until the model returns a final
+    answer with no tool selected, BOUNDED by a loop guard (docs: `LoopCount`/`TotalCallsCount` Call
+    Conditions). A single call that ignores ToolSelection is the #1 mistake — the agent 'reasons' but its
+    tools never fire. The model chooses tools by their DESCRIPTION, so every tool needs one."""
     name = _p(params, "agent_name", required=True)
     prompt = _p(params, "system_prompt", "You are a helpful assistant.")
     model = _p(params, "model_connection", "TrialClaudeHaiku4_5")
-    tools = _p(params, "tools", []) or []
-    tools_txt = (
-        f"\n5. Give the agent these tools (each an existing Server Action): {', '.join(tools)}. Wire each with a "
-        f"PARAMETERLESS handler = agent.CreateActionHandler(); handler.Action = <the server action>; for system-"
-        f"supplied args set IsFilledByAI=false. (A tool is just a Server Action — there is no special Tool type.)"
-        if tools else "")
+    max_loops = _p(params, "max_loops", 8)
+    # The REST endpoint is how the harness INVOKES + gates an agent (exec_in_app can't reach AIAgent
+    # actions), so it's ON by default for verifiability — but it is a DEV/verification affordance that
+    # MUST be auth-gated or stripped for production (anonymous HTTP on an agent is a security smell; the
+    # real consumption path is the Call<AgentName> service action). Set expose_rest=False for a prod build.
+    expose_rest = _p(params, "expose_rest", True)
+
+    def _tool(t):
+        if isinstance(t, str):
+            return {"name": t, "description": f"Calls the {t} server action.", "parameters": "", "required": ""}
+        return {"name": t.get("name", ""), "description": t.get("description", f"Calls {t.get('name','')}."),
+                "parameters": t.get("parameters", ""), "required": t.get("required", "")}
+    tools = [_tool(t) for t in (_p(params, "tools", []) or [])]
+    tools_block = ""
+    if tools:
+        lines = "\n".join(
+            f"   - {t['name']}: {t['description']}"
+            + (f" Parameters: {t['parameters']}." if t['parameters'] else "")
+            + (f" Required: {t['required']}." if t['required'] else "")
+            for t in tools)
+        tools_block = (
+            f"\n5. TOOLS (function-calling). Each tool is an EXISTING Server Action. Register each as a tool the model "
+            f"can call, giving it a NAME + a clear DESCRIPTION (the model chooses tools by their description) + its "
+            f"parameter shape:\n{lines}\n"
+            f"   Wire each via the agent's action-calling (native: agent.CreateActionHandler(); handler.Action = the "
+            f"Server Action; set IsFilledByAI=false ONLY for system-supplied args). If the tenant has the "
+            f"AIAgentBuilder component, the `CallAgentV2` service action is the documented function-calling path — it "
+            f"takes the ChatMessages + the Tools list ({{Name, Description, Parameters, RequiredParameters}}) and "
+            f"returns Response + ToolSelection {{Name, Parameters}}; use whichever your model connection supports.\n"
+            f"6. THE REASONING LOOP (this is the part single-shot agents get wrong). AgentFlow must:\n"
+            f"   (a) call the agent with the current ChatMessages + the Tools;\n"
+            f"   (b) if the result selects a tool (ToolSelection.Name is non-empty): EXECUTE that Server Action with "
+            f"ToolSelection.Parameters, APPEND its output to ChatMessages, and GO BACK to (a);\n"
+            f"   (c) if no tool is selected: the response is final — return it.\n"
+            f"   BOUND the loop at {max_loops} iterations (a LoopCount / TotalCallsCount guard) so it always terminates. "
+            f"Author this as a bounded loop or a depth-limited recursive AgentFlow — never a single call that ignores "
+            f"ToolSelection (that leaves the tools dead).\n")
+    else:
+        tools_block = (
+            f"\n5. No tools — this is a direct-model agent (deterministic completion). AgentFlow: build the ChatMessages, "
+            f"call the agent once, return the Response. (No function-calling loop needed without tools.)\n")
+
+    rest_block = (
+        f"\n{7 if tools else 6}. VERIFICATION endpoint (DEV/test — the harness invokes the agent through it; "
+        f"AUTH-GATE OR STRIP for production, since anonymous HTTP on an agent is a security smell and the real "
+        f"consumption path is the Call{name} service action above). Add a REST API named EXACTLY \"AgentAPI\", POST method \"Ask\", "
+        f"Authentication=None, Text input \"Question\" -> Text output \"Answer\"; inside call AgentFlow(Question) and "
+        f"Assign Response to Answer. ServerRequestTimeout=120. Resolves to POST /<module>/rest/AgentAPI/ask.\n"
+        if expose_rest else "")
+
     return (
         f"{_PREAMBLE}\n\n"
-        f"This is a blank ODC AI Agent app (app_create kind=AIAgent ships an empty shell). Author a COMPLETE working "
-        f"agent named {name} entirely in-model:\n"
-        f"1. Create the agent element{' (EnableActionCalling=true)' if tools else ''}.\n"
-        f"2. A BuildMessages server action that builds the AIMessage list: a System message whose "
+        f"This is a blank ODC AI Agent app (app_create kind=AIAgent ships an empty shell). Author a COMPLETE working, "
+        f"FUNCTION-CALLING agent named {name} entirely in-model. An ODC agent runs headless; it consumes the model via "
+        f"Call<AIModelName> and exposes Call{name} to consuming apps.\n"
+        f"1. Create the agent element{' with action-calling ENABLED (EnableActionCalling=true)' if tools else ''}.\n"
+        f"2. A BuildMessages server action that builds the ChatMessages (AIMessage list): a System message whose "
         f'SystemMessageContent.ContentText is exactly "{prompt}", and a User message from a UserInput text parameter '
-        f"(build the record with a typed local + Assign per attribute; an inline [{{Role:...}}] literal is rejected by "
+        f"(build each record with a typed local + Assign per attribute; an inline [{{Role:...}}] literal is rejected by "
         f"the parser).\n"
-        f"3. An AgentFlow server action: call BuildMessages, then call the agent (CreateNode<ICallAgentNode>; "
-        f"n.Agent=agent), and Assign the agent's response text to a Response output.\n"
-        f"4. Bind the agent's AIModel slot to the EXISTING AIModelConnection named \"{model}\" (a Trial model — Trial "
-        f"connections ARE reference-able + bindable via MCP and publish clean; do NOT expect OS-APPS-40028).{tools_txt}\n"
-        f"6. A PUBLIC service action Call{name} exposing SessionId + UserInput -> Response (the standard agent "
-        f"contract). Set ServerRequestTimeout=120 on the call node (LLM latency).\n"
-        f"7. An exposed REST endpoint so the agent is invocable + verifiable over HTTP (exec_in_app does not reach "
-        f"AIAgent actions): a REST API integration named EXACTLY \"AgentAPI\" with a POST method named EXACTLY \"Ask\", "
-        f"Authentication=None (anonymous), a Text request-body input \"Question\" and a Text response-body output "
-        f"\"Answer\"; inside, call AgentFlow passing Question as the user input (RequestId/SessionId = 0 / empty "
-        f"grounding) and Assign the agent's Response to Answer. Set ServerRequestTimeout=120 on that call node. "
-        f"The endpoint resolves to POST /<module>/rest/AgentAPI/ask.\n"
-        f"After authoring, confirm change_applied=true and report the AIModel binding + any errors. The app MUST then "
-        f"publish to `succeeded` with NO OS-APPS-40028. Do not publish.")
+        f"3. Bind the agent's AIModel slot to the EXISTING AIModelConnection named \"{model}\" (a Trial model is fine for "
+        f"dev — Trial connections ARE reference-able + bindable via MCP and publish clean; do NOT expect OS-APPS-40028. "
+        f"Parameterize this to the client's own model connection for production).\n"
+        f"4. An AgentFlow server action (SessionId + UserInput -> Response) implementing the flow below."
+        f"{tools_block}{rest_block}"
+        f"{7 if (tools and expose_rest) else 6 if (tools or expose_rest) else 5}. A PUBLIC service action Call{name} "
+        f"(SessionId + UserInput -> Response) that calls AgentFlow — the standard, documented consumption contract for "
+        f"any consuming app. Set ServerRequestTimeout=120 on the call node (LLM + tool-loop latency).\n"
+        f"After authoring, confirm change_applied=true and report: the AIModel binding, the registered tool names, and "
+        f"that AgentFlow implements the execute-tool-and-continue LOOP (not a single call). The app MUST then publish to "
+        f"`succeeded` with NO OS-APPS-40028. Do not publish.")
 
 
 def chart(params: dict) -> str:

@@ -389,12 +389,42 @@ def test_cli_plan(capsys, tmp_path):
 def test_agent_recipe_binds_trial_model_and_gates_publish():
     p = pr.render("agent", {"agent_name": "HelperAgent", "system_prompt": "You are terse.",
                             "tools": ["LookupOrder"]})
-    assert "kind=AIAgent" in p and "BuildMessages" in p and "ICallAgentNode" in p
+    assert "kind=AIAgent" in p and "BuildMessages" in p
     assert "You are terse." in p and "AIModelConnection named \"TrialClaudeHaiku4_5\"" in p
     assert "OS-APPS-40028" in p and "ServerRequestTimeout=120" in p
-    assert "CreateActionHandler()" in p and "LookupOrder" in p           # tool wiring
-    assert "CallHelperAgent" in p                                        # public contract
-    assert "AgentAPI" in p and "/rest/AgentAPI/ask" in p                 # invocable REST trigger (gate hits this)
+    assert "CallHelperAgent" in p                                        # public consumption contract
+    # REST verification endpoint is ON by default (the gate invokes through it) but labeled dev/strip-for-prod
+    assert "AgentAPI" in p and ("AUTH-GATE OR STRIP for production" in p or "VERIFICATION endpoint" in p)
+
+
+def test_agent_recipe_authors_the_function_calling_loop_not_single_shot():
+    # The #1 ODC agent mistake: a single call that ignores ToolSelection -> tools never fire. The recipe
+    # must author the execute-tool-and-continue REASONING LOOP, tool DESCRIPTIONS, and a bound.
+    p = pr.render("agent", {"agent_name": "ScreeningAgent", "system_prompt": "Screen suppliers.",
+                            "max_loops": 6, "tools": [
+                                {"name": "GetScreeningResult",
+                                 "description": "Look up denied-party screening for a supplier code.",
+                                 "parameters": "SupplierCode (Text)"}]})
+    assert "REASONING LOOP" in p
+    assert "ToolSelection" in p and "APPEND its output to ChatMessages" in p and "GO BACK" in p
+    assert "BOUND the loop at 6" in p                                    # terminates
+    assert "Look up denied-party screening" in p                        # tool DESCRIPTION (model chooses by it)
+    assert "single call that ignores ToolSelection" in p               # the anti-pattern is called out
+
+
+def test_agent_no_tools_is_direct_model_no_loop():
+    p = pr.render("agent", {"agent_name": "Summarizer", "system_prompt": "Summarize.", "tools": []})
+    assert "direct-model agent" in p and "REASONING LOOP" not in p       # no tools -> no loop
+    assert "CallSummarizer" in p
+
+
+def test_agent_rest_endpoint_can_be_stripped_for_production():
+    # default: verification REST present (the gate needs it) but flagged for prod hardening
+    on = pr.render("agent", {"agent_name": "A", "system_prompt": "x", "tools": ["T"]})
+    assert "AgentAPI" in on and "/rest/AgentAPI/ask" in on and "STRIP for production" in on
+    # a production build sets expose_rest=False -> no anonymous endpoint
+    off = pr.render("agent", {"agent_name": "A", "system_prompt": "x", "tools": ["T"], "expose_rest": False})
+    assert "AgentAPI" not in off
 
 
 def test_chart_recipe_avoids_listappend_and_uses_aggregate():
