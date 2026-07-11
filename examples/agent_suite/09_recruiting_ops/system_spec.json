@@ -1,0 +1,248 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "recruiting_ops",
+    "apps": [
+      {
+        "name": "RecruitingDesignSystem",
+        "kind": "Library",
+        "layer": "foundation",
+        "exposes": {}
+      },
+      {
+        "name": "RecruitingCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "recruiting",
+        "owns": [
+          "Role",
+          "Candidate",
+          "Application",
+          "ScreeningResult",
+          "Interview",
+          "InterviewNote",
+          "Decision",
+          "AuditEvent"
+        ],
+        "exposes": {
+          "serviceActions": [
+            "SubmitApplication",
+            "ScreenApplication",
+            "RecordDecision",
+            "ScheduleInterview",
+            "ApproveDecision",
+            "SaveRole"
+          ],
+          "events": [
+            "ApplicationSubmitted"
+          ],
+          "staticEntities": []
+        },
+        "foreignKeys": [
+          {
+            "from": "Application",
+            "target": "Role"
+          },
+          {
+            "from": "Application",
+            "target": "Candidate"
+          },
+          {
+            "from": "Application",
+            "target": "AuditEvent"
+          },
+          {
+            "from": "ScreeningResult",
+            "target": "Application"
+          },
+          {
+            "from": "ScreeningResult",
+            "target": "Role"
+          },
+          {
+            "from": "Interview",
+            "target": "Application"
+          },
+          {
+            "from": "Interview",
+            "target": "Candidate"
+          },
+          {
+            "from": "InterviewNote",
+            "target": "Interview"
+          },
+          {
+            "from": "InterviewNote",
+            "target": "Application"
+          },
+          {
+            "from": "Decision",
+            "target": "Application"
+          },
+          {
+            "from": "Decision",
+            "target": "Role"
+          },
+          {
+            "from": "AuditEvent",
+            "target": "Application"
+          }
+        ],
+        "consumes": []
+      },
+      {
+        "name": "RecruitAgent",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {
+          "serviceActions": [
+            "RecruitAgent"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "RecruitingCore",
+            "entities": [
+              "Application",
+              "Role"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ScreeningWorkflow",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {
+          "triggerEvent": "ApplicationSubmitted",
+          "startProcessOn": "RecruitingCore.ApplicationSubmitted"
+        },
+        "activities": [
+          {
+            "name": "Screen",
+            "callsServiceAction": "RecruitAgent"
+          },
+          {
+            "name": "Schedule",
+            "callsServiceAction": "ScheduleInterview"
+          },
+          {
+            "name": "Approve",
+            "callsServiceAction": "RecordDecision"
+          }
+        ],
+        "consumes": [
+          {
+            "app": "RecruitingCore",
+            "events": [
+              "ApplicationSubmitted"
+            ],
+            "serviceActions": [
+              "RecordDecision",
+              "ScheduleInterview"
+            ]
+          },
+          {
+            "app": "RecruitAgent",
+            "serviceActions": [
+              "RecruitAgent"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AdminApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "admin",
+        "exposes": {
+          "screens": [
+            "ManageRoles",
+            "AuditTrail"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "RecruitingCore",
+            "entities": [
+              "Application",
+              "AuditEvent",
+              "Role"
+            ],
+            "serviceActions": [
+              "SaveRole"
+            ]
+          },
+          {
+            "app": "RecruitingDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "HiringManagerApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "hiring_manager",
+        "exposes": {
+          "screens": [
+            "ApprovalInbox"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "RecruitingCore",
+            "entities": [
+              "Application",
+              "AuditEvent",
+              "Decision",
+              "InterviewNote",
+              "ScreeningResult"
+            ],
+            "serviceActions": [
+              "ApproveDecision"
+            ]
+          },
+          {
+            "app": "RecruitingDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "RecruiterApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "recruiter",
+        "exposes": {
+          "screens": [
+            "SubmitApplication",
+            "RecordDecision",
+            "ScheduleInterview",
+            "MyPipeline"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "RecruitingCore",
+            "entities": [
+              "Application",
+              "AuditEvent",
+              "Candidate",
+              "Decision",
+              "Interview",
+              "Role",
+              "ScreeningResult"
+            ],
+            "serviceActions": [
+              "RecordDecision",
+              "ScheduleInterview",
+              "SubmitApplication"
+            ]
+          },
+          {
+            "app": "RecruitingDesignSystem"
+          }
+        ]
+      }
+    ]
+  }
+}

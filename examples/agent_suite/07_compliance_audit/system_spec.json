@@ -1,0 +1,225 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "compliance_audit",
+    "apps": [
+      {
+        "name": "ComplianceDesignSystem",
+        "kind": "Library",
+        "layer": "foundation",
+        "exposes": {}
+      },
+      {
+        "name": "ComplianceCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "compliance",
+        "owns": [
+          "Framework",
+          "Control",
+          "Evidence",
+          "GapFinding",
+          "RemediationTask",
+          "Attestation",
+          "AuditEvent"
+        ],
+        "exposes": {
+          "serviceActions": [
+            "StartControlReview",
+            "AssessControl",
+            "AttachEvidence",
+            "RecordAttestation",
+            "ApproveAttestation",
+            "SaveFramework"
+          ],
+          "events": [
+            "ControlReviewStarted"
+          ],
+          "staticEntities": []
+        },
+        "foreignKeys": [
+          {
+            "from": "Control",
+            "target": "Framework"
+          },
+          {
+            "from": "Control",
+            "target": "AuditEvent"
+          },
+          {
+            "from": "Evidence",
+            "target": "Control"
+          },
+          {
+            "from": "GapFinding",
+            "target": "Control"
+          },
+          {
+            "from": "RemediationTask",
+            "target": "Control"
+          },
+          {
+            "from": "RemediationTask",
+            "target": "GapFinding"
+          },
+          {
+            "from": "Attestation",
+            "target": "Control"
+          }
+        ],
+        "consumes": []
+      },
+      {
+        "name": "ComplianceAgent",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {
+          "serviceActions": [
+            "ComplianceAgent"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "ComplianceCore",
+            "entities": [
+              "Control",
+              "Framework"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "ControlReviewWorkflow",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {
+          "triggerEvent": "ControlReviewStarted",
+          "startProcessOn": "ComplianceCore.ControlReviewStarted"
+        },
+        "activities": [
+          {
+            "name": "GatherEvidence",
+            "callsServiceAction": "ComplianceAgent"
+          },
+          {
+            "name": "DetectGaps",
+            "callsServiceAction": "ComplianceAgent"
+          },
+          {
+            "name": "Attest",
+            "callsServiceAction": "RecordAttestation"
+          }
+        ],
+        "consumes": [
+          {
+            "app": "ComplianceCore",
+            "events": [
+              "ControlReviewStarted"
+            ],
+            "serviceActions": [
+              "RecordAttestation"
+            ]
+          },
+          {
+            "app": "ComplianceAgent",
+            "serviceActions": [
+              "ComplianceAgent"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AdminApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "admin",
+        "exposes": {
+          "screens": [
+            "ManageFrameworks",
+            "AuditTrail"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "ComplianceCore",
+            "entities": [
+              "AuditEvent",
+              "Control",
+              "Framework"
+            ],
+            "serviceActions": [
+              "SaveFramework"
+            ]
+          },
+          {
+            "app": "ComplianceDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "ComplianceAnalystApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "compliance_analyst",
+        "exposes": {
+          "screens": [
+            "StartControlReview",
+            "AttachEvidence",
+            "CompliancePosture"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "ComplianceCore",
+            "entities": [
+              "AuditEvent",
+              "Control",
+              "Evidence",
+              "Framework",
+              "GapFinding",
+              "RemediationTask"
+            ],
+            "serviceActions": [
+              "AttachEvidence",
+              "StartControlReview"
+            ]
+          },
+          {
+            "app": "ComplianceDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "ControlOwnerApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "control_owner",
+        "exposes": {
+          "screens": [
+            "RecordAttestation",
+            "AttestationInbox"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "ComplianceCore",
+            "entities": [
+              "Attestation",
+              "AuditEvent",
+              "Control",
+              "Evidence",
+              "GapFinding"
+            ],
+            "serviceActions": [
+              "ApproveAttestation",
+              "RecordAttestation"
+            ]
+          },
+          {
+            "app": "ComplianceDesignSystem"
+          }
+        ]
+      }
+    ]
+  }
+}

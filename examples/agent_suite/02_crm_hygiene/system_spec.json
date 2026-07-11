@@ -1,0 +1,231 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "crm_hygiene",
+    "apps": [
+      {
+        "name": "CrmDesignSystem",
+        "kind": "Library",
+        "layer": "foundation",
+        "exposes": {}
+      },
+      {
+        "name": "CrmCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "crm",
+        "owns": [
+          "Account",
+          "Contact",
+          "Opportunity",
+          "CallLog",
+          "ResearchBrief",
+          "ProposedUpdate",
+          "AuditEvent"
+        ],
+        "exposes": {
+          "serviceActions": [
+            "LogCall",
+            "PrepAccount",
+            "ApplyUpdate",
+            "LogNextStep",
+            "ApproveUpdate",
+            "SaveAccount"
+          ],
+          "events": [
+            "CallLogged"
+          ],
+          "staticEntities": []
+        },
+        "foreignKeys": [
+          {
+            "from": "Contact",
+            "target": "Account"
+          },
+          {
+            "from": "Opportunity",
+            "target": "Account"
+          },
+          {
+            "from": "CallLog",
+            "target": "Account"
+          },
+          {
+            "from": "CallLog",
+            "target": "Contact"
+          },
+          {
+            "from": "CallLog",
+            "target": "Opportunity"
+          },
+          {
+            "from": "ResearchBrief",
+            "target": "Account"
+          },
+          {
+            "from": "ResearchBrief",
+            "target": "CallLog"
+          },
+          {
+            "from": "ProposedUpdate",
+            "target": "Account"
+          },
+          {
+            "from": "ProposedUpdate",
+            "target": "CallLog"
+          },
+          {
+            "from": "AuditEvent",
+            "target": "Account"
+          }
+        ],
+        "consumes": []
+      },
+      {
+        "name": "CrmAssistAgent",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {
+          "serviceActions": [
+            "CrmAssistAgent"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "CrmCore",
+            "entities": [
+              "Account",
+              "CallLog"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "HygieneWorkflow",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {
+          "triggerEvent": "CallLogged",
+          "startProcessOn": "CrmCore.CallLogged"
+        },
+        "activities": [
+          {
+            "name": "Prep",
+            "callsServiceAction": "CrmAssistAgent"
+          },
+          {
+            "name": "Approve",
+            "callsServiceAction": "ApplyUpdate"
+          }
+        ],
+        "consumes": [
+          {
+            "app": "CrmCore",
+            "events": [
+              "CallLogged"
+            ],
+            "serviceActions": [
+              "ApplyUpdate"
+            ]
+          },
+          {
+            "app": "CrmAssistAgent",
+            "serviceActions": [
+              "CrmAssistAgent"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AdminApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "admin",
+        "exposes": {
+          "screens": [
+            "ManageAccounts",
+            "AuditTrail"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "CrmCore",
+            "entities": [
+              "Account",
+              "AuditEvent"
+            ],
+            "serviceActions": [
+              "SaveAccount"
+            ]
+          },
+          {
+            "app": "CrmDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "SalesManagerApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "sales_manager",
+        "exposes": {
+          "screens": [
+            "ApprovalInbox"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "CrmCore",
+            "entities": [
+              "Account",
+              "AuditEvent",
+              "CallLog",
+              "ProposedUpdate"
+            ],
+            "serviceActions": [
+              "ApproveUpdate"
+            ]
+          },
+          {
+            "app": "CrmDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "SalesRepApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "sales_rep",
+        "exposes": {
+          "screens": [
+            "LogCall",
+            "ApplyUpdate",
+            "LogNextStep",
+            "MyAccounts"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "CrmCore",
+            "entities": [
+              "Account",
+              "AuditEvent",
+              "CallLog",
+              "Contact",
+              "Opportunity",
+              "ProposedUpdate"
+            ],
+            "serviceActions": [
+              "ApplyUpdate",
+              "LogCall",
+              "LogNextStep"
+            ]
+          },
+          {
+            "app": "CrmDesignSystem"
+          }
+        ]
+      }
+    ]
+  }
+}

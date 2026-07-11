@@ -176,7 +176,7 @@ def decompose(spec: dict) -> dict:
             ai_svc = step.get("ai")
             if not ai_svc or ai_svc in agent_of_service:
                 continue
-            agent_name = f"{ai_svc}Agent"
+            agent_name = ai_svc if ai_svc.endswith("Agent") else f"{ai_svc}Agent"
             agent_of_service[ai_svc] = agent_name
             reads_core = _cores_for_entities(step.get("reads", []), owner_app)
             apps[agent_name] = {
@@ -189,7 +189,7 @@ def decompose(spec: dict) -> dict:
     for cap in caps:
         if not cap.get("orchestrates"):
             continue
-        wf_name = f"{cap['name']}Workflow"
+        wf_name = cap["name"] if cap["name"].endswith("Workflow") else f"{cap['name']}Workflow"
         trigger = cap.get("triggerEvent")
         trigger_core = _core_raising_event(apps, trigger)
         consumes: list[dict] = []

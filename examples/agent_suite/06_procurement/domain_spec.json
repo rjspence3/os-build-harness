@@ -1,0 +1,124 @@
+{
+  "specVersion": "0.1",
+  "domain": {
+    "name": "procurement",
+    "description": "Procurement & vendor ops — PO matching, exception handling, and spend-anomaly flagging (use case #6). A PoMatchAgent grounds on the PurchaseOrder + Invoice + GoodsReceipt + Vendor history, runs the 2/3-way match, and PROPOSES a MatchResult + a PaymentProposal with a RiskTier. It never releases payment directly — it proposes. Clean matched POs under threshold auto-approve; unmatched/anomalous POs and large-spend releases enter an OutSystems approval workflow (BPT) for a human to sign off before the write lands. Every action is audited. The bounded action space (match-and-approve | flag-exception | release-payment) + the human-at-the-write-step is what makes it ship, not just reason.",
+
+    "entities": [
+      {"name": "Vendor", "context": "procurement", "naturalKey": "VendorNo",
+       "attributes": [
+         {"name": "VendorNo", "dataType": "Text", "mandatory": true},
+         {"name": "Name", "dataType": "Text", "mandatory": true},
+         {"name": "Category", "dataType": "Text"},
+         {"name": "PaymentTerms", "dataType": "Text"},
+         {"name": "RiskRating", "dataType": "Text"},
+         {"name": "IsApproved", "dataType": "Boolean"}]},
+
+      {"name": "PurchaseOrder", "context": "procurement", "naturalKey": "PoNo", "references": ["Vendor", "AuditEvent"],
+       "attributes": [
+         {"name": "PoNo", "dataType": "Text", "mandatory": true},
+         {"name": "Description", "dataType": "Text"},
+         {"name": "TotalAmount", "dataType": "Decimal", "mandatory": true},
+         {"name": "Currency", "dataType": "Text"},
+         {"name": "OrderedQuantity", "dataType": "Integer"},
+         {"name": "Status", "dataType": "Text"},
+         {"name": "OrderedAt", "dataType": "DateTime"}]},
+
+      {"name": "GoodsReceipt", "context": "procurement", "naturalKey": "ReceiptNo", "references": ["PurchaseOrder"],
+       "attributes": [
+         {"name": "ReceiptNo", "dataType": "Text", "mandatory": true},
+         {"name": "ReceivedQuantity", "dataType": "Integer", "mandatory": true},
+         {"name": "ReceivedAt", "dataType": "DateTime"},
+         {"name": "Condition", "dataType": "Text"}]},
+
+      {"name": "Invoice", "context": "procurement", "naturalKey": "InvoiceNo", "references": ["PurchaseOrder", "Vendor"],
+       "attributes": [
+         {"name": "InvoiceNo", "dataType": "Text", "mandatory": true},
+         {"name": "InvoiceAmount", "dataType": "Decimal", "mandatory": true},
+         {"name": "Currency", "dataType": "Text"},
+         {"name": "BilledQuantity", "dataType": "Integer"},
+         {"name": "InvoiceDate", "dataType": "DateTime"},
+         {"name": "Status", "dataType": "Text"}]},
+
+      {"name": "MatchResult", "context": "procurement", "references": ["Invoice", "PurchaseOrder", "GoodsReceipt"],
+       "attributes": [
+         {"name": "MatchType", "dataType": "Text", "mandatory": true},
+         {"name": "IsMatched", "dataType": "Boolean"},
+         {"name": "PriceVariance", "dataType": "Decimal"},
+         {"name": "QuantityVariance", "dataType": "Integer"},
+         {"name": "ExceptionReason", "dataType": "Text"},
+         {"name": "RiskTier", "dataType": "Text"},
+         {"name": "Status", "dataType": "Text"}]},
+
+      {"name": "PaymentProposal", "context": "procurement", "references": ["Invoice", "MatchResult", "Vendor"],
+       "attributes": [
+         {"name": "ActionType", "dataType": "Text", "mandatory": true},
+         {"name": "ProposedAmount", "dataType": "Decimal"},
+         {"name": "AnomalyScore", "dataType": "Integer"},
+         {"name": "Rationale", "dataType": "Text"},
+         {"name": "RiskTier", "dataType": "Text"},
+         {"name": "Status", "dataType": "Text"},
+         {"name": "ApprovedBy", "dataType": "Text"}]},
+
+      {"name": "AuditEvent", "context": "procurement",
+       "attributes": [
+         {"name": "Description", "dataType": "Text", "mandatory": true},
+         {"name": "Actor", "dataType": "Text"},
+         {"name": "At", "dataType": "Text"}]}
+    ],
+
+    "actors": ["ap_clerk", "procurement_manager", "admin"],
+
+    "capabilities": [
+      {"name": "ReceiveInvoice", "actor": "ap_clerk",
+       "reads": ["PurchaseOrder", "Vendor", "GoodsReceipt"], "writes": ["Invoice", "AuditEvent"],
+       "service": "ReceiveInvoice", "raisesEvent": "InvoiceReceived",
+       "note": "AP-clerk intake — records the vendor invoice against its PurchaseOrder and kicks off the matching flow."},
+
+      {"name": "MatchInvoice", "ai": "PoMatchAgent",
+       "reads": ["Invoice", "PurchaseOrder", "GoodsReceipt", "Vendor"],
+       "writes": ["Invoice", "MatchResult", "PaymentProposal", "AuditEvent"],
+       "service": "MatchInvoice",
+       "note": "THE AGENT. Grounds on the Invoice + PurchaseOrder + GoodsReceipt + Vendor history (native retrieval tool), runs the 2/3-way match (price + quantity variance), scores spend anomalies, and PROPOSES a MatchResult + a PaymentProposal (match-and-approve | flag-exception | release-payment) each with a RiskTier. It never releases payment directly — it proposes."},
+
+      {"name": "ReleasePayment", "actor": "ap_clerk",
+       "reads": ["PaymentProposal", "Invoice", "MatchResult"], "writes": ["Invoice", "PaymentProposal", "AuditEvent"],
+       "service": "ReleasePayment",
+       "note": "The bounded WRITE to the system of record: release payment for a matched invoice, mark the PaymentProposal released + the Invoice paid, audited. Called by the workflow after approval (or auto for clean matches under threshold)."},
+
+      {"name": "FlagException", "actor": "ap_clerk",
+       "reads": ["MatchResult", "Invoice"], "writes": ["MatchResult", "AuditEvent"],
+       "service": "FlagException",
+       "note": "The other bounded write: mark an unmatched/anomalous MatchResult as an exception routed to a human queue, audited."},
+
+      {"name": "MatchWorkflow", "orchestrates": true, "triggerEvent": "InvoiceReceived",
+       "steps": [
+         {"name": "Match", "ai": "PoMatchAgent", "reads": ["Invoice", "PurchaseOrder", "GoodsReceipt"], "writes": ["MatchResult", "PaymentProposal"]},
+         {"name": "Approve", "callsService": "ReleasePayment"}],
+       "note": "HITL via OutSystems BPT: on InvoiceReceived the workflow runs the PoMatchAgent to produce a MatchResult + a proposed PaymentProposal; low RiskTier (clean match under threshold) auto-calls ReleasePayment, higher RiskTier (unmatched, anomalous, or large-spend) holds at a Human Approval activity until an ap_clerk/procurement_manager approves, THEN calls ReleasePayment/FlagException. The approval + audit is native workflow, not custom code."},
+
+      {"name": "MyQueue", "actor": "ap_clerk",
+       "reads": ["Invoice", "PurchaseOrder", "MatchResult", "PaymentProposal"]},
+
+      {"name": "ApprovalInbox", "actor": "procurement_manager",
+       "reads": ["PaymentProposal", "MatchResult", "Invoice"], "writes": ["PaymentProposal", "AuditEvent"],
+       "service": "ApprovePayment",
+       "note": "Where a procurement_manager approves/rejects a held anomalous/large-spend proposal — the write-step sign-off."},
+
+      {"name": "ManageVendors", "actor": "admin",
+       "reads": ["Vendor"], "writes": ["Vendor"],
+       "service": "SaveVendor",
+       "note": "Admin maintains the vendor master + match rules (approved flag, payment terms, risk rating, thresholds) the agent grounds on."},
+
+      {"name": "SpendDashboard", "actor": "procurement_manager",
+       "reads": ["PurchaseOrder", "Invoice", "MatchResult", "PaymentProposal", "AuditEvent"]}
+    ],
+
+    "integrations": [
+      {"name": "ErpSystem", "kind": "consume", "purpose": "optional external ERP system-of-record (SAP/Oracle-style REST) that supplies PurchaseOrders + GoodsReceipts the agent grounds on and the ReleasePayment service posts back to", "stub": true},
+      {"name": "PaymentSystem", "kind": "consume", "purpose": "payment/AP disbursement provider (bank/ACH-style REST) the ReleasePayment service calls to execute the approved payment", "stub": true}
+    ],
+
+    "libraries": ["ProcurementDesignSystem"]
+  }
+}

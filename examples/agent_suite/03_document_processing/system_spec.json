@@ -1,0 +1,227 @@
+{
+  "specVersion": "0.1",
+  "system": {
+    "name": "document_processing",
+    "apps": [
+      {
+        "name": "DocProcDesignSystem",
+        "kind": "Library",
+        "layer": "foundation",
+        "exposes": {}
+      },
+      {
+        "name": "DocprocCore",
+        "kind": "WebApplication",
+        "layer": "core",
+        "context": "docproc",
+        "owns": [
+          "Vendor",
+          "ValidationRule",
+          "Document",
+          "ExtractedField",
+          "ProposedPosting",
+          "LedgerEntry",
+          "AuditEvent"
+        ],
+        "exposes": {
+          "serviceActions": [
+            "IngestDocument",
+            "ExtractDocument",
+            "PostToLedger",
+            "RouteForReview",
+            "FlagException",
+            "ApprovePosting",
+            "SaveRule"
+          ],
+          "events": [
+            "DocumentReceived"
+          ],
+          "staticEntities": []
+        },
+        "foreignKeys": [
+          {
+            "from": "Document",
+            "target": "Vendor"
+          },
+          {
+            "from": "ExtractedField",
+            "target": "Document"
+          },
+          {
+            "from": "ProposedPosting",
+            "target": "Document"
+          },
+          {
+            "from": "LedgerEntry",
+            "target": "Document"
+          },
+          {
+            "from": "LedgerEntry",
+            "target": "Vendor"
+          },
+          {
+            "from": "AuditEvent",
+            "target": "Document"
+          }
+        ],
+        "consumes": []
+      },
+      {
+        "name": "DocExtractAgent",
+        "kind": "AIAgent",
+        "layer": "orchestration",
+        "exposes": {
+          "serviceActions": [
+            "DocExtractAgent"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "DocprocCore",
+            "entities": [
+              "Vendor",
+              "Document",
+              "ValidationRule"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "PostingWorkflow",
+        "kind": "BusinessProcess",
+        "layer": "orchestration",
+        "process": {
+          "triggerEvent": "DocumentReceived",
+          "startProcessOn": "DocprocCore.DocumentReceived"
+        },
+        "activities": [
+          {
+            "name": "Extract",
+            "callsServiceAction": "DocExtractAgent"
+          },
+          {
+            "name": "Validate",
+            "callsServiceAction": "RouteForReview"
+          },
+          {
+            "name": "Post",
+            "callsServiceAction": "PostToLedger"
+          }
+        ],
+        "consumes": [
+          {
+            "app": "DocprocCore",
+            "events": [
+              "DocumentReceived"
+            ],
+            "serviceActions": [
+              "PostToLedger",
+              "RouteForReview"
+            ]
+          },
+          {
+            "app": "DocExtractAgent",
+            "serviceActions": [
+              "DocExtractAgent"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "AdminApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "admin",
+        "exposes": {
+          "screens": [
+            "ManageRules",
+            "AuditTrail"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "DocprocCore",
+            "entities": [
+              "AuditEvent",
+              "Document",
+              "ValidationRule"
+            ],
+            "serviceActions": [
+              "SaveRule"
+            ]
+          },
+          {
+            "app": "DocProcDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "ApClerkApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "ap_clerk",
+        "exposes": {
+          "screens": [
+            "IngestDocument",
+            "PostToLedger",
+            "RouteForReview",
+            "FlagException",
+            "MyQueue"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "DocprocCore",
+            "entities": [
+              "AuditEvent",
+              "Document",
+              "LedgerEntry",
+              "ProposedPosting",
+              "Vendor"
+            ],
+            "serviceActions": [
+              "FlagException",
+              "IngestDocument",
+              "PostToLedger",
+              "RouteForReview"
+            ]
+          },
+          {
+            "app": "DocProcDesignSystem"
+          }
+        ]
+      },
+      {
+        "name": "FinanceApproverApp",
+        "kind": "WebApplication",
+        "layer": "enduser",
+        "actor": "finance_approver",
+        "exposes": {
+          "screens": [
+            "ApprovalInbox",
+            "LedgerDashboard"
+          ]
+        },
+        "consumes": [
+          {
+            "app": "DocprocCore",
+            "entities": [
+              "AuditEvent",
+              "Document",
+              "ExtractedField",
+              "LedgerEntry",
+              "ProposedPosting",
+              "Vendor"
+            ],
+            "serviceActions": [
+              "ApprovePosting"
+            ]
+          },
+          {
+            "app": "DocProcDesignSystem"
+          }
+        ]
+      }
+    ]
+  }
+}
