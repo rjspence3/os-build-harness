@@ -1011,6 +1011,29 @@ def test_workflow_recipe_refs_and_process_in_one_turn():
     assert "Global Event OrderPlaced" in p and "Service Action(s) SendNotice" in p
     assert "StartProcessOn = the referenced OrderPlaced Global Event" in p and "TriggerMode = Event" in p
     assert "ActionToTrigger is the referenced PUBLIC Service Action SendNotice" in p
+    assert "KEEP THE PROCESS MINIMAL" in p                                    # the push-logic-to-Core doctrine
+    assert "900s" in p                                                        # the one-turn timeout warning
+
+
+def test_workflow_recipe_hitl_decision_and_human_activity():
+    # HITL shape (live-proven need): one decision on a process variable + one human activity, with the
+    # end-and-defer fallback, and the "no nested gateways — branch in a Core action" rule.
+    p = pr.render("workflow", {"name": "TicketResolution", "producer_app": "SupportCore",
+                               "trigger_event": "TicketSubmitted",
+                               "activities": [{"name": "RunTriage", "calls_service_action": "CallTriageAgent"},
+                                              {"name": "Handle", "calls_service_action": "PersistProposal"}],
+                               "decision": {"on": "RiskTier", "then_activity": "ApproveTask", "else_activity": "End"},
+                               "human_activity": {"name": "ApproveTask", "role": "SupportAgent"}})
+    assert "Decision node on the process variable 'RiskTier'" in p
+    assert "Do NOT add nested/second gateways" in p                          # multi-way branching goes in a Core action
+    assert "Human activity 'ApproveTask'" in p and "role 'SupportAgent'" in p
+    assert "end-and-defer" in p.lower() or "END that branch" in p            # the fallback when human activity unauthored
+
+
+def test_workflow_recipe_no_decision_stays_linear():
+    p = pr.render("workflow", {"name": "Simple", "producer_app": "Core", "trigger_event": "Ev",
+                               "activities": [{"name": "A", "calls_service_action": "DoIt"}]})
+    assert "Decision node" not in p and "Human activity" not in p            # linear when no HITL params
 
 
 def test_app_reference_recipe_imports_static_and_handles_hidden_stub():

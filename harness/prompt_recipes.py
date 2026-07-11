@@ -1317,19 +1317,35 @@ def entity_index(params: dict) -> str:
 
 
 def workflow(params: dict) -> str:
-    """Author a Business Process (BPT) — cross-app refs + process in ONE turn (runtime-proven, wfprobe
-    2026-07-07). The trigger Global Event + the Service Actions the activities call live in a PRODUCER app
-    (a NORMAL app — CreateGlobalEvent THROWS in a Workflow app) and are referenced cross-app. Sequence
-    (owned by the driver/plan): the producer app already holds the event + PUBLIC service action(s);
-    `app_create kind=BusinessProcess` registers the Workflow app WITHOUT auto-publishing (0 deployments —
-    the safe window); this turn references the producer's elements AND authors the process; then the
-    orchestrator publishes ONCE with the process present. A 0-process Workflow app publish corrupts its
-    verify cache, so NEVER publish before this turn lands. params: name, producer_app, trigger_event,
-    activities:[{name, calls_service_action}] (an auto-activity can call ONLY a PUBLIC Service Action)."""
+    """Author a Business Process (BPT) — cross-app refs + a MINIMAL process in ONE turn (runtime-proven,
+    wfprobe 2026-07-07). The trigger Global Event + the Service Actions the activities call live in a
+    PRODUCER app (a NORMAL app — CreateGlobalEvent THROWS in a Workflow app) and are referenced cross-app.
+    Sequence (owned by the driver/plan): the producer app already holds the event + PUBLIC service
+    action(s); `app_create kind=BusinessProcess` registers the Workflow app WITHOUT auto-publishing
+    (0 deployments — the safe window); this turn references the producer's elements AND authors the
+    process; then the orchestrator publishes ONCE with the process present. A 0-process Workflow app
+    publish corrupts its verify cache, so NEVER publish before this turn lands.
+
+    KEEP THE PROCESS MINIMAL — push logic to the Core (live-proven 2026-07-11). A node-heavy process
+    (multiple decision gateways + a human activity + several write activities) authored in one turn
+    TIMES OUT at 900s. So model the workflow as a few automatic activities + AT MOST one decision + at
+    most one human activity, and push ALL branching / parsing / risk-gating into CORE service actions the
+    activities call. Example HITL shape: Start -> CallAgent -> a single Core handler service action
+    HandleProposal(...) that parses+persists+auto-executes the low-risk path and returns NeedsApproval ->
+    Decision(NeedsApproval) -> [human activity -> a Core Finalize service action] or [End]. Structures
+    (for JSON deserialize) CANNOT live in a BPT app — author them + the handler in the Core and reference
+    it. If a process still needs many nodes, STAGE it across turns (turn 1 refs, turn 2 the linear
+    skeleton, turn 3 the decision/human branch). params: name, producer_app, trigger_event,
+    activities:[{name, calls_service_action}] (an auto-activity can call ONLY a PUBLIC Service Action);
+    optional decision:{on, then_activity, else_activity} (one gateway on a process variable) and
+    human_activity:{name, role} (a wait step; falls back to end-and-defer-to-portal if a Human/Wait
+    activity is not authorable via the Model API)."""
     name = _p(params, "name", required=True)
     producer = _p(params, "producer_app", required=True)
     trigger = _p(params, "trigger_event", required=True)
     activities = _p(params, "activities", [], required=True)
+    decision = _p(params, "decision", None)
+    human = _p(params, "human_activity", None)
     # Accept either the snake_case (`calls_service_action`) or the camelCase (`callsServiceAction`, as
     # expand.py emits) key — the spec factory + the hand-authored path use different casings.
     def _sa(a):
@@ -1339,12 +1355,34 @@ def workflow(params: dict) -> str:
     acts = "\n".join(
         f"   - an Automatic Activity node '{a.get('name', _sa(a))}' whose ActionToTrigger is the referenced PUBLIC "
         f"Service Action {_sa(a)} (an auto-activity can call ONLY a Public Service Action; set its "
-        f"arguments — e.g. NullIdentifier() for an Identifier input when no business value is needed)"
+        f"arguments — e.g. NullIdentifier() for an Identifier input when no business value is needed; capture its "
+        f"outputs into process variables if a later decision needs them)"
         for a in acts_ok)
+    n_nodes = 2 + len(acts_ok) + (1 if decision else 0) + (1 if human else 0)  # Start + End + activities + branch nodes
+    decision_block = ""
+    if decision:
+        decision_block = (
+            f"   - a SINGLE Decision node on the process variable '{decision.get('on', '?')}': when it matches, go to "
+            f"'{decision.get('then_activity', 'the human branch')}'; otherwise go to '{decision.get('else_activity', 'End')}'. "
+            f"Do NOT add nested/second gateways — do multi-way branching inside a Core service action, not in the process.\n")
+    human_block = ""
+    if human:
+        human_block = (
+            f"   - a Human activity '{human.get('name', 'Approve')}' assigned to role '{human.get('role', 'User')}' that "
+            f"WAITS for a human to approve; after it completes, continue to the finalize activity. IMPORTANT: if a "
+            f"Human/Wait activity CANNOT be authored via the Model API in a BPT app, OMIT it and END that branch "
+            f"instead (the record stays in its pending state for a human to approve later in a portal inbox), and "
+            f"clearly REPORT which shape you used.\n")
+    staging = ("" if n_nodes <= 6 else
+               f"\nNOTE: this process is ~{n_nodes} nodes — that risks a 900s authoring timeout. Prefer to STAGE it: "
+               f"author the references + Start + the automatic activities + End in THIS turn, and add the decision/human "
+               f"branch in a SEPARATE follow-up turn. Or push more logic into a Core handler to cut node count.\n")
     return (f"{_PREAMBLE}\n\n"
             f"This is a Workflow (BusinessProcess-kind) app with ZERO processes; it has NEVER been published and "
             f"must NOT be published until it has a process (a 0-process Workflow app corrupts its verify cache). "
-            f"Author BOTH of the following in THIS one turn, then STOP (do NOT publish):\n"
+            f"KEEP THE PROCESS MINIMAL — a BPT process is orchestration only; all branching/parsing/risk logic belongs "
+            f"in CORE service actions this process calls (a node-heavy process times out at 900s; structures can't live "
+            f"in a BPT app). Author BOTH of the following in THIS one turn, then STOP (do NOT publish):\n"
             f"1. Reference the producer app '{producer}' and import (all PUBLIC): the Global Event {trigger} and the "
             f"Service Action(s) {', '.join(sa_names)}. Use addReferenceToElements + AddDependency(ParseGlobalKey) + "
             f"RefreshDependencies. The event resolves under the reference's GlobalEvents collection; the service "
@@ -1352,7 +1390,9 @@ def workflow(params: dict) -> str:
             f"2. Author a Business Process named {name} (eSpace.CreateBusinessProcess) with CreateNode<T> + "
             f".Target/ConnectedBelow:\n"
             f"   - a Start node with StartProcessOn = the referenced {trigger} Global Event and TriggerMode = Event;\n{acts}\n"
-            f"   - an End node; wire Start -> activities -> End.\n"
+            f"{decision_block}{human_block}"
+            f"   - an End node; wire Start -> activities -> {'decision -> branches -> ' if decision else ''}End.\n"
+            f"{staging}"
             f"After authoring, run model validation (expect 0 errors; a 'missing event handler' + a 'no User "
             f"Provider' warning are BENIGN for a consume-only workflow app). Do NOT publish — the orchestrator "
             f"publishes the process + refs in one shot (never a 0-process Workflow app).")
