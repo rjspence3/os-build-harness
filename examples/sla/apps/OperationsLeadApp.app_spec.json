@@ -12,25 +12,25 @@
   },
   "screens": [
     {
-      "id": "SLADashboard",
-      "name": "SLADashboard",
+      "id": "MonitorSLA",
+      "name": "MonitorSLA",
       "components": [
         {
-          "id": "SLADashboard_application_table",
+          "id": "MonitorSLA_application_table",
           "type": "Table",
           "boundTo": "Application",
-          "label": "SLADashboard"
+          "label": "MonitorSLA"
         }
       ],
       "acceptance": {
         "assertions": [
           {
             "kind": "componentPresent",
-            "componentId": "SLADashboard_application_table"
+            "componentId": "MonitorSLA_application_table"
           },
           {
             "kind": "binding",
-            "componentId": "SLADashboard_application_table",
+            "componentId": "MonitorSLA_application_table",
             "boundTo": "Application"
           }
         ]
@@ -47,11 +47,11 @@
           "kind": "Entity"
         },
         {
-          "name": "Requirement",
+          "name": "CaseOwner",
           "kind": "Entity"
         },
         {
-          "name": "CaseOwner",
+          "name": "Requirement",
           "kind": "Entity"
         }
       ]

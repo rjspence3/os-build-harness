@@ -12,25 +12,25 @@
   },
   "screens": [
     {
-      "id": "PipelineList",
-      "name": "PipelineList",
+      "id": "ViewPipeline",
+      "name": "ViewPipeline",
       "components": [
         {
-          "id": "PipelineList_application_table",
+          "id": "ViewPipeline_application_table",
           "type": "Table",
           "boundTo": "Application",
-          "label": "PipelineList"
+          "label": "ViewPipeline"
         }
       ],
       "acceptance": {
         "assertions": [
           {
             "kind": "componentPresent",
-            "componentId": "PipelineList_application_table"
+            "componentId": "ViewPipeline_application_table"
           },
           {
             "kind": "binding",
-            "componentId": "PipelineList_application_table",
+            "componentId": "ViewPipeline_application_table",
             "boundTo": "Application"
           }
         ]
@@ -42,9 +42,9 @@
       "name": "ApplicationDetail",
       "components": [
         {
-          "id": "ApplicationDetail_requirement_table",
+          "id": "ApplicationDetail_caseowner_table",
           "type": "Table",
-          "boundTo": "Requirement",
+          "boundTo": "CaseOwner",
           "label": "ApplicationDetail"
         }
       ],
@@ -52,12 +52,12 @@
         "assertions": [
           {
             "kind": "componentPresent",
-            "componentId": "ApplicationDetail_requirement_table"
+            "componentId": "ApplicationDetail_caseowner_table"
           },
           {
             "kind": "binding",
-            "componentId": "ApplicationDetail_requirement_table",
-            "boundTo": "Requirement"
+            "componentId": "ApplicationDetail_caseowner_table",
+            "boundTo": "CaseOwner"
           }
         ]
       }
@@ -67,9 +67,9 @@
       "name": "SLAAssistant",
       "components": [
         {
-          "id": "SLAAssistant_caseowner_table",
+          "id": "SLAAssistant_requirement_table",
           "type": "Table",
-          "boundTo": "CaseOwner",
+          "boundTo": "Requirement",
           "label": "SLAAssistant"
         }
       ],
@@ -77,12 +77,12 @@
         "assertions": [
           {
             "kind": "componentPresent",
-            "componentId": "SLAAssistant_caseowner_table"
+            "componentId": "SLAAssistant_requirement_table"
           },
           {
             "kind": "binding",
-            "componentId": "SLAAssistant_caseowner_table",
-            "boundTo": "CaseOwner"
+            "componentId": "SLAAssistant_requirement_table",
+            "boundTo": "Requirement"
           }
         ]
       }
@@ -97,24 +97,20 @@
           "kind": "Entity"
         },
         {
-          "name": "Requirement",
-          "kind": "Entity"
-        },
-        {
           "name": "CaseOwner",
           "kind": "Entity"
         },
         {
-          "name": "SendOutreach",
-          "kind": "ServiceAction"
+          "name": "Requirement",
+          "kind": "Entity"
         }
       ]
     },
     {
-      "producerApp": "SLAOpsAgent",
+      "producerApp": "SLAOpsAgentAgent",
       "elements": [
         {
-          "name": "CallSLAOpsAgent",
+          "name": "SLAOpsAgent",
           "kind": "ServiceAction"
         }
       ]

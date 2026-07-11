@@ -128,25 +128,8 @@
           }
         ]
       }
-    ]
+    ],
+    "public": true
   },
-  "screens": [],
-  "logic": [
-    {
-      "kind": "serviceAction",
-      "name": "QueryPipeline"
-    },
-    {
-      "kind": "serviceAction",
-      "name": "SearchPlaybook"
-    },
-    {
-      "kind": "serviceAction",
-      "name": "DraftOutreach"
-    },
-    {
-      "kind": "serviceAction",
-      "name": "SendOutreach"
-    }
-  ]
+  "screens": []
 }

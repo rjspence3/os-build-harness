@@ -1,7 +1,7 @@
 {
   "specVersion": "0.2",
   "app": {
-    "name": "SLAOpsAgent",
+    "name": "SLAOpsAgentAgent",
     "roles": [
       "User"
     ],
@@ -13,9 +13,9 @@
   "screens": [],
   "agents": [
     {
-      "name": "CallSLAOpsAgent",
+      "name": "SLAOpsAgent",
       "modelConnection": "TrialClaudeHaiku4_5",
-      "systemPrompt": "You are SLAOpsAgent. Reason over the referenced inputs and return a result."
+      "systemPrompt": "You are SLAOpsAgentAgent. Reason over the referenced inputs and return a result."
     }
   ],
   "appReferences": [
@@ -23,7 +23,7 @@
       "producerApp": "SlaCore",
       "elements": [
         {
-          "name": "Application",
+          "name": "CaseOwner",
           "kind": "Entity"
         },
         {
@@ -31,20 +31,8 @@
           "kind": "Entity"
         },
         {
-          "name": "CaseOwner",
+          "name": "Application",
           "kind": "Entity"
-        },
-        {
-          "name": "QueryPipeline",
-          "kind": "ServiceAction"
-        },
-        {
-          "name": "SearchPlaybook",
-          "kind": "ServiceAction"
-        },
-        {
-          "name": "DraftOutreach",
-          "kind": "ServiceAction"
         }
       ]
     }
