@@ -956,12 +956,24 @@ def run_agent(agent_base_url: str, question: str, must_contain: str = "") -> dic
     data grounding could produce (e.g. a seeded status the agent must retrieve)."""
     import urllib.request
     import urllib.error
-    url = agent_base_url.rstrip("/") + "/rest/AgentAPI/ask"
-    body = json.dumps({"Question": question}).encode()
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-    try:
+    import urllib.parse
+    base = agent_base_url.rstrip("/") + "/rest/AgentAPI/ask"
+
+    def _post(url, data, headers):
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=130) as resp:
-            raw, status = resp.read().decode(), resp.status
+            return resp.read().decode(), resp.status
+
+    # A scalar ODC REST input defaults to the query string, so send Question there first (live-proven);
+    # fall back to a JSON body for endpoints authored to receive it in the body.
+    try:
+        try:
+            raw, status = _post(base + "?Question=" + urllib.parse.quote(question), None, {})
+        except urllib.error.HTTPError as qe:
+            if qe.code != 400:
+                raise
+            raw, status = _post(base, json.dumps({"Question": question}).encode(),
+                                {"Content-Type": "application/json"})
     except urllib.error.HTTPError as e:
         return _finalize({"kind": "agent", "verdict": f"HTTP_{e.code}", "detail": e.read().decode()[:200]})
     except Exception as e:
