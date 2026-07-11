@@ -1346,12 +1346,32 @@ def workflow(params: dict) -> str:
     activities = _p(params, "activities", [], required=True)
     decision = _p(params, "decision", None)
     human = _p(params, "human_activity", None)
+    # skeleton=True renders the tiny FIRST turn only (refs + Start->End, no activities) — for a COMPLEX
+    # process built up across many small turns (each node added by a `workflow-add` step). This is the
+    # non-greedy path: every turn lands in 1-4 min instead of one 900s-timeout turn.
+    skeleton = _p(params, "skeleton", False)
     # Accept either the snake_case (`calls_service_action`) or the camelCase (`callsServiceAction`, as
     # expand.py emits) key — the spec factory + the hand-authored path use different casings.
     def _sa(a):
         return a.get("calls_service_action") or a.get("callsServiceAction") or ""
     acts_ok = [a for a in activities if _sa(a)]
     sa_names = sorted({_sa(a) for a in acts_ok})
+    if skeleton:
+        return (f"{_PREAMBLE}\n\n"
+                f"This is a Workflow (BusinessProcess-kind) app with ZERO processes; it has NEVER been published and "
+                f"must NOT be published until it has a process (a 0-process Workflow app corrupts its verify cache). "
+                f"Do ONLY this small unit (the process SKELETON — nodes are added in later turns), then STOP (do NOT "
+                f"publish):\n"
+                f"1. Reference the producer app '{producer}' and import (all PUBLIC): the Global Event {trigger}"
+                f"{' and the Service Action(s) ' + ', '.join(sa_names) if sa_names else ''}. Use addReferenceToElements "
+                f"+ AddDependency(ParseGlobalKey) + RefreshDependencies. The event resolves under the reference's "
+                f"GlobalEvents collection; service actions under its ServiceActions collection.\n"
+                f"2. Author a Business Process named {name} (eSpace.CreateBusinessProcess) with a Start node "
+                f"(StartProcessOn = the referenced {trigger} Global Event, TriggerMode = Event) wired directly to an End "
+                f"node. NO activities yet — they are added one per follow-up turn. After the skeleton lands and is "
+                f"published, the app is safe (it has a process).\n"
+                f"After authoring, run model validation (0 errors; a 'missing event handler' + 'no User Provider' "
+                f"warning are BENIGN). Do NOT publish — the orchestrator publishes.")
     acts = "\n".join(
         f"   - an Automatic Activity node '{a.get('name', _sa(a))}' whose ActionToTrigger is the referenced PUBLIC "
         f"Service Action {_sa(a)} (an auto-activity can call ONLY a Public Service Action; set its "
@@ -1396,6 +1416,47 @@ def workflow(params: dict) -> str:
             f"After authoring, run model validation (expect 0 errors; a 'missing event handler' + a 'no User "
             f"Provider' warning are BENIGN for a consume-only workflow app). Do NOT publish — the orchestrator "
             f"publishes the process + refs in one shot (never a 0-process Workflow app).")
+
+
+def workflow_add(params: dict) -> str:
+    """Add ONE node to an EXISTING Business Process — the non-greedy staged path (one small turn per node,
+    each lands in 1-4 min, no 900s timeout). Used after the `workflow` skeleton turn (Start->End) to build
+    a complex process up incrementally. params: process(name), kind ('activity'|'decision'|'human'), plus
+    per-kind detail:
+      activity: calls_service_action, name?  (an auto-activity calls ONLY a PUBLIC Service Action)
+      decision: on(process variable), then_activity, else_activity
+      human:    name, role  (falls back to end-and-defer if a Human/Wait activity isn't authorable).
+    Each add-node turn re-opens the process, inserts the node just BEFORE the End node, and rewires the
+    connector (whatever currently flows into End now flows into the new node, then onward to End)."""
+    proc = _p(params, "process", required=True)
+    kind = _p(params, "kind", "activity")
+    if kind == "activity":
+        sa = _p(params, "calls_service_action") or _p(params, "callsServiceAction") or _p(params, "service_action", required=True)
+        node = (f"an Automatic Activity node '{_p(params, 'name', sa)}' whose ActionToTrigger is the referenced PUBLIC "
+                f"Service Action {sa} (an auto-activity can call ONLY a Public Service Action; set its arguments, using "
+                f"process variables captured from earlier activities where needed — e.g. NullIdentifier() for an unused "
+                f"Identifier input). Capture its outputs into process variables if a later decision needs them")
+    elif kind == "decision":
+        on = _p(params, "on", required=True)
+        node = (f"a SINGLE Decision node on the process variable '{on}': when it matches, go to "
+                f"'{_p(params, 'then_activity', 'the next node')}'; otherwise go to '{_p(params, 'else_activity', 'End')}'. "
+                f"Do NOT add nested/second gateways — multi-way branching belongs in a Core service action, not the process")
+    elif kind == "human":
+        node = (f"a Human activity '{_p(params, 'name', 'Approve')}' assigned to role '{_p(params, 'role', 'User')}' that "
+                f"WAITS for a human to approve. IMPORTANT: if a Human/Wait activity CANNOT be authored via the Model API "
+                f"in a BPT app, OMIT it and END that branch instead (the record stays pending for a human to approve in a "
+                f"portal inbox); clearly REPORT which shape you used")
+    else:
+        node = f"a node of kind '{kind}'"
+    return (f"{_PREAMBLE}\n\n"
+            f"This app already has a Business Process named {proc} (with at least a Start node and an End node) and the "
+            f"needed cross-app references. Do ONLY this ONE small edit (one node — small turns are deliberate; a "
+            f"node-heavy single turn times out at 900s), then STOP:\n"
+            f"INSERT into process {proc}, immediately BEFORE the End node, {node}.\n"
+            f"Rewire the connectors: whatever currently connects INTO the End node must now connect into this new node, "
+            f"and the new node connects onward to End (or to its branch targets for a decision). Do not touch any other "
+            f"node. After authoring, run model validation (0 errors; benign event-handler / User-Provider warnings ok). "
+            f"Do NOT publish — the orchestrator publishes after this small turn lands.")
 
 
 def app_reference(params: dict) -> str:
@@ -1488,6 +1549,7 @@ RECIPES = {
     "global-event": global_event,
     "entity-index": entity_index,
     "workflow": workflow,
+    "workflow-add": workflow_add,
     "app-reference": app_reference,
     "external-library": external_library,
     "screen": screen,
@@ -2159,8 +2221,30 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
     # its activities call to already exist. (The driver app_creates a BusinessProcess-kind app + authors the
     # process before the FIRST publish — a 0-process Workflow app corrupts its verify cache.)
     for proc in spec.get("processes", []) or []:
-        steps.append({"recipe": "workflow", "why": f"business process {proc['name']}",
-                      "params": {"name": proc["name"], "producer_app": proc["producerApp"],
-                                 "trigger_event": proc["triggerEvent"],
-                                 "activities": proc.get("activities", [])}})
+        acts = proc.get("activities", []) or []
+        decision = proc.get("decision")
+        human = proc.get("humanActivity") or proc.get("human_activity")
+        base = {"name": proc["name"], "producer_app": proc["producerApp"], "trigger_event": proc["triggerEvent"]}
+        # A SIMPLE process (few activities, no decision/human) authors in one turn. A COMPLEX process is
+        # STAGED into many small turns — a skeleton (refs + Start->End) then one `workflow-add` per node —
+        # so no single turn is Mentor-greedy / times out (900s). See bpt-process-keep-minimal doctrine.
+        if not decision and not human and len(acts) <= 2:
+            steps.append({"recipe": "workflow", "why": f"business process {proc['name']}",
+                          "params": {**base, "activities": acts}})
+        else:
+            steps.append({"recipe": "workflow", "why": f"process {proc['name']} — skeleton (refs + Start->End)",
+                          "params": {**base, "activities": acts, "skeleton": True}})
+            for a in acts:
+                sa = a.get("callsServiceAction") or a.get("calls_service_action")
+                if not sa:
+                    continue
+                steps.append({"recipe": "workflow-add", "why": f"{proc['name']} += activity {sa}",
+                              "params": {"process": proc["name"], "kind": "activity",
+                                         "name": a.get("name", sa), "calls_service_action": sa}})
+            if decision:
+                steps.append({"recipe": "workflow-add", "why": f"{proc['name']} += decision on {decision.get('on')}",
+                              "params": {"process": proc["name"], "kind": "decision", **decision}})
+            if human:
+                steps.append({"recipe": "workflow-add", "why": f"{proc['name']} += human approval",
+                              "params": {"process": proc["name"], "kind": "human", **human}})
     return annotate_weights(steps)

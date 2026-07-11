@@ -1036,6 +1036,50 @@ def test_workflow_recipe_no_decision_stays_linear():
     assert "Decision node" not in p and "Human activity" not in p            # linear when no HITL params
 
 
+def test_workflow_skeleton_is_refs_plus_start_end_only():
+    # the non-greedy first turn: refs + Start->End, NO activities (added later, one small turn each)
+    p = pr.render("workflow", {"name": "Wf", "producer_app": "Core", "trigger_event": "Ev",
+                               "activities": [{"name": "A", "calls_service_action": "DoIt"}], "skeleton": True})
+    assert "SKELETON" in p and "wired directly to an End node" in p
+    assert "NO activities yet" in p
+    assert "an Automatic Activity node 'A'" not in p                         # activities are NOT in the skeleton turn
+
+
+def test_workflow_add_inserts_one_node_before_end():
+    a = pr.render("workflow-add", {"process": "Wf", "kind": "activity", "calls_service_action": "CallAgent"})
+    assert "one node" in a.lower() and "immediately BEFORE the End node" in a and "CallAgent" in a
+    d = pr.render("workflow-add", {"process": "Wf", "kind": "decision", "on": "RiskTier",
+                                   "then_activity": "Approve", "else_activity": "End"})
+    assert "Decision node on the process variable 'RiskTier'" in d and "nested/second gateways" in d
+    h = pr.render("workflow-add", {"process": "Wf", "kind": "human", "name": "Approve", "role": "Agent"})
+    assert "Human activity 'Approve'" in h and "END that branch" in h        # defer fallback
+
+
+def test_plan_stages_complex_process_into_small_turns():
+    # a process with a decision + human is STAGED: skeleton + one workflow-add per activity + decision + human
+    spec = {"app": {"name": "Wf"}, "dataModel": {"entities": []}, "screens": [],
+            "processes": [{"name": "Res", "producerApp": "Core", "triggerEvent": "Sub",
+                           "activities": [{"name": "T", "callsServiceAction": "CallAgent"},
+                                          {"name": "H", "callsServiceAction": "Handle"}],
+                           "decision": {"on": "NeedsApproval", "then_activity": "Ap", "else_activity": "End"},
+                           "humanActivity": {"name": "Ap", "role": "Agent"}}]}
+    steps = pr.plan_from_spec(spec)
+    wf = [s for s in steps if s["recipe"] in ("workflow", "workflow-add")]
+    assert wf[0]["recipe"] == "workflow" and wf[0]["params"].get("skeleton") is True
+    adds = [s for s in wf if s["recipe"] == "workflow-add"]
+    kinds = [s["params"]["kind"] for s in adds]
+    assert kinds == ["activity", "activity", "decision", "human"]           # every node its own small turn
+
+
+def test_plan_simple_process_stays_one_turn():
+    spec = {"app": {"name": "Wf"}, "dataModel": {"entities": []}, "screens": [],
+            "processes": [{"name": "Simple", "producerApp": "Core", "triggerEvent": "Sub",
+                           "activities": [{"name": "N", "callsServiceAction": "Notify"}]}]}
+    steps = pr.plan_from_spec(spec)
+    wf = [s for s in steps if s["recipe"].startswith("workflow")]
+    assert len(wf) == 1 and wf[0]["recipe"] == "workflow" and not wf[0]["params"].get("skeleton")
+
+
 def test_app_reference_recipe_imports_static_and_handles_hidden_stub():
     p = pr.render("app-reference", {"producer_app": "CoreData",
                                     "elements": [{"kind": "Entity", "name": "Customer"},
