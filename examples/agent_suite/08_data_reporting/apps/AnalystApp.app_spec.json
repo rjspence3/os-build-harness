@@ -1,0 +1,126 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AnalystApp",
+    "roles": [
+      "Analyst"
+    ],
+    "description": "End-user app for analyst"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "RequestReport",
+      "name": "RequestReport",
+      "components": [
+        {
+          "id": "RequestReport_anomalyfinding_table",
+          "type": "Table",
+          "boundTo": "AnomalyFinding",
+          "label": "RequestReport"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "RequestReport_anomalyfinding_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "RequestReport_anomalyfinding_table",
+            "boundTo": "AnomalyFinding"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "MyReports",
+      "name": "MyReports",
+      "components": [
+        {
+          "id": "MyReports_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "MyReports"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "MyReports_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "MyReports_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AnomalyDashboard",
+      "name": "AnomalyDashboard",
+      "components": [
+        {
+          "id": "AnomalyDashboard_datasource_table",
+          "type": "Table",
+          "boundTo": "DataSource",
+          "label": "AnomalyDashboard"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "AnomalyDashboard_datasource_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "AnomalyDashboard_datasource_table",
+            "boundTo": "DataSource"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "AnalyticsCore",
+      "elements": [
+        {
+          "name": "AnomalyFinding",
+          "kind": "Entity"
+        },
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "DataSource",
+          "kind": "Entity"
+        },
+        {
+          "name": "QueryRequest",
+          "kind": "Entity"
+        },
+        {
+          "name": "ReportDefinition",
+          "kind": "Entity"
+        },
+        {
+          "name": "ReportRun",
+          "kind": "Entity"
+        },
+        {
+          "name": "RequestReport",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

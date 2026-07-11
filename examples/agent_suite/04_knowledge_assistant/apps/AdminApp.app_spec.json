@@ -1,0 +1,89 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AdminApp",
+    "roles": [
+      "Admin"
+    ],
+    "description": "End-user app for admin"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ManageCorpus",
+      "name": "ManageCorpus",
+      "components": [
+        {
+          "id": "ManageCorpus_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ManageCorpus"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ManageCorpus_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ManageCorpus_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "AuditTrail",
+      "name": "AuditTrail",
+      "components": [
+        {
+          "id": "AuditTrail_knowledgedoc_table",
+          "type": "Table",
+          "boundTo": "KnowledgeDoc",
+          "label": "AuditTrail"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "AuditTrail_knowledgedoc_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "AuditTrail_knowledgedoc_table",
+            "boundTo": "KnowledgeDoc"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "KnowledgeCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "KnowledgeDoc",
+          "kind": "Entity"
+        },
+        {
+          "name": "Question",
+          "kind": "Entity"
+        },
+        {
+          "name": "SaveKnowledgeDoc",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

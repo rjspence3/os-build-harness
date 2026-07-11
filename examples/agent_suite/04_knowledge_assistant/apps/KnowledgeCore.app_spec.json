@@ -1,0 +1,245 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "KnowledgeCore",
+    "roles": [
+      "User"
+    ],
+    "description": "Core service (knowledge context)"
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "KnowledgeDoc",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "DocKey",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Category",
+            "dataType": "Text"
+          },
+          {
+            "name": "Source",
+            "dataType": "Text"
+          },
+          {
+            "name": "Url",
+            "dataType": "Text"
+          },
+          {
+            "name": "Content",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          }
+        ]
+      },
+      {
+        "name": "Question",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "QuestionNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Body",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "AskedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "Topic",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConfidenceScore",
+            "dataType": "Integer"
+          },
+          {
+            "name": "AuditEventId",
+            "dataType": "Identifier",
+            "references": "AuditEvent",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Answer",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Body",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Grounded",
+            "dataType": "Boolean"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "QuestionId",
+            "dataType": "Identifier",
+            "references": "Question",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Citation",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Snippet",
+            "dataType": "Text"
+          },
+          {
+            "name": "Rank",
+            "dataType": "Integer"
+          },
+          {
+            "name": "AnswerId",
+            "dataType": "Identifier",
+            "references": "Answer",
+            "mandatory": false
+          },
+          {
+            "name": "KnowledgeDocId",
+            "dataType": "Identifier",
+            "references": "KnowledgeDoc",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Escalation",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Reason",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "AssignedTo",
+            "dataType": "Text"
+          },
+          {
+            "name": "Resolution",
+            "dataType": "Text"
+          },
+          {
+            "name": "QuestionId",
+            "dataType": "Identifier",
+            "references": "Question",
+            "mandatory": false
+          }
+        ]
+      }
+    ],
+    "public": true
+  },
+  "screens": [],
+  "logic": [
+    {
+      "kind": "serviceAction",
+      "name": "AskQuestion"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "AnswerQuestion"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "RecordAnswer"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "RaiseEscalation"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ResolveEscalation"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SaveKnowledgeDoc"
+    },
+    {
+      "kind": "globalEvent",
+      "name": "QuestionAsked"
+    }
+  ]
+}

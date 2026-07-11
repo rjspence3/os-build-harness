@@ -1,0 +1,41 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "TriageAgent",
+    "roles": [
+      "User"
+    ],
+    "description": "AI Agent (reasoning)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "agents": [
+    {
+      "name": "TriageAgent",
+      "modelConnection": "TrialClaudeHaiku4_5",
+      "systemPrompt": "You are TriageAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Ticket, PolicyDoc) \u2014 never answer without first retrieving it.",
+      "grounding": [
+        "Ticket",
+        "PolicyDoc"
+      ],
+      "tools": []
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "SupportCore",
+      "elements": [
+        {
+          "name": "Ticket",
+          "kind": "Entity"
+        },
+        {
+          "name": "PolicyDoc",
+          "kind": "Entity"
+        }
+      ]
+    }
+  ]
+}

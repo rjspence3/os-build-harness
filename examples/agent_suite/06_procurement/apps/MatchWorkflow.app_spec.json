@@ -1,0 +1,51 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "MatchWorkflow",
+    "roles": [
+      "User"
+    ],
+    "description": "Business process (BPT orchestration)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "processes": [
+    {
+      "name": "MatchProcess",
+      "producerApp": "ProcurementCore",
+      "triggerEvent": "InvoiceReceived",
+      "activities": [
+        {
+          "name": "Match",
+          "callsServiceAction": "PoMatchAgent"
+        },
+        {
+          "name": "Approve",
+          "callsServiceAction": "ReleasePayment"
+        }
+      ]
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ProcurementCore",
+      "elements": [
+        {
+          "name": "ReleasePayment",
+          "kind": "ServiceAction"
+        }
+      ]
+    },
+    {
+      "producerApp": "PoMatchAgent",
+      "elements": [
+        {
+          "name": "PoMatchAgent",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

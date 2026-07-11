@@ -1,0 +1,85 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AdminApp",
+    "roles": [
+      "Admin"
+    ],
+    "description": "End-user app for admin"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ManageAccounts",
+      "name": "ManageAccounts",
+      "components": [
+        {
+          "id": "ManageAccounts_account_table",
+          "type": "Table",
+          "boundTo": "Account",
+          "label": "ManageAccounts"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ManageAccounts_account_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ManageAccounts_account_table",
+            "boundTo": "Account"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "AuditTrail",
+      "name": "AuditTrail",
+      "components": [
+        {
+          "id": "AuditTrail_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "AuditTrail"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "AuditTrail_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "AuditTrail_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "CrmCore",
+      "elements": [
+        {
+          "name": "Account",
+          "kind": "Entity"
+        },
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "SaveAccount",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

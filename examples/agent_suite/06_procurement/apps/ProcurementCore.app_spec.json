@@ -1,0 +1,360 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ProcurementCore",
+    "roles": [
+      "User"
+    ],
+    "description": "Core service (procurement context)"
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "Vendor",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "VendorNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Category",
+            "dataType": "Text"
+          },
+          {
+            "name": "PaymentTerms",
+            "dataType": "Text"
+          },
+          {
+            "name": "RiskRating",
+            "dataType": "Text"
+          },
+          {
+            "name": "IsApproved",
+            "dataType": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "PurchaseOrder",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "PoNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text"
+          },
+          {
+            "name": "TotalAmount",
+            "dataType": "Decimal",
+            "mandatory": true
+          },
+          {
+            "name": "Currency",
+            "dataType": "Text"
+          },
+          {
+            "name": "OrderedQuantity",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "OrderedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "VendorId",
+            "dataType": "Identifier",
+            "references": "Vendor",
+            "mandatory": false
+          },
+          {
+            "name": "AuditEventId",
+            "dataType": "Identifier",
+            "references": "AuditEvent",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "GoodsReceipt",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "ReceiptNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "ReceivedQuantity",
+            "dataType": "Integer",
+            "mandatory": true
+          },
+          {
+            "name": "ReceivedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Condition",
+            "dataType": "Text"
+          },
+          {
+            "name": "PurchaseOrderId",
+            "dataType": "Identifier",
+            "references": "PurchaseOrder",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Invoice",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "InvoiceNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "InvoiceAmount",
+            "dataType": "Decimal",
+            "mandatory": true
+          },
+          {
+            "name": "Currency",
+            "dataType": "Text"
+          },
+          {
+            "name": "BilledQuantity",
+            "dataType": "Integer"
+          },
+          {
+            "name": "InvoiceDate",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "PurchaseOrderId",
+            "dataType": "Identifier",
+            "references": "PurchaseOrder",
+            "mandatory": false
+          },
+          {
+            "name": "VendorId",
+            "dataType": "Identifier",
+            "references": "Vendor",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "MatchResult",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "MatchType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "IsMatched",
+            "dataType": "Boolean"
+          },
+          {
+            "name": "PriceVariance",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "QuantityVariance",
+            "dataType": "Integer"
+          },
+          {
+            "name": "ExceptionReason",
+            "dataType": "Text"
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "InvoiceId",
+            "dataType": "Identifier",
+            "references": "Invoice",
+            "mandatory": false
+          },
+          {
+            "name": "PurchaseOrderId",
+            "dataType": "Identifier",
+            "references": "PurchaseOrder",
+            "mandatory": false
+          },
+          {
+            "name": "GoodsReceiptId",
+            "dataType": "Identifier",
+            "references": "GoodsReceipt",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "PaymentProposal",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "ProposedAmount",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "AnomalyScore",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Rationale",
+            "dataType": "Text"
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "InvoiceId",
+            "dataType": "Identifier",
+            "references": "Invoice",
+            "mandatory": false
+          },
+          {
+            "name": "MatchResultId",
+            "dataType": "Identifier",
+            "references": "MatchResult",
+            "mandatory": false
+          },
+          {
+            "name": "VendorId",
+            "dataType": "Identifier",
+            "references": "Vendor",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "Text"
+          }
+        ]
+      }
+    ],
+    "public": true
+  },
+  "screens": [],
+  "logic": [
+    {
+      "kind": "serviceAction",
+      "name": "ReceiveInvoice"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "MatchInvoice"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ReleasePayment"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "FlagException"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ApprovePayment"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SaveVendor"
+    },
+    {
+      "kind": "globalEvent",
+      "name": "InvoiceReceived"
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ApClerkApp",
+    "roles": [
+      "ApClerk"
+    ],
+    "description": "End-user app for ap_clerk"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ReceiveInvoice",
+      "name": "ReceiveInvoice",
+      "components": [
+        {
+          "id": "ReceiveInvoice_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ReceiveInvoice"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ReceiveInvoice_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ReceiveInvoice_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "ReleasePayment",
+      "name": "ReleasePayment",
+      "components": [
+        {
+          "id": "ReleasePayment_goodsreceipt_table",
+          "type": "Table",
+          "boundTo": "GoodsReceipt",
+          "label": "ReleasePayment"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ReleasePayment_goodsreceipt_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ReleasePayment_goodsreceipt_table",
+            "boundTo": "GoodsReceipt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "FlagException",
+      "name": "FlagException",
+      "components": [
+        {
+          "id": "FlagException_invoice_table",
+          "type": "Table",
+          "boundTo": "Invoice",
+          "label": "FlagException"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "FlagException_invoice_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "FlagException_invoice_table",
+            "boundTo": "Invoice"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MyQueue",
+      "name": "MyQueue",
+      "components": [
+        {
+          "id": "MyQueue_matchresult_table",
+          "type": "Table",
+          "boundTo": "MatchResult",
+          "label": "MyQueue"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "MyQueue_matchresult_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "MyQueue_matchresult_table",
+            "boundTo": "MatchResult"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ProcurementCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "GoodsReceipt",
+          "kind": "Entity"
+        },
+        {
+          "name": "Invoice",
+          "kind": "Entity"
+        },
+        {
+          "name": "MatchResult",
+          "kind": "Entity"
+        },
+        {
+          "name": "PaymentProposal",
+          "kind": "Entity"
+        },
+        {
+          "name": "PurchaseOrder",
+          "kind": "Entity"
+        },
+        {
+          "name": "Vendor",
+          "kind": "Entity"
+        },
+        {
+          "name": "FlagException",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "ReceiveInvoice",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "ReleasePayment",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

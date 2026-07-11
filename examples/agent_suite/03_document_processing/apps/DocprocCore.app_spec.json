@@ -1,0 +1,334 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "DocprocCore",
+    "roles": [
+      "User"
+    ],
+    "description": "Core service (docproc context)"
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "Vendor",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "VendorCode",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "TaxId",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "PaymentTerms",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ValidationRule",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "DocType",
+            "dataType": "Text"
+          },
+          {
+            "name": "FieldName",
+            "dataType": "Text"
+          },
+          {
+            "name": "Expression",
+            "dataType": "Text"
+          },
+          {
+            "name": "Severity",
+            "dataType": "Text"
+          },
+          {
+            "name": "Active",
+            "dataType": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "Document",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "DocNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "DocType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "SourceUri",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReceivedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "Amount",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "Currency",
+            "dataType": "Text"
+          },
+          {
+            "name": "ExtractionConfidence",
+            "dataType": "Integer"
+          },
+          {
+            "name": "VendorId",
+            "dataType": "Identifier",
+            "references": "Vendor",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "ExtractedField",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "FieldName",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "FieldValue",
+            "dataType": "Text"
+          },
+          {
+            "name": "Confidence",
+            "dataType": "Integer"
+          },
+          {
+            "name": "IsValid",
+            "dataType": "Boolean"
+          },
+          {
+            "name": "DocumentId",
+            "dataType": "Identifier",
+            "references": "Document",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "ProposedPosting",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Amount",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "GlAccount",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConfidenceScore",
+            "dataType": "Integer"
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "DocumentId",
+            "dataType": "Identifier",
+            "references": "Document",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "LedgerEntry",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "EntryNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Amount",
+            "dataType": "Decimal",
+            "mandatory": true
+          },
+          {
+            "name": "GlAccount",
+            "dataType": "Text"
+          },
+          {
+            "name": "PostedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "PostedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "ErpReference",
+            "dataType": "Text"
+          },
+          {
+            "name": "DocumentId",
+            "dataType": "Identifier",
+            "references": "Document",
+            "mandatory": false
+          },
+          {
+            "name": "VendorId",
+            "dataType": "Identifier",
+            "references": "Vendor",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "Text"
+          },
+          {
+            "name": "DocumentId",
+            "dataType": "Identifier",
+            "references": "Document",
+            "mandatory": false
+          }
+        ]
+      }
+    ],
+    "public": true
+  },
+  "screens": [],
+  "logic": [
+    {
+      "kind": "serviceAction",
+      "name": "IngestDocument"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ExtractDocument"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "PostToLedger"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "RouteForReview"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "FlagException"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ApprovePosting"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SaveRule"
+    },
+    {
+      "kind": "globalEvent",
+      "name": "DocumentReceived"
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AdminApp",
+    "roles": [
+      "Admin"
+    ],
+    "description": "End-user app for admin"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "WorkOrderDashboard",
+      "name": "WorkOrderDashboard",
+      "components": [
+        {
+          "id": "WorkOrderDashboard_asset_table",
+          "type": "Table",
+          "boundTo": "Asset",
+          "label": "WorkOrderDashboard"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "WorkOrderDashboard_asset_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "WorkOrderDashboard_asset_table",
+            "boundTo": "Asset"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "ManageCatalog",
+      "name": "ManageCatalog",
+      "components": [
+        {
+          "id": "ManageCatalog_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ManageCatalog"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ManageCatalog_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ManageCatalog_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AuditTrail",
+      "name": "AuditTrail",
+      "components": [
+        {
+          "id": "AuditTrail_diagnosis_table",
+          "type": "Table",
+          "boundTo": "Diagnosis",
+          "label": "AuditTrail"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "AuditTrail_diagnosis_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "AuditTrail_diagnosis_table",
+            "boundTo": "Diagnosis"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "FieldserviceCore",
+      "elements": [
+        {
+          "name": "Asset",
+          "kind": "Entity"
+        },
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Diagnosis",
+          "kind": "Entity"
+        },
+        {
+          "name": "Part",
+          "kind": "Entity"
+        },
+        {
+          "name": "ServiceRequest",
+          "kind": "Entity"
+        },
+        {
+          "name": "Technician",
+          "kind": "Entity"
+        },
+        {
+          "name": "WorkOrder",
+          "kind": "Entity"
+        },
+        {
+          "name": "SaveCatalog",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

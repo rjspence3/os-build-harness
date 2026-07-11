@@ -1,0 +1,159 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "SalesRepApp",
+    "roles": [
+      "SalesRep"
+    ],
+    "description": "End-user app for sales_rep"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "LogCall",
+      "name": "LogCall",
+      "components": [
+        {
+          "id": "LogCall_account_table",
+          "type": "Table",
+          "boundTo": "Account",
+          "label": "LogCall"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "LogCall_account_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "LogCall_account_table",
+            "boundTo": "Account"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "ApplyUpdate",
+      "name": "ApplyUpdate",
+      "components": [
+        {
+          "id": "ApplyUpdate_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ApplyUpdate"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ApplyUpdate_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ApplyUpdate_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LogNextStep",
+      "name": "LogNextStep",
+      "components": [
+        {
+          "id": "LogNextStep_calllog_table",
+          "type": "Table",
+          "boundTo": "CallLog",
+          "label": "LogNextStep"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "LogNextStep_calllog_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "LogNextStep_calllog_table",
+            "boundTo": "CallLog"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MyAccounts",
+      "name": "MyAccounts",
+      "components": [
+        {
+          "id": "MyAccounts_contact_table",
+          "type": "Table",
+          "boundTo": "Contact",
+          "label": "MyAccounts"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "MyAccounts_contact_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "MyAccounts_contact_table",
+            "boundTo": "Contact"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "CrmCore",
+      "elements": [
+        {
+          "name": "Account",
+          "kind": "Entity"
+        },
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "CallLog",
+          "kind": "Entity"
+        },
+        {
+          "name": "Contact",
+          "kind": "Entity"
+        },
+        {
+          "name": "Opportunity",
+          "kind": "Entity"
+        },
+        {
+          "name": "ProposedUpdate",
+          "kind": "Entity"
+        },
+        {
+          "name": "ApplyUpdate",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "LogCall",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "LogNextStep",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

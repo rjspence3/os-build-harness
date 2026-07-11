@@ -1,0 +1,97 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ProcurementManagerApp",
+    "roles": [
+      "ProcurementManager"
+    ],
+    "description": "End-user app for procurement_manager"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ApprovalInbox",
+      "name": "ApprovalInbox",
+      "components": [
+        {
+          "id": "ApprovalInbox_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ApprovalInbox"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ApprovalInbox_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ApprovalInbox_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "SpendDashboard",
+      "name": "SpendDashboard",
+      "components": [
+        {
+          "id": "SpendDashboard_invoice_table",
+          "type": "Table",
+          "boundTo": "Invoice",
+          "label": "SpendDashboard"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "SpendDashboard_invoice_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "SpendDashboard_invoice_table",
+            "boundTo": "Invoice"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ProcurementCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Invoice",
+          "kind": "Entity"
+        },
+        {
+          "name": "MatchResult",
+          "kind": "Entity"
+        },
+        {
+          "name": "PaymentProposal",
+          "kind": "Entity"
+        },
+        {
+          "name": "PurchaseOrder",
+          "kind": "Entity"
+        },
+        {
+          "name": "ApprovePayment",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

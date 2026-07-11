@@ -1,0 +1,41 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ComplianceAgent",
+    "roles": [
+      "User"
+    ],
+    "description": "AI Agent (reasoning)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "agents": [
+    {
+      "name": "ComplianceAgent",
+      "modelConnection": "TrialClaudeHaiku4_5",
+      "systemPrompt": "You are ComplianceAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Control, Framework) \u2014 never answer without first retrieving it.",
+      "grounding": [
+        "Control",
+        "Framework"
+      ],
+      "tools": []
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ComplianceCore",
+      "elements": [
+        {
+          "name": "Control",
+          "kind": "Entity"
+        },
+        {
+          "name": "Framework",
+          "kind": "Entity"
+        }
+      ]
+    }
+  ]
+}

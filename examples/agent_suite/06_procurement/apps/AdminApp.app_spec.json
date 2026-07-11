@@ -1,0 +1,56 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AdminApp",
+    "roles": [
+      "Admin"
+    ],
+    "description": "End-user app for admin"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ManageVendors",
+      "name": "ManageVendors",
+      "components": [
+        {
+          "id": "ManageVendors_vendor_table",
+          "type": "Table",
+          "boundTo": "Vendor",
+          "label": "ManageVendors"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ManageVendors_vendor_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ManageVendors_vendor_table",
+            "boundTo": "Vendor"
+          }
+        ]
+      },
+      "isDefault": true
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ProcurementCore",
+      "elements": [
+        {
+          "name": "Vendor",
+          "kind": "Entity"
+        },
+        {
+          "name": "SaveVendor",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

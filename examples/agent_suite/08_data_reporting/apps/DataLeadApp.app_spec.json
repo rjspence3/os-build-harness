@@ -1,0 +1,130 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "DataLeadApp",
+    "roles": [
+      "DataLead"
+    ],
+    "description": "End-user app for data_lead"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "PublishReport",
+      "name": "PublishReport",
+      "components": [
+        {
+          "id": "PublishReport_anomalyfinding_table",
+          "type": "Table",
+          "boundTo": "AnomalyFinding",
+          "label": "PublishReport"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "PublishReport_anomalyfinding_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "PublishReport_anomalyfinding_table",
+            "boundTo": "AnomalyFinding"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "DistributeReport",
+      "name": "DistributeReport",
+      "components": [
+        {
+          "id": "DistributeReport_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "DistributeReport"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "DistributeReport_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "DistributeReport_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ApprovalInbox",
+      "name": "ApprovalInbox",
+      "components": [
+        {
+          "id": "ApprovalInbox_distribution_table",
+          "type": "Table",
+          "boundTo": "Distribution",
+          "label": "ApprovalInbox"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ApprovalInbox_distribution_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ApprovalInbox_distribution_table",
+            "boundTo": "Distribution"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "AnalyticsCore",
+      "elements": [
+        {
+          "name": "AnomalyFinding",
+          "kind": "Entity"
+        },
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Distribution",
+          "kind": "Entity"
+        },
+        {
+          "name": "ReportDefinition",
+          "kind": "Entity"
+        },
+        {
+          "name": "ReportRun",
+          "kind": "Entity"
+        },
+        {
+          "name": "ApproveDistribution",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "DistributeReport",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "PublishReport",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

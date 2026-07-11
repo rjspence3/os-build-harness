@@ -1,0 +1,93 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AdminApp",
+    "roles": [
+      "Admin"
+    ],
+    "description": "End-user app for admin"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ManageDataSources",
+      "name": "ManageDataSources",
+      "components": [
+        {
+          "id": "ManageDataSources_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ManageDataSources"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ManageDataSources_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ManageDataSources_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "AuditTrail",
+      "name": "AuditTrail",
+      "components": [
+        {
+          "id": "AuditTrail_datasource_table",
+          "type": "Table",
+          "boundTo": "DataSource",
+          "label": "AuditTrail"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "AuditTrail_datasource_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "AuditTrail_datasource_table",
+            "boundTo": "DataSource"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "AnalyticsCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "DataSource",
+          "kind": "Entity"
+        },
+        {
+          "name": "ReportDefinition",
+          "kind": "Entity"
+        },
+        {
+          "name": "ReportRun",
+          "kind": "Entity"
+        },
+        {
+          "name": "SaveDataSource",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

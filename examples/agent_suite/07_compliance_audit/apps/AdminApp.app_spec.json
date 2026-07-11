@@ -1,0 +1,89 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AdminApp",
+    "roles": [
+      "Admin"
+    ],
+    "description": "End-user app for admin"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ManageFrameworks",
+      "name": "ManageFrameworks",
+      "components": [
+        {
+          "id": "ManageFrameworks_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ManageFrameworks"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ManageFrameworks_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ManageFrameworks_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "AuditTrail",
+      "name": "AuditTrail",
+      "components": [
+        {
+          "id": "AuditTrail_control_table",
+          "type": "Table",
+          "boundTo": "Control",
+          "label": "AuditTrail"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "AuditTrail_control_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "AuditTrail_control_table",
+            "boundTo": "Control"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ComplianceCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Control",
+          "kind": "Entity"
+        },
+        {
+          "name": "Framework",
+          "kind": "Entity"
+        },
+        {
+          "name": "SaveFramework",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

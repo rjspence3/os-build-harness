@@ -1,0 +1,338 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AnalyticsCore",
+    "roles": [
+      "User"
+    ],
+    "description": "Core service (analytics context)"
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "DataSource",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Kind",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConnectionUri",
+            "dataType": "Text"
+          },
+          {
+            "name": "SchemaDoc",
+            "dataType": "Text"
+          },
+          {
+            "name": "Active",
+            "dataType": "Boolean"
+          }
+        ]
+      },
+      {
+        "name": "ReportDefinition",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text"
+          },
+          {
+            "name": "Schedule",
+            "dataType": "Text"
+          },
+          {
+            "name": "Audience",
+            "dataType": "Text"
+          },
+          {
+            "name": "Active",
+            "dataType": "Boolean"
+          },
+          {
+            "name": "DataSourceId",
+            "dataType": "Identifier",
+            "references": "DataSource",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "QueryRequest",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "RequestNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Question",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "GeneratedSql",
+            "dataType": "Text"
+          },
+          {
+            "name": "ResultSummary",
+            "dataType": "Text"
+          },
+          {
+            "name": "RowCount",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ConfidenceScore",
+            "dataType": "Integer"
+          },
+          {
+            "name": "DataSourceId",
+            "dataType": "Identifier",
+            "references": "DataSource",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "ReportRun",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "RunNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Narrative",
+            "dataType": "Text"
+          },
+          {
+            "name": "ArtifactUri",
+            "dataType": "Text"
+          },
+          {
+            "name": "GeneratedAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReportDefinitionId",
+            "dataType": "Identifier",
+            "references": "ReportDefinition",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "AnomalyFinding",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Metric",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "ObservedValue",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "ExpectedValue",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "Deviation",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "Narrative",
+            "dataType": "Text"
+          },
+          {
+            "name": "Severity",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReportRunId",
+            "dataType": "Identifier",
+            "references": "ReportRun",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "Distribution",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Channel",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Recipients",
+            "dataType": "Text"
+          },
+          {
+            "name": "SentAt",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReportRunId",
+            "dataType": "Identifier",
+            "references": "ReportRun",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReportRunId",
+            "dataType": "Identifier",
+            "references": "ReportRun",
+            "mandatory": false
+          }
+        ]
+      }
+    ],
+    "public": true
+  },
+  "screens": [],
+  "logic": [
+    {
+      "kind": "serviceAction",
+      "name": "RequestReport"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "AnalyzeData"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "PublishReport"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "DistributeReport"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ApproveDistribution"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SaveDataSource"
+    },
+    {
+      "kind": "globalEvent",
+      "name": "ReportRequested"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "CodeGenAgent",
+    "roles": [
+      "User"
+    ],
+    "description": "AI Agent (reasoning)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "agents": [
+    {
+      "name": "CodeGenAgent",
+      "modelConnection": "TrialClaudeHaiku4_5",
+      "systemPrompt": "You are CodeGenAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (WorkItem, Repository) \u2014 never answer without first retrieving it.",
+      "grounding": [
+        "WorkItem",
+        "Repository"
+      ],
+      "tools": []
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "DevtasksCore",
+      "elements": [
+        {
+          "name": "WorkItem",
+          "kind": "Entity"
+        },
+        {
+          "name": "Repository",
+          "kind": "Entity"
+        }
+      ]
+    }
+  ]
+}

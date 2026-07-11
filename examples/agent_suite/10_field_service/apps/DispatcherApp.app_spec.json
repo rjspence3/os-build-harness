@@ -1,0 +1,138 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "DispatcherApp",
+    "roles": [
+      "Dispatcher"
+    ],
+    "description": "End-user app for dispatcher"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "DispatchTechnician",
+      "name": "DispatchTechnician",
+      "components": [
+        {
+          "id": "DispatchTechnician_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "DispatchTechnician"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "DispatchTechnician_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "DispatchTechnician_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "CommitParts",
+      "name": "CommitParts",
+      "components": [
+        {
+          "id": "CommitParts_diagnosis_table",
+          "type": "Table",
+          "boundTo": "Diagnosis",
+          "label": "CommitParts"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "CommitParts_diagnosis_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "CommitParts_diagnosis_table",
+            "boundTo": "Diagnosis"
+          }
+        ]
+      }
+    },
+    {
+      "id": "DispatcherInbox",
+      "name": "DispatcherInbox",
+      "components": [
+        {
+          "id": "DispatcherInbox_dispatchproposal_table",
+          "type": "Table",
+          "boundTo": "DispatchProposal",
+          "label": "DispatcherInbox"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "DispatcherInbox_dispatchproposal_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "DispatcherInbox_dispatchproposal_table",
+            "boundTo": "DispatchProposal"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "FieldserviceCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Diagnosis",
+          "kind": "Entity"
+        },
+        {
+          "name": "DispatchProposal",
+          "kind": "Entity"
+        },
+        {
+          "name": "Part",
+          "kind": "Entity"
+        },
+        {
+          "name": "ServiceRequest",
+          "kind": "Entity"
+        },
+        {
+          "name": "Technician",
+          "kind": "Entity"
+        },
+        {
+          "name": "WorkOrder",
+          "kind": "Entity"
+        },
+        {
+          "name": "ApproveDispatch",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "CommitParts",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "DispatchTechnician",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

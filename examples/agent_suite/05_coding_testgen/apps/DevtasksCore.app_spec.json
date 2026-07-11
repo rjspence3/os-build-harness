@@ -1,0 +1,356 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "DevtasksCore",
+    "roles": [
+      "User"
+    ],
+    "description": "Core service (devtasks context)"
+  },
+  "dataModel": {
+    "entities": [
+      {
+        "name": "Repository",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Slug",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "DefaultBranch",
+            "dataType": "Text"
+          },
+          {
+            "name": "Language",
+            "dataType": "Text"
+          },
+          {
+            "name": "GitUrl",
+            "dataType": "Text"
+          },
+          {
+            "name": "Owner",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "WorkItem",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "ItemNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text"
+          },
+          {
+            "name": "Type",
+            "dataType": "Text"
+          },
+          {
+            "name": "Priority",
+            "dataType": "Integer"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "AssignedTo",
+            "dataType": "Text"
+          },
+          {
+            "name": "RepositoryId",
+            "dataType": "Identifier",
+            "references": "Repository",
+            "mandatory": false
+          },
+          {
+            "name": "AuditEventId",
+            "dataType": "Identifier",
+            "references": "AuditEvent",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "ChangeProposal",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "ActionType",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Summary",
+            "dataType": "Text"
+          },
+          {
+            "name": "Diff",
+            "dataType": "Text"
+          },
+          {
+            "name": "BranchName",
+            "dataType": "Text"
+          },
+          {
+            "name": "Rationale",
+            "dataType": "Text"
+          },
+          {
+            "name": "RiskTier",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ApprovedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "WorkItemId",
+            "dataType": "Identifier",
+            "references": "WorkItem",
+            "mandatory": false
+          },
+          {
+            "name": "RepositoryId",
+            "dataType": "Identifier",
+            "references": "Repository",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "TestSuite",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Framework",
+            "dataType": "Text"
+          },
+          {
+            "name": "TestCode",
+            "dataType": "Text"
+          },
+          {
+            "name": "CaseCount",
+            "dataType": "Integer"
+          },
+          {
+            "name": "CoveragePct",
+            "dataType": "Decimal"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "ChangeProposalId",
+            "dataType": "Identifier",
+            "references": "ChangeProposal",
+            "mandatory": false
+          },
+          {
+            "name": "WorkItemId",
+            "dataType": "Identifier",
+            "references": "WorkItem",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "PullRequest",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "PrNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Title",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "SourceBranch",
+            "dataType": "Text"
+          },
+          {
+            "name": "TargetBranch",
+            "dataType": "Text"
+          },
+          {
+            "name": "BuildStatus",
+            "dataType": "Text"
+          },
+          {
+            "name": "ReviewState",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "MergedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "ChangeProposalId",
+            "dataType": "Identifier",
+            "references": "ChangeProposal",
+            "mandatory": false
+          },
+          {
+            "name": "RepositoryId",
+            "dataType": "Identifier",
+            "references": "Repository",
+            "mandatory": false
+          },
+          {
+            "name": "WorkItemId",
+            "dataType": "Identifier",
+            "references": "WorkItem",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "ReviewComment",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Body",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Author",
+            "dataType": "Text"
+          },
+          {
+            "name": "Verdict",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "DateTime"
+          },
+          {
+            "name": "PullRequestId",
+            "dataType": "Identifier",
+            "references": "PullRequest",
+            "mandatory": false
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "attributes": [
+          {
+            "name": "Id",
+            "dataType": "Identifier",
+            "isIdentifier": true,
+            "mandatory": true
+          },
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "Text"
+          }
+        ]
+      }
+    ],
+    "public": true
+  },
+  "screens": [],
+  "logic": [
+    {
+      "kind": "serviceAction",
+      "name": "AssignWorkItem"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "DraftChange"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "OpenPullRequest"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "RecordReview"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "ApprovePullRequest"
+    },
+    {
+      "kind": "serviceAction",
+      "name": "SaveRepository"
+    },
+    {
+      "kind": "globalEvent",
+      "name": "WorkItemAssigned"
+    }
+  ]
+}

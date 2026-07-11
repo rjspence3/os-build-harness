@@ -1,0 +1,130 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "SubjectExpertApp",
+    "roles": [
+      "SubjectExpert"
+    ],
+    "description": "End-user app for subject_expert"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "RecordAnswer",
+      "name": "RecordAnswer",
+      "components": [
+        {
+          "id": "RecordAnswer_answer_table",
+          "type": "Table",
+          "boundTo": "Answer",
+          "label": "RecordAnswer"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "RecordAnswer_answer_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "RecordAnswer_answer_table",
+            "boundTo": "Answer"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "RaiseEscalation",
+      "name": "RaiseEscalation",
+      "components": [
+        {
+          "id": "RaiseEscalation_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "RaiseEscalation"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "RaiseEscalation_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "RaiseEscalation_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ExpertInbox",
+      "name": "ExpertInbox",
+      "components": [
+        {
+          "id": "ExpertInbox_citation_table",
+          "type": "Table",
+          "boundTo": "Citation",
+          "label": "ExpertInbox"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ExpertInbox_citation_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ExpertInbox_citation_table",
+            "boundTo": "Citation"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "KnowledgeCore",
+      "elements": [
+        {
+          "name": "Answer",
+          "kind": "Entity"
+        },
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Citation",
+          "kind": "Entity"
+        },
+        {
+          "name": "Escalation",
+          "kind": "Entity"
+        },
+        {
+          "name": "Question",
+          "kind": "Entity"
+        },
+        {
+          "name": "RaiseEscalation",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "RecordAnswer",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "ResolveEscalation",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

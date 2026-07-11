@@ -1,0 +1,55 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ControlReviewWorkflow",
+    "roles": [
+      "User"
+    ],
+    "description": "Business process (BPT orchestration)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "processes": [
+    {
+      "name": "ControlReviewProcess",
+      "producerApp": "ComplianceCore",
+      "triggerEvent": "ControlReviewStarted",
+      "activities": [
+        {
+          "name": "GatherEvidence",
+          "callsServiceAction": "ComplianceAgent"
+        },
+        {
+          "name": "DetectGaps",
+          "callsServiceAction": "ComplianceAgent"
+        },
+        {
+          "name": "Attest",
+          "callsServiceAction": "RecordAttestation"
+        }
+      ]
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ComplianceCore",
+      "elements": [
+        {
+          "name": "RecordAttestation",
+          "kind": "ServiceAction"
+        }
+      ]
+    },
+    {
+      "producerApp": "ComplianceAgent",
+      "elements": [
+        {
+          "name": "ComplianceAgent",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

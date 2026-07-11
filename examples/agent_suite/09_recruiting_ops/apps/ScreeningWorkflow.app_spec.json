@@ -1,0 +1,59 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ScreeningWorkflow",
+    "roles": [
+      "User"
+    ],
+    "description": "Business process (BPT orchestration)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "processes": [
+    {
+      "name": "ScreeningProcess",
+      "producerApp": "RecruitingCore",
+      "triggerEvent": "ApplicationSubmitted",
+      "activities": [
+        {
+          "name": "Screen",
+          "callsServiceAction": "RecruitAgent"
+        },
+        {
+          "name": "Schedule",
+          "callsServiceAction": "ScheduleInterview"
+        },
+        {
+          "name": "Approve",
+          "callsServiceAction": "RecordDecision"
+        }
+      ]
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "RecruitingCore",
+      "elements": [
+        {
+          "name": "RecordDecision",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "ScheduleInterview",
+          "kind": "ServiceAction"
+        }
+      ]
+    },
+    {
+      "producerApp": "RecruitAgent",
+      "elements": [
+        {
+          "name": "RecruitAgent",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

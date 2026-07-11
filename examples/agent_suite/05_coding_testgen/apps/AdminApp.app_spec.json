@@ -1,0 +1,93 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "AdminApp",
+    "roles": [
+      "Admin"
+    ],
+    "description": "End-user app for admin"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "ManageRepositories",
+      "name": "ManageRepositories",
+      "components": [
+        {
+          "id": "ManageRepositories_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "ManageRepositories"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ManageRepositories_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ManageRepositories_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "BuildDashboard",
+      "name": "BuildDashboard",
+      "components": [
+        {
+          "id": "BuildDashboard_pullrequest_table",
+          "type": "Table",
+          "boundTo": "PullRequest",
+          "label": "BuildDashboard"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "BuildDashboard_pullrequest_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "BuildDashboard_pullrequest_table",
+            "boundTo": "PullRequest"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "DevtasksCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "PullRequest",
+          "kind": "Entity"
+        },
+        {
+          "name": "Repository",
+          "kind": "Entity"
+        },
+        {
+          "name": "WorkItem",
+          "kind": "Entity"
+        },
+        {
+          "name": "SaveRepository",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

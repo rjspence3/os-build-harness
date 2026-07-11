@@ -1,0 +1,163 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "RecruiterApp",
+    "roles": [
+      "Recruiter"
+    ],
+    "description": "End-user app for recruiter"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "SubmitApplication",
+      "name": "SubmitApplication",
+      "components": [
+        {
+          "id": "SubmitApplication_application_table",
+          "type": "Table",
+          "boundTo": "Application",
+          "label": "SubmitApplication"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "SubmitApplication_application_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "SubmitApplication_application_table",
+            "boundTo": "Application"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "RecordDecision",
+      "name": "RecordDecision",
+      "components": [
+        {
+          "id": "RecordDecision_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "RecordDecision"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "RecordDecision_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "RecordDecision_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ScheduleInterview",
+      "name": "ScheduleInterview",
+      "components": [
+        {
+          "id": "ScheduleInterview_candidate_table",
+          "type": "Table",
+          "boundTo": "Candidate",
+          "label": "ScheduleInterview"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "ScheduleInterview_candidate_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "ScheduleInterview_candidate_table",
+            "boundTo": "Candidate"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MyPipeline",
+      "name": "MyPipeline",
+      "components": [
+        {
+          "id": "MyPipeline_decision_table",
+          "type": "Table",
+          "boundTo": "Decision",
+          "label": "MyPipeline"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "MyPipeline_decision_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "MyPipeline_decision_table",
+            "boundTo": "Decision"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "RecruitingCore",
+      "elements": [
+        {
+          "name": "Application",
+          "kind": "Entity"
+        },
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Candidate",
+          "kind": "Entity"
+        },
+        {
+          "name": "Decision",
+          "kind": "Entity"
+        },
+        {
+          "name": "Interview",
+          "kind": "Entity"
+        },
+        {
+          "name": "Role",
+          "kind": "Entity"
+        },
+        {
+          "name": "ScreeningResult",
+          "kind": "Entity"
+        },
+        {
+          "name": "RecordDecision",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "ScheduleInterview",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "SubmitApplication",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "ComplianceAnalystApp",
+    "roles": [
+      "ComplianceAnalyst"
+    ],
+    "description": "End-user app for compliance_analyst"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "StartControlReview",
+      "name": "StartControlReview",
+      "components": [
+        {
+          "id": "StartControlReview_auditevent_table",
+          "type": "Table",
+          "boundTo": "AuditEvent",
+          "label": "StartControlReview"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "StartControlReview_auditevent_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "StartControlReview_auditevent_table",
+            "boundTo": "AuditEvent"
+          }
+        ]
+      },
+      "isDefault": true
+    },
+    {
+      "id": "AttachEvidence",
+      "name": "AttachEvidence",
+      "components": [
+        {
+          "id": "AttachEvidence_control_table",
+          "type": "Table",
+          "boundTo": "Control",
+          "label": "AttachEvidence"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "AttachEvidence_control_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "AttachEvidence_control_table",
+            "boundTo": "Control"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CompliancePosture",
+      "name": "CompliancePosture",
+      "components": [
+        {
+          "id": "CompliancePosture_evidence_table",
+          "type": "Table",
+          "boundTo": "Evidence",
+          "label": "CompliancePosture"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "CompliancePosture_evidence_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "CompliancePosture_evidence_table",
+            "boundTo": "Evidence"
+          }
+        ]
+      }
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "ComplianceCore",
+      "elements": [
+        {
+          "name": "AuditEvent",
+          "kind": "Entity"
+        },
+        {
+          "name": "Control",
+          "kind": "Entity"
+        },
+        {
+          "name": "Evidence",
+          "kind": "Entity"
+        },
+        {
+          "name": "Framework",
+          "kind": "Entity"
+        },
+        {
+          "name": "GapFinding",
+          "kind": "Entity"
+        },
+        {
+          "name": "RemediationTask",
+          "kind": "Entity"
+        },
+        {
+          "name": "AttachEvidence",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "StartControlReview",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "RecruitAgent",
+    "roles": [
+      "User"
+    ],
+    "description": "AI Agent (reasoning)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "agents": [
+    {
+      "name": "RecruitAgent",
+      "modelConnection": "TrialClaudeHaiku4_5",
+      "systemPrompt": "You are RecruitAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Application, Role) \u2014 never answer without first retrieving it.",
+      "grounding": [
+        "Application",
+        "Role"
+      ],
+      "tools": []
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "RecruitingCore",
+      "elements": [
+        {
+          "name": "Application",
+          "kind": "Entity"
+        },
+        {
+          "name": "Role",
+          "kind": "Entity"
+        }
+      ]
+    }
+  ]
+}

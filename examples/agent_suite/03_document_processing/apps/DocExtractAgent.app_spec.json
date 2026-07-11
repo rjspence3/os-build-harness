@@ -1,0 +1,46 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "DocExtractAgent",
+    "roles": [
+      "User"
+    ],
+    "description": "AI Agent (reasoning)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "agents": [
+    {
+      "name": "DocExtractAgent",
+      "modelConnection": "TrialClaudeHaiku4_5",
+      "systemPrompt": "You are DocExtractAgent. Reason over the referenced inputs and return a result. Ground every answer in the referenced data (Vendor, Document, ValidationRule) \u2014 never answer without first retrieving it.",
+      "grounding": [
+        "Vendor",
+        "Document",
+        "ValidationRule"
+      ],
+      "tools": []
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "DocprocCore",
+      "elements": [
+        {
+          "name": "Vendor",
+          "kind": "Entity"
+        },
+        {
+          "name": "Document",
+          "kind": "Entity"
+        },
+        {
+          "name": "ValidationRule",
+          "kind": "Entity"
+        }
+      ]
+    }
+  ]
+}

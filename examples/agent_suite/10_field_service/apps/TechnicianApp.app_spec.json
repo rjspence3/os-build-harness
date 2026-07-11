@@ -1,0 +1,64 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "TechnicianApp",
+    "roles": [
+      "Technician"
+    ],
+    "description": "End-user app for technician"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [
+    {
+      "id": "TechWorkboard",
+      "name": "TechWorkboard",
+      "components": [
+        {
+          "id": "TechWorkboard_asset_table",
+          "type": "Table",
+          "boundTo": "Asset",
+          "label": "TechWorkboard"
+        }
+      ],
+      "acceptance": {
+        "assertions": [
+          {
+            "kind": "componentPresent",
+            "componentId": "TechWorkboard_asset_table"
+          },
+          {
+            "kind": "binding",
+            "componentId": "TechWorkboard_asset_table",
+            "boundTo": "Asset"
+          }
+        ]
+      },
+      "isDefault": true
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "FieldserviceCore",
+      "elements": [
+        {
+          "name": "Asset",
+          "kind": "Entity"
+        },
+        {
+          "name": "Diagnosis",
+          "kind": "Entity"
+        },
+        {
+          "name": "ServiceRequest",
+          "kind": "Entity"
+        },
+        {
+          "name": "WorkOrder",
+          "kind": "Entity"
+        }
+      ]
+    }
+  ]
+}

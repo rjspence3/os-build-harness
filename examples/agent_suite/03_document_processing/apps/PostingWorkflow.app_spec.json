@@ -1,0 +1,59 @@
+{
+  "specVersion": "0.2",
+  "app": {
+    "name": "PostingWorkflow",
+    "roles": [
+      "User"
+    ],
+    "description": "Business process (BPT orchestration)"
+  },
+  "dataModel": {
+    "entities": []
+  },
+  "screens": [],
+  "processes": [
+    {
+      "name": "PostingProcess",
+      "producerApp": "DocprocCore",
+      "triggerEvent": "DocumentReceived",
+      "activities": [
+        {
+          "name": "Extract",
+          "callsServiceAction": "DocExtractAgent"
+        },
+        {
+          "name": "Validate",
+          "callsServiceAction": "RouteForReview"
+        },
+        {
+          "name": "Post",
+          "callsServiceAction": "PostToLedger"
+        }
+      ]
+    }
+  ],
+  "appReferences": [
+    {
+      "producerApp": "DocprocCore",
+      "elements": [
+        {
+          "name": "PostToLedger",
+          "kind": "ServiceAction"
+        },
+        {
+          "name": "RouteForReview",
+          "kind": "ServiceAction"
+        }
+      ]
+    },
+    {
+      "producerApp": "DocExtractAgent",
+      "elements": [
+        {
+          "name": "DocExtractAgent",
+          "kind": "ServiceAction"
+        }
+      ]
+    }
+  ]
+}
