@@ -1451,7 +1451,10 @@ def test_G3a_library_import_seed_defaults():
     positions = [p.index(e) for e in entities]
     assert positions == sorted(positions)
     assert "DELETE-then-INSERT" in p
-    assert "IsInDevStage" in p
+    # ODC has NO IsInDevStage(): the recipe must gate on a Confirm input param and warn
+    # against the phantom stage built-in (live-proven publish failure OS-DPL-50205).
+    assert "Confirm" in p
+    assert "IsInDevStage" in p  # present only as the negative caveat
     assert "OnReady" in p
     assert "headless" in p.lower()
     assert "do not publish" in p.lower()

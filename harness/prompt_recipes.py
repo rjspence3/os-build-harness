@@ -1638,18 +1638,28 @@ def workflow_engine(params: dict) -> str:
         ),
         "InstantiateWorkflow": (
             f"InstantiateWorkflow (Public Service Action -> InstantiateWorkflowInternal Server Action): "
-            f"create a {wi} record (State=Running), then spawn the FIRST wave of {ti}(s): "
-            f"all {ss} rows in the first ParallelGroup (or all steps with no unmet DependsOnStep "
-            f"dependency). Write an {ae} row for the instantiation. Return the new {wi}.Id."
+            f"create a {wi} record (State=Running), then spawn ONLY the FIRST wave of {ti}(s): "
+            f"the {ss} row(s) at the MINIMUM Sequence value for the {sc} (several only if they share "
+            f"that first Sequence's ParallelGroup). SEQUENCE IS THE PRIMARY FRONTIER (live-proven "
+            f"parallel-spawn bug): do NOT spawn 'all steps with no DependsOnStep' — in the common linear "
+            f"case DependsOnStep is unset on every step, so 'no unmet dependency' matches EVERY step and "
+            f"spawns the ENTIRE workflow at once. That defeats sequential gating AND the rework loop: "
+            f"AdvanceInstance's 'return early while sibling {ti} still Active' guard then suppresses the "
+            f"{tr} reject-routing, so a rejected approval is never reworked and the instance can complete "
+            f"with a step bypassed. DependsOnStep is an ADDITIONAL gate ONLY when explicitly populated — "
+            f"never the sole readiness test. Write an {ae} row for the instantiation. Return the new {wi}.Id."
         ),
         "AdvanceInstance": (
             f"AdvanceInstance (Public Service Action -> AdvanceInstanceInternal Server Action — "
             f"load-bearing; called by CompleteTask): check if ALL Active {ti}(s) for the {wi} are Done. "
             f"If not, nothing to advance yet (return early). If yes, evaluate {tr}.Condition expressions "
             f"over the completed {ti}.OutputData to pick the next transition (first-match wins). Spawn "
-            f"next {ti}(s) honoring ParallelGroup (all steps in the group) and DependsOnStep (only spawn "
-            f"a step when all its declared dependencies are Done). Set {wi}.State to Running (more steps "
-            f"remain) or Completed (all steps done). Write an {ae} for the transition. "
+            f"next {ti}(s) at the next frontier: the matched {tr} target, else the {ss} at the completed "
+            f"step's Sequence+1 (the linear frontier). Honor ParallelGroup (spawn all steps sharing that "
+            f"next Sequence's group). DependsOnStep is an ADDITIONAL gate ONLY when populated (spawn a step "
+            f"only once its declared dependencies are Done) — an UNSET DependsOnStep must NOT count as "
+            f"'ready', or the whole graph spawns at once (live-proven parallel-spawn bug). Set {wi}.State "
+            f"to Running (more steps remain) or Completed (all steps done). Write an {ae} for the transition. "
             f"BRANCHING + PARALLELISM (off-by-one bug — live-proven): iterate the target steps and spawn "
             f"EXACTLY ONE {ti} INSIDE the loop body per step. Do NOT carry a single 'chosen step' variable "
             f"out of the loop and spawn once after it — that pattern keeps only the LAST iteration's step "
@@ -1837,7 +1847,8 @@ def dynamic_form(params: dict) -> str:
 
 def library_import(params: dict) -> str:
     """Author a deterministic library loader for any N library rows — two modes.
-    seed: NON-PUBLIC LoadLibrary orchestrator; FK order; DELETE-then-INSERT; IsInDevStage-gated.
+    seed: NON-PUBLIC LoadLibrary orchestrator; FK order; DELETE-then-INSERT; Confirm-param-gated
+    (ODC has NO IsInDevStage() built-in — a phantom stage call fails publish OS-DPL-50205).
     etl: consumed/exposed REST bulk endpoint; natural-key upsert; FK order; NOT delete-then-insert.
     params: mode ('seed'|'etl'), library_entities (default FK-ordered 5), source (mode-dependent
     default), natural_key (default 'Code'), loader_name (default LoadLibrary/BulkImportLibrary)."""
@@ -1865,12 +1876,20 @@ def library_import(params: dict) -> str:
             f"{entities_ordered}\n\n"
             f"DELETE-then-INSERT (re-runnable): before inserting, DELETE all existing rows in REVERSE "
             f"FK order (children before parents) so re-runs are idempotent and safe.\n\n"
-            f"IsInDevStage GATE: wrap the entire loader in an IsInDevStage() check — this seed runs "
-            f"ONLY in development/test stages, never in production.\n\n"
+            f"RE-RUN GUARD — NO IsInDevStage() IN ODC (live-proven, OS-DPL-50205): ODC has no "
+            f"IsInDevStage() / GetPersonalAreaName() / stage-detection built-in. Do NOT call one — "
+            f"Mentor will substitute a non-existent function and PUBLISH then fails model-features "
+            f"validation (OS-DPL-50205) even though authoring reports 0 errors (this validation runs "
+            f"only at publish, not at authoring). Instead gate on an explicit Boolean INPUT PARAMETER "
+            f"named Confirm (default False): the loader no-ops (returns immediately) unless the caller "
+            f"passes Confirm=True. This is the ODC-safe dev-only guard — production code never calls it "
+            f"with Confirm=True, so the destructive delete-then-insert cannot run by accident.\n\n"
             f"HEADLESS-CORE CAVEAT: if the Core app has no screens (screens:[]), its OnReady action "
             f"never fires and the seed never runs. Give the Core a minimal bootstrap screen and call "
-            f"{loader_name} from that screen's OnReady — do not rely on a timer or a WhenPublished "
-            f"trigger alone for a headless data-owner (live-proven: headless core cannot seed via OnReady).\n\n"
+            f"{loader_name} with Confirm:=True from that screen's OnReady — do not rely on a timer or a "
+            f"WhenPublished trigger alone for a headless data-owner (live-proven: headless core cannot "
+            f"seed via OnReady). The bootstrap screen is the dev-only trigger; do not deploy it (or do "
+            f"not pass Confirm=True) in production.\n\n"
             f"After authoring, run model validation and report errors. Do not publish."
         )
     else:

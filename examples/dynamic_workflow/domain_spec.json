@@ -2,137 +2,433 @@
   "specVersion": "0.1",
   "domain": {
     "name": "dynamic_workflow_engine",
-    "description": "A data-driven workflow engine (Pega/Appian-class): an intake questionnaire resolves to a Scenario from a library; a generic orchestrator instantiates it and decomposes it into tasks routed to users. N-invariant — the engine loads ONE scenario per instance; the library is data. NO native ODC BPT (can't define processes at runtime); the process is a state machine in data + engine service actions. The engine/UI/loader are FIXED code; scenarios are rows. See ARCHITECTURE.md.",
-
+    "description": "A data-driven workflow engine (Pega/Appian-class): an intake questionnaire resolves to a Scenario from a library; a generic orchestrator instantiates it and decomposes it into tasks routed to users. N-invariant \u2014 the engine loads ONE scenario per instance; the library is data. NO native ODC BPT (can't define processes at runtime); the process is a state machine in data + engine service actions. The engine/UI/loader are FIXED code; scenarios are rows. See ARCHITECTURE.md.",
     "entities": [
-      {"name": "TaskTemplate", "context": "workflow", "naturalKey": "Code",
-       "attributes": [
-         {"name": "Code", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "Type", "dataType": "Text"},
-         {"name": "FieldDefinition", "dataType": "Text"},
-         {"name": "DefaultRole", "dataType": "Text"},
-         {"name": "SlaHours", "dataType": "Integer"}]},
-
-      {"name": "Scenario", "context": "workflow", "naturalKey": "Code",
-       "attributes": [
-         {"name": "Code", "dataType": "Text", "mandatory": true},
-         {"name": "Name", "dataType": "Text", "mandatory": true},
-         {"name": "EntryCriteria", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"}]},
-
-      {"name": "ScenarioStep", "context": "workflow", "references": ["Scenario", "TaskTemplate"],
-       "attributes": [
-         {"name": "Sequence", "dataType": "Integer", "mandatory": true},
-         {"name": "ParallelGroup", "dataType": "Text"},
-         {"name": "DependsOnStep", "dataType": "Text"}]},
-
-      {"name": "TransitionRule", "context": "workflow", "references": ["Scenario"],
-       "attributes": [
-         {"name": "FromStep", "dataType": "Text", "mandatory": true},
-         {"name": "ToStep", "dataType": "Text", "mandatory": true},
-         {"name": "Condition", "dataType": "Text"}]},
-
-      {"name": "DecisionRow", "context": "workflow", "references": ["Scenario"],
-       "attributes": [
-         {"name": "MatchExpression", "dataType": "Text", "mandatory": true},
-         {"name": "Priority", "dataType": "Integer"}]},
-
-      {"name": "WorkflowInstance", "context": "workflow", "references": ["Scenario"], "naturalKey": "InstanceNo",
-       "attributes": [
-         {"name": "InstanceNo", "dataType": "Text", "mandatory": true},
-         {"name": "State", "dataType": "Text"},
-         {"name": "Context", "dataType": "Text"},
-         {"name": "StartedBy", "dataType": "Text"},
-         {"name": "StartedAt", "dataType": "Text"}]},
-
-      {"name": "TaskInstance", "context": "workflow", "references": ["WorkflowInstance", "TaskTemplate"],
-       "attributes": [
-         {"name": "Assignee", "dataType": "Text"},
-         {"name": "Status", "dataType": "Text"},
-         {"name": "InputData", "dataType": "Text"},
-         {"name": "OutputData", "dataType": "Text"},
-         {"name": "DueAt", "dataType": "Text"}]},
-
-      {"name": "AuditEvent", "context": "workflow", "references": ["WorkflowInstance"],
-       "attributes": [
-         {"name": "Description", "dataType": "Text", "mandatory": true},
-         {"name": "Actor", "dataType": "Text"},
-         {"name": "At", "dataType": "Text"}]}
+      {
+        "name": "TaskTemplate",
+        "context": "workflow",
+        "naturalKey": "Code",
+        "attributes": [
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Type",
+            "dataType": "Text"
+          },
+          {
+            "name": "FieldDefinition",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "DefaultRole",
+            "dataType": "Text"
+          },
+          {
+            "name": "SlaHours",
+            "dataType": "Integer"
+          }
+        ]
+      },
+      {
+        "name": "Scenario",
+        "context": "workflow",
+        "naturalKey": "Code",
+        "attributes": [
+          {
+            "name": "Code",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Name",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "EntryCriteria",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "ScenarioStep",
+        "context": "workflow",
+        "references": [
+          "Scenario",
+          "TaskTemplate"
+        ],
+        "attributes": [
+          {
+            "name": "Sequence",
+            "dataType": "Integer",
+            "mandatory": true
+          },
+          {
+            "name": "ParallelGroup",
+            "dataType": "Text"
+          },
+          {
+            "name": "DependsOnStep",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "TransitionRule",
+        "context": "workflow",
+        "references": [
+          "Scenario"
+        ],
+        "attributes": [
+          {
+            "name": "FromStep",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "ToStep",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Condition",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "DecisionRow",
+        "context": "workflow",
+        "references": [
+          "Scenario"
+        ],
+        "attributes": [
+          {
+            "name": "MatchExpression",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Priority",
+            "dataType": "Integer"
+          }
+        ]
+      },
+      {
+        "name": "WorkflowInstance",
+        "context": "workflow",
+        "references": [
+          "Scenario"
+        ],
+        "naturalKey": "InstanceNo",
+        "attributes": [
+          {
+            "name": "InstanceNo",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "State",
+            "dataType": "Text"
+          },
+          {
+            "name": "Context",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "StartedBy",
+            "dataType": "Text"
+          },
+          {
+            "name": "StartedAt",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "TaskInstance",
+        "context": "workflow",
+        "references": [
+          "WorkflowInstance",
+          "TaskTemplate"
+        ],
+        "attributes": [
+          {
+            "name": "Assignee",
+            "dataType": "Text"
+          },
+          {
+            "name": "Status",
+            "dataType": "Text"
+          },
+          {
+            "name": "InputData",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "OutputData",
+            "dataType": "Text",
+            "length": 2000
+          },
+          {
+            "name": "DueAt",
+            "dataType": "Text"
+          }
+        ]
+      },
+      {
+        "name": "AuditEvent",
+        "context": "workflow",
+        "references": [
+          "WorkflowInstance"
+        ],
+        "attributes": [
+          {
+            "name": "Description",
+            "dataType": "Text",
+            "mandatory": true
+          },
+          {
+            "name": "Actor",
+            "dataType": "Text"
+          },
+          {
+            "name": "At",
+            "dataType": "Text"
+          }
+        ]
+      }
     ],
-
-    "actors": ["requester", "worker", "admin"],
-
+    "actors": [
+      "requester",
+      "worker",
+      "admin"
+    ],
     "capabilities": [
-      {"name": "SubmitIntake", "actor": "requester",
-       "reads": ["DecisionRow", "Scenario"],
-       "writes": ["WorkflowInstance", "TaskInstance", "AuditEvent"],
-       "service": "SubmitIntake", "raisesEvent": "InstanceStarted",
-       "engine": true, "note": "questionnaire answers -> ResolveScenario (DecisionRow match) -> InstantiateWorkflow (spawn first TaskInstance(s))"},
-
-      {"name": "ResolveScenario", "actor": "requester", "reads": ["DecisionRow", "Scenario"],
-       "service": "ResolveScenario", "engine": true,
-       "note": "FIXED: indexed decision-table match of intake answers -> Scenario. N-invariant (lookup, not scan)."},
-
-      {"name": "AdvanceInstance", "reads": ["WorkflowInstance", "Scenario", "ScenarioStep", "TransitionRule", "TaskInstance"],
-       "writes": ["TaskInstance", "WorkflowInstance", "AuditEvent"],
-       "service": "AdvanceInstance", "engine": true,
-       "note": "FIXED ENGINE (G1): on task completion, traverse THIS instance's ScenarioSteps + eval TransitionRules -> spawn next TaskInstance(s) (parallel groups), update State, write audit. Loads one scenario; N-invariant."},
-
-      {"name": "CompleteTask", "actor": "worker",
-       "reads": ["TaskInstance"], "writes": ["TaskInstance", "AuditEvent"],
-       "service": "CompleteTask", "callsService": "AdvanceInstance", "engine": true,
-       "note": "worker submits a task's OutputData -> CompleteTask -> AdvanceInstance."},
-
-      {"name": "ClaimTask", "actor": "worker", "reads": ["TaskInstance"], "writes": ["TaskInstance"],
-       "service": "ClaimTask"},
-
-      {"name": "MyWork", "actor": "worker", "reads": ["TaskInstance", "WorkflowInstance", "TaskTemplate"]},
-
-      {"name": "TrackInstance", "actor": "requester", "reads": ["WorkflowInstance", "TaskInstance", "AuditEvent"]},
-
-      {"name": "AuthorLibrary", "actor": "admin",
-       "reads": ["TaskTemplate", "Scenario", "ScenarioStep", "TransitionRule", "DecisionRow"],
-       "writes": ["TaskTemplate", "Scenario", "ScenarioStep", "TransitionRule", "DecisionRow"],
-       "service": "SaveLibraryElement",
-       "note": "the client maintains the scenario library (any N) without code."},
-
-      {"name": "ComposeInstance",
-       "reads": ["TaskTemplate", "WorkflowInstance"],
-       "writes": ["WorkflowInstance", "ScenarioStep", "AuditEvent"],
-       "service": "ComposeInstance", "engine": true,
-       "note": "FIXED (G5): assemble an instance-specific ScenarioStep graph from GOVERNED TaskTemplates (select/order/route). Called by the IntakeAgent. Composition only — never invents a task."},
-
-      {"name": "ValidateComposition",
-       "reads": ["ScenarioStep", "TaskTemplate", "WorkflowInstance"],
-       "writes": ["AuditEvent"],
-       "service": "ValidateComposition", "engine": true,
-       "note": "FIXED (G5): deterministic gate BEFORE an instance runs — every step resolves to a real TaskTemplate, routing roles exist, required controls present, no orphan/cycle, SLAs sane. Invalid -> reject for agent revision. Nothing runs unvalidated."},
-
-      {"name": "AgenticIntake", "orchestrates": true, "triggerEvent": "IntakeStarted",
-       "steps": [
-         {"name": "Compose", "ai": "IntakeComposer", "reads": ["TaskTemplate"], "writes": ["ScenarioStep"]},
-         {"name": "Validate", "callsService": "ValidateComposition"},
-         {"name": "Instantiate", "callsService": "InstantiateWorkflow"}],
-       "note": "G4: the agentic intake as a short compose->validate->instantiate orchestration. The Compose step is an AIAgent (IntakeComposer) that assembles the workflow from GOVERNED TaskTemplates; Validate is the deterministic gate; Instantiate spawns the first tasks. Replaces the static ResolveScenario for emergent (N->0 pre-authored) scenarios; the fixed engine + dynamic UI are unchanged. The orchestration SHELL is static (one process); the DYNAMISM is the agent's composed output. Risk-tiered approval sits between Validate and Instantiate; fully audited + reproducible."},
-
-      {"name": "EscalateOverdue", "orchestrates": true, "triggerEvent": "SlaSweep",
-       "steps": [
-         {"name": "FindOverdue", "reads": ["TaskInstance"]},
-         {"name": "Escalate", "callsService": "AdvanceInstance"}],
-       "note": "Timer-driven SLA/escalation sweep (the ONLY timer; not per-instance flow)."}
+      {
+        "name": "SubmitIntake",
+        "actor": "requester",
+        "reads": [
+          "DecisionRow",
+          "Scenario"
+        ],
+        "writes": [
+          "WorkflowInstance",
+          "TaskInstance",
+          "AuditEvent"
+        ],
+        "service": "SubmitIntake",
+        "raisesEvent": "InstanceStarted",
+        "engine": true,
+        "note": "questionnaire answers -> ResolveScenario (DecisionRow match) -> InstantiateWorkflow (spawn first TaskInstance(s))"
+      },
+      {
+        "name": "ResolveScenario",
+        "actor": "requester",
+        "reads": [
+          "DecisionRow",
+          "Scenario"
+        ],
+        "service": "ResolveScenario",
+        "engine": true,
+        "note": "FIXED: indexed decision-table match of intake answers -> Scenario. N-invariant (lookup, not scan)."
+      },
+      {
+        "name": "AdvanceInstance",
+        "reads": [
+          "WorkflowInstance",
+          "Scenario",
+          "ScenarioStep",
+          "TransitionRule",
+          "TaskInstance"
+        ],
+        "writes": [
+          "TaskInstance",
+          "WorkflowInstance",
+          "AuditEvent"
+        ],
+        "service": "AdvanceInstance",
+        "engine": true,
+        "note": "FIXED ENGINE (G1): on task completion, traverse THIS instance's ScenarioSteps + eval TransitionRules -> spawn next TaskInstance(s) (parallel groups), update State, write audit. Loads one scenario; N-invariant."
+      },
+      {
+        "name": "CompleteTask",
+        "actor": "worker",
+        "reads": [
+          "TaskInstance"
+        ],
+        "writes": [
+          "TaskInstance",
+          "AuditEvent"
+        ],
+        "service": "CompleteTask",
+        "callsService": "AdvanceInstance",
+        "engine": true,
+        "note": "worker submits a task's OutputData -> CompleteTask -> AdvanceInstance."
+      },
+      {
+        "name": "ClaimTask",
+        "actor": "worker",
+        "reads": [
+          "TaskInstance"
+        ],
+        "writes": [
+          "TaskInstance"
+        ],
+        "service": "ClaimTask"
+      },
+      {
+        "name": "MyWork",
+        "actor": "worker",
+        "reads": [
+          "TaskInstance",
+          "WorkflowInstance",
+          "TaskTemplate"
+        ]
+      },
+      {
+        "name": "TrackInstance",
+        "actor": "requester",
+        "reads": [
+          "WorkflowInstance",
+          "TaskInstance",
+          "AuditEvent"
+        ]
+      },
+      {
+        "name": "AuthorLibrary",
+        "actor": "admin",
+        "reads": [
+          "TaskTemplate",
+          "Scenario",
+          "ScenarioStep",
+          "TransitionRule",
+          "DecisionRow"
+        ],
+        "writes": [
+          "TaskTemplate",
+          "Scenario",
+          "ScenarioStep",
+          "TransitionRule",
+          "DecisionRow"
+        ],
+        "service": "SaveLibraryElement",
+        "note": "the client maintains the scenario library (any N) without code."
+      },
+      {
+        "name": "ComposeInstance",
+        "reads": [
+          "TaskTemplate",
+          "WorkflowInstance"
+        ],
+        "writes": [
+          "WorkflowInstance",
+          "ScenarioStep",
+          "AuditEvent"
+        ],
+        "service": "ComposeInstance",
+        "engine": true,
+        "note": "FIXED (G5): assemble an instance-specific ScenarioStep graph from GOVERNED TaskTemplates (select/order/route). Called by the IntakeAgent. Composition only \u2014 never invents a task."
+      },
+      {
+        "name": "ValidateComposition",
+        "reads": [
+          "ScenarioStep",
+          "TaskTemplate",
+          "WorkflowInstance"
+        ],
+        "writes": [
+          "AuditEvent"
+        ],
+        "service": "ValidateComposition",
+        "engine": true,
+        "note": "FIXED (G5): deterministic gate BEFORE an instance runs \u2014 every step resolves to a real TaskTemplate, routing roles exist, required controls present, no orphan/cycle, SLAs sane. Invalid -> reject for agent revision. Nothing runs unvalidated."
+      },
+      {
+        "name": "AgenticIntake",
+        "orchestrates": true,
+        "triggerEvent": "IntakeStarted",
+        "steps": [
+          {
+            "name": "Compose",
+            "ai": "IntakeComposer",
+            "reads": [
+              "TaskTemplate"
+            ],
+            "writes": [
+              "ScenarioStep"
+            ]
+          },
+          {
+            "name": "Validate",
+            "callsService": "ValidateComposition"
+          },
+          {
+            "name": "Instantiate",
+            "callsService": "InstantiateWorkflow"
+          }
+        ],
+        "note": "G4: the agentic intake as a short compose->validate->instantiate orchestration. The Compose step is an AIAgent (IntakeComposer) that assembles the workflow from GOVERNED TaskTemplates; Validate is the deterministic gate; Instantiate spawns the first tasks. Replaces the static ResolveScenario for emergent (N->0 pre-authored) scenarios; the fixed engine + dynamic UI are unchanged. The orchestration SHELL is static (one process); the DYNAMISM is the agent's composed output. Risk-tiered approval sits between Validate and Instantiate; fully audited + reproducible."
+      },
+      {
+        "name": "EscalateOverdue",
+        "orchestrates": true,
+        "triggerEvent": "SlaSweep",
+        "steps": [
+          {
+            "name": "FindOverdue",
+            "reads": [
+              "TaskInstance"
+            ]
+          },
+          {
+            "name": "Escalate",
+            "callsService": "AdvanceInstance"
+          }
+        ],
+        "note": "Timer-driven SLA/escalation sweep (the ONLY timer; not per-instance flow)."
+      }
     ],
-
     "integrations": [
-      {"name": "IdP", "kind": "identity", "purpose": "SSO/roles", "stub": true},
-      {"name": "LibrarySource", "kind": "consume", "purpose": "bulk-load the scenario library (ETL from Appian/Pega/sheets) — G3", "stub": true},
-      {"name": "Notify", "kind": "consume", "purpose": "task assignment / SLA notifications", "stub": true}
+      {
+        "name": "IdP",
+        "kind": "identity",
+        "purpose": "SSO/roles",
+        "stub": true
+      },
+      {
+        "name": "LibrarySource",
+        "kind": "consume",
+        "purpose": "bulk-load the scenario library (ETL from Appian/Pega/sheets) \u2014 G3",
+        "stub": true
+      },
+      {
+        "name": "Notify",
+        "kind": "consume",
+        "purpose": "task assignment / SLA notifications",
+        "stub": true
+      }
     ],
-
-    "libraries": ["WorkflowDesignSystem"],
-
+    "libraries": [
+      "WorkflowDesignSystem"
+    ],
     "_harness_gaps": {
-      "note": "The capabilities flagged engine:true map to a NEW canonical `workflow-engine` recipe (G1) — one fixed implementation parameterized by entity names, NOT per-scenario. The WorkspacePortal's task screen needs a NEW `dynamic-form` recipe (G2) that renders TaskTemplate.FieldDefinition at runtime via a fixed field-type set. The library rows load via a bulk importer (G3, generalize the deterministic-SQL/REST seed). Everything else uses existing recipes. SPIKE the dynamic form UX first."
+      "note": "The capabilities flagged engine:true map to a NEW canonical `workflow-engine` recipe (G1) \u2014 one fixed implementation parameterized by entity names, NOT per-scenario. The WorkspacePortal's task screen needs a NEW `dynamic-form` recipe (G2) that renders TaskTemplate.FieldDefinition at runtime via a fixed field-type set. The library rows load via a bulk importer (G3, generalize the deterministic-SQL/REST seed). Everything else uses existing recipes. SPIKE the dynamic form UX first."
     }
   }
 }
