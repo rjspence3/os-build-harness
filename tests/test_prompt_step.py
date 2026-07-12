@@ -1395,6 +1395,9 @@ def test_G2c_dynamic_form_live_proven_parse_gotchas():
     assert "SELECT LIMITATION" in p and "text Input" in p
     # the parse driver + submit serialization
     assert "LoadActiveForm" in p and "JSONSerialize" in p
+    # serialization false-positive: Options leak into OutputData -> match "Value":"X", not bare token
+    assert "SERIALIZATION CAVEAT" in p
+    assert '"Value":"Reject"' in p
 
 
 def test_G1d_workflow_engine_frontier_not_a_count():
@@ -1407,6 +1410,9 @@ def test_G1d_workflow_engine_frontier_not_a_count():
     assert "rework" in p and "loop-back" in p
     # CompleteTask carries the approval-reject routing
     assert "Reject" in p and "does NOT mark the instance Completed" in p
+    # reject detection must match the VALUE, not a bare token (Options leak "Reject" into OutputData)
+    assert "DETECT THE VALUE" in p and '"Value":"Reject"' in p
+    assert "Sequence+1" in p               # concrete linear frontier fallback
 
 
 def test_agent_recipe_carries_cold_start_timeout_caveat():
