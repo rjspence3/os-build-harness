@@ -1510,17 +1510,21 @@ def _engine_spec(actions, entities=None, core_app="WorkflowCore", extra_logic=No
     return spec
 
 
-def test_emitter_workflow_engine_8_actions_produces_2_chunks():
-    """8 actions -> exactly 2 workflow-engine steps, each len<=4 (D6)."""
+def test_emitter_workflow_engine_chunks_le_4_and_cover_all():
+    """The full engine action set chunks into ceil(N/4) steps, each len<=4, concatenating back
+    to _ENGINE_ACTIONS in canonical order (turn-size doctrine D6)."""
+    import math
     from harness.prompt_recipes import _ENGINE_ACTIONS
     spec = _engine_spec(_ENGINE_ACTIONS)
     steps = pr.plan_from_spec(spec)
     wf = [s for s in steps if s["recipe"] == "workflow-engine"]
-    assert len(wf) == 2, f"expected 2 chunks, got {len(wf)}"
-    assert wf[0]["params"]["actions"] == _ENGINE_ACTIONS[:4]
-    assert wf[1]["params"]["actions"] == _ENGINE_ACTIONS[4:]
+    expected_chunks = math.ceil(len(_ENGINE_ACTIONS) / 4)
+    assert len(wf) == expected_chunks, f"expected {expected_chunks} chunks, got {len(wf)}"
     for s in wf:
         assert len(s["params"]["actions"]) <= 4
+    concatenated = [a for s in wf for a in s["params"]["actions"]]
+    assert concatenated == _ENGINE_ACTIONS
+    assert wf[0]["params"]["actions"] == _ENGINE_ACTIONS[:4]
 
 
 def test_emitter_workflow_engine_core_app_and_entities_passthrough():

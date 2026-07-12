@@ -282,6 +282,17 @@
         "note": "worker submits a task's OutputData -> CompleteTask -> AdvanceInstance."
       },
       {
+        "name": "GetInstanceStatus",
+        "reads": [
+          "WorkflowInstance",
+          "TaskInstance",
+          "TaskTemplate"
+        ],
+        "service": "GetInstanceStatus",
+        "engine": true,
+        "note": "READ (no writes): returns WorkflowInstance.State + the first still-open TaskInstance (Id, StepCode) + OpenCount for an instance. The task-queue/worker-UI read; also the runtime drive/observe reader (ASE db_query is v1 template-only). Non-public Server Action (no write-split needed)."
+      },
+      {
         "name": "ClaimTask",
         "actor": "worker",
         "reads": [

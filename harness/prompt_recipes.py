@@ -1227,6 +1227,7 @@ def _sig(items) -> str:
 _ENGINE_ACTIONS = [
     "ResolveScenario", "InstantiateWorkflow", "AdvanceInstance", "CompleteTask",
     "ClaimTask", "EscalateOverdue", "ValidateComposition", "ComposeInstance",
+    "GetInstanceStatus",
 ]
 _ENGINE_ENTITY_DEFAULTS = {
     "task_template": "TaskTemplate", "scenario": "Scenario", "scenario_step": "ScenarioStep",
@@ -1715,6 +1716,26 @@ def workflow_engine(params: dict) -> str:
             f"assemble the {ss} step graph from the GOVERNED library of {tt} TaskTemplates — read the "
             f"{sc} + its {ss} rows, resolve each to the declared {tt}, and build the composition. "
             f"This action is composition only: never invents a task not in the {tt} library."
+        ),
+        "GetInstanceStatus": (
+            f"GetInstanceStatus — the task-queue / instance-state READ (live-proven required): any "
+            f"worker UI (a 'my open tasks' queue, an instance detail) needs this, and it is ALSO how you "
+            f"drive+observe the engine at runtime (the ASE test harness's db_query is v1 template-only and "
+            f"returns no SELECT rows, so drive/verify must read through action RETURNS). "
+            f"READ ACTION — EXCEPTION TO THE SPLIT RULE: it performs NO entity writes, so it does NOT need "
+            f"the public->*Internal write-split. Author it as a NON-public Server Action directly "
+            f"(same-app screens call Server Actions, and the ASE harness exposes ONLY Server Actions — this "
+            f"is what makes the engine runtime-drivable). Add a thin PUBLIC Service Action wrapper only if a "
+            f"different app must read it (allowed — it is side-effect-free). "
+            f"INPUT: WorkflowInstanceId ({wi} Identifier). OUTPUTS: State (Text — the {wi}.State), "
+            f"OpenTaskId ({ti} Identifier — the first still-open task), OpenStepCode (Text — that task's "
+            f"{tt}.Code), OpenCount (Integer — how many open tasks remain). LOGIC: fetch {wi} by Id -> "
+            f"State; aggregate {ti} JOINed to {tt} ({ti}.{tt}Id = {tt}.Id) filtered to "
+            f"{ti}.WorkflowInstanceId = the input AND {ti}.Status <> \"Done\" (use <> \"Done\" as the open "
+            f"test — do NOT hardcode a specific open-status literal), sorted by {ti}.Id ascending; "
+            f"OpenCount = its count; if > 0 set OpenTaskId + OpenStepCode from the first row, else leave "
+            f"them empty. A worker-queue variant (GetOpenTasksForActor: same read-only shape, filtered by "
+            f"Assignee/role across instances) follows this exact pattern for the worker portal."
         ),
     }
 
