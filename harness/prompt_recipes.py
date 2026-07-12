@@ -2528,12 +2528,54 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                                  "model_connection": ag.get("modelConnection", "TrialClaudeHaiku4_5"),
                                  "grounding": ag.get("grounding", []),
                                  "tools": ag.get("tools", [])}})
+    # workflow-engine: chunked ≤4 actions/step (D6). Emitted before logic so engine SAs are
+    # clearly separated from any remaining generic logic units.
+    eng = spec.get("engine")
+    if eng:
+        actions = list(eng.get("actions") or [])
+        entities = eng.get("entities") or {}
+        core_app = eng.get("coreApp") or "WorkflowEngineCore"
+        for i in range(0, max(len(actions), 1), 4):
+            chunk = actions[i:i + 4]
+            if not chunk:
+                break
+            steps.append({"recipe": "workflow-engine",
+                          "why": f"engine actions {', '.join(chunk)} on {core_app}",
+                          "params": {"entities": entities, "actions": chunk, "core_app": core_app}})
+
+    # dynamic-form: one step per screen that declares a dynamicForm block.
+    for s in spec.get("screens") or []:
+        df = s.get("dynamicForm")
+        if not df:
+            continue
+        steps.append({"recipe": "dynamic-form",
+                      "why": f"dynamic task form on {s.get('name', s['id'])}",
+                      "params": {"block_name": "DynamicTaskForm",
+                                 "screen": s.get("name", s["id"]),
+                                 "entities": {"task_template": df["taskTemplate"],
+                                              "task_instance": df["taskInstance"]},
+                                 "complete_action": df.get("completeAction", "CompleteTask")}})
+
+    # library-import: one step when the spec declares a libraryImport block.
+    lib = spec.get("libraryImport")
+    if lib:
+        steps.append({"recipe": "library-import",
+                      "why": f"seed workflow library ({', '.join(lib.get('libraryEntities') or [])})",
+                      "params": {"mode": lib.get("mode", "seed"),
+                                 "library_entities": lib.get("libraryEntities") or []}})
+
     # Batch B: standalone logic units (emitted last — a service action may wrap a write-path server action).
+    # D4 defense-in-depth: skip any serviceAction whose name is already in the engine's action list,
+    # so engine names never appear as both a workflow-engine step AND a generic logic service-action step.
+    _engine_names = set((spec.get("engine") or {}).get("actions") or [])
     _LOGIC_KIND = {"serviceAction": "service-action", "clientAction": "client-action",
                    "sqlAction": "sql-action", "globalEvent": "global-event"}
     for unit in spec.get("logic", []) or []:
         recipe = _LOGIC_KIND.get(unit.get("kind"))
         if not recipe:
+            continue
+        # D4: skip engine action names from generic logic loop.
+        if unit.get("kind") == "serviceAction" and unit.get("name") in _engine_names:
             continue
         p = {k: v for k, v in unit.items() if k != "kind"}
         steps.append({"recipe": recipe, "why": f"logic {unit['kind']} {unit.get('name', '')}", "params": p})

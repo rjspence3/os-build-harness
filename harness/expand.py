@@ -34,8 +34,140 @@ import sys
 from pathlib import Path
 
 from harness import architecture
+from harness.prompt_recipes import _ENGINE_ACTIONS, _ENGINE_ENTITY_DEFAULTS
 
 _ID_ATTR = {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True}
+
+# ── workflow-engine / dynamic-form / library-import detector helpers ──────────
+# All helpers are pure, never raise, and return empty/False on missing data.
+
+_LIBRARY_ENTITY_ORDER = ["TaskTemplate", "Scenario", "ScenarioStep", "TransitionRule", "DecisionRow"]
+
+
+def _engine_actions_for_core(owns: list[str], capabilities: list[dict]) -> list[str]:
+    """Return engine action names that belong on this Core (owns ∩ cap reads/writes non-empty),
+    in canonical _ENGINE_ACTIONS order. Never raises; returns [] on empty/missing data.
+
+    Collection logic (D3):
+      (a) Caps whose service ∈ _ENGINE_ACTIONS AND (reads ∪ writes) ∩ owns is non-empty.
+      (b) Orchestration steps whose callsService ∈ _ENGINE_ACTIONS (picks up InstantiateWorkflow etc.)
+      (c) Orchestration cap names that are themselves ∈ _ENGINE_ACTIONS (picks up EscalateOverdue).
+    """
+    if not owns or not capabilities:
+        return []
+    owns_set = set(owns)
+    engine_set = set(_ENGINE_ACTIONS)
+    found_a: set[str] = set()    # (a) top-level engine service caps, OWNS-GATED on their own entities
+    found_bc: set[str] = set()   # (b)/(c) orchestration references — no entity of their own to owns-gate
+
+    for cap in capabilities or []:
+        # (a) regular cap with a service field, gated on owning one of its read/write entities
+        svc = cap.get("service")
+        if svc and svc in engine_set:
+            entity_refs = set(cap.get("reads") or []) | set(cap.get("writes") or [])
+            if entity_refs & owns_set:
+                found_a.add(svc)
+        # (b) orchestration callsService steps (e.g. InstantiateWorkflow, referenced only here)
+        for step in cap.get("steps") or []:
+            cs = step.get("callsService")
+            if cs and cs in engine_set:
+                found_bc.add(cs)
+        # (c) orchestration cap name itself is an engine action (e.g. EscalateOverdue)
+        if cap.get("orchestrates") and cap.get("name") in engine_set:
+            found_bc.add(cap["name"])
+
+    # (b)/(c) are orchestration references with no entity of their own to owns-gate. Attribute them to
+    # the ENGINE Core ONLY — the Core that already owns >=1 top-level engine service cap (found_a). Without
+    # this gate a MULTI-Core workflow domain would stamp InstantiateWorkflow/EscalateOverdue onto every
+    # Core, not just the one owning the workflow entities (FIX-001). Single-engine-Core is unaffected.
+    found = found_a | (found_bc if found_a else set())
+    return [a for a in _ENGINE_ACTIONS if a in found]
+
+
+def _engine_entity_map(owns: list[str]) -> dict[str, str]:
+    """Return role->entity-name map for roles whose default entity is owned by this Core.
+    Roles whose default is not in owns are omitted (recipe _en() falls back to defaults).
+    Returns {} on empty/missing data (D5)."""
+    if not owns:
+        return {}
+    owns_set = set(owns)
+    return {role: default for role, default in _ENGINE_ENTITY_DEFAULTS.items()
+            if default in owns_set}
+
+
+def _library_entities_for_core(owns: list[str]) -> list[str]:
+    """Return library entity names owned by this Core, in FK parent-before-child order (D10).
+    Returns [] if none of the canonical 5 are owned."""
+    if not owns:
+        return []
+    owns_set = set(owns)
+    return [e for e in _LIBRARY_ENTITY_ORDER if e in owns_set]
+
+
+def _has_bulk_load_integration(domain: dict | None) -> bool:
+    """Return True when the domain declares a consume-kind integration whose purpose
+    mentions 'bulk-load' (case-insensitive). Returns False when domain is None (D9)."""
+    if not domain:
+        return False
+    dom = (domain.get("domain") or domain)
+    for integ in dom.get("integrations") or []:
+        if (integ.get("kind") == "consume"
+                and "bulk-load" in (integ.get("purpose") or "").lower()):
+            return True
+    return False
+
+
+def _task_screen_ids(capabilities: list[dict], domain_entities: dict, actor: str | None) -> list[str]:
+    """Return capability names (= screen ids) for task screens that should get a dynamicForm.
+
+    A task screen = a capability where:
+      - cap.actor == actor
+      - cap.reads includes a TaskTemplate-role entity (has FieldDefinition attribute)
+      - cap.reads includes a TaskInstance-role entity: an entity that references BOTH the template
+        entity AND a workflow-instance-like entity (has WorkflowInstance in its references)
+
+    The dual-reference requirement (template + workflow-instance) distinguishes a task runtime screen
+    (TaskInstance) from a library-management screen (ScenarioStep, which references TaskTemplate but
+    not a WorkflowInstance-like entity). (D8)
+    """
+    if not actor or not capabilities:
+        return []
+    result = []
+    for cap in capabilities:
+        if cap.get("actor") != actor:
+            continue
+        reads = set(cap.get("reads") or [])
+        if len(reads) < 2:
+            continue
+        # Find the template entity (has FieldDefinition attribute)
+        template_name = None
+        for ent_name in reads:
+            ent = domain_entities.get(ent_name) or {}
+            if any(a.get("name") == "FieldDefinition" for a in (ent.get("attributes") or [])):
+                template_name = ent_name
+                break
+        if not template_name:
+            continue
+        # Find the instance entity: references BOTH the template AND a WorkflowInstance-like entity
+        # (i.e. an entity that has a WorkflowInstance reference — distinguishes TaskInstance from ScenarioStep)
+        instance_name = None
+        for ent_name in reads:
+            if ent_name == template_name:
+                continue
+            ent = domain_entities.get(ent_name) or {}
+            refs = set(ent.get("references") or [])
+            # Must reference the template AND at least one entity that itself has a WorkflowInstance ref
+            # or is a "workflow_instance"-role entity.
+            if template_name not in refs:
+                continue
+            # Also verify this entity references something workflow-instance-like (not just library entities)
+            workflow_instance_default = _ENGINE_ENTITY_DEFAULTS.get("workflow_instance", "WorkflowInstance")
+            if workflow_instance_default in refs:
+                instance_name = ent_name
+                break
+        if template_name and instance_name:
+            result.append(cap["name"])
+    return result
 
 
 def _apps(system: dict) -> list[dict]:
@@ -88,7 +220,9 @@ def _app_references(consumes: list[dict]) -> list[dict]:
     return refs
 
 
-def _core_spec(app: dict, domain_entities: dict) -> dict:
+def _core_spec(app: dict, domain_entities: dict,
+               capabilities: list[dict] | None = None,
+               bulk_load: bool = False) -> dict:
     owns = app.get("owns", [])
     fks = app.get("foreignKeys", []) or []
     entities = [_entity_spec(n, fks, domain_entities) for n in owns]
@@ -96,7 +230,13 @@ def _core_spec(app: dict, domain_entities: dict) -> dict:
     for st in exposes.get("staticEntities", []) or []:
         entities.append({"name": st, "isStatic": True,
                          "attributes": [dict(_ID_ATTR), {"name": "Label", "dataType": "Text", "mandatory": True}]})
-    logic = [{"kind": "serviceAction", "name": sa} for sa in exposes.get("serviceActions", []) or []]
+
+    # Detect engine actions BEFORE building logic so we can remove duplicates (D4).
+    engine_actions = _engine_actions_for_core(owns, capabilities or [])
+    engine_names = set(engine_actions)
+
+    logic = [{"kind": "serviceAction", "name": sa} for sa in exposes.get("serviceActions", []) or []
+             if sa not in engine_names]
     logic += [{"kind": "globalEvent", "name": ev} for ev in exposes.get("events", []) or []]
     spec = {
         "specVersion": "0.2",
@@ -113,6 +253,21 @@ def _core_spec(app: dict, domain_entities: dict) -> dict:
     refs = _app_references(app.get("consumes", []))
     if refs:
         spec["appReferences"] = refs
+
+    # Stamp engine block when this Core owns engine capabilities (D2, D3, D5, D6).
+    if engine_actions:
+        spec["engine"] = {
+            "coreApp": app["name"],
+            "actions": engine_actions,
+            "entities": _engine_entity_map(owns),
+        }
+
+    # Stamp libraryImport when this Core owns library entities AND the domain has a bulk-load integration (D9, D10).
+    if bulk_load:
+        lib_ents = _library_entities_for_core(owns)
+        if lib_ents:
+            spec["libraryImport"] = {"mode": "seed", "libraryEntities": lib_ents}
+
     return spec
 
 
@@ -138,15 +293,55 @@ def _consumed_entities(app: dict) -> list[str]:
     return out
 
 
-def _enduser_spec(app: dict, capabilities: list[dict]) -> dict:
+def _enduser_spec(app: dict, capabilities: list[dict],
+                  domain_entities: dict | None = None) -> dict:
     role = _role_for(app)
     read_entities = _consumed_entities(app)
     screen_names = (app.get("exposes") or {}).get("screens", [])
+
+    # Detect task screens for dynamic-form stamping (D7, D8).
+    task_screen_set = set(_task_screen_ids(capabilities, domain_entities or {}, app.get("actor")))
+
+    # Build a lookup from domain entities for task screen details.
+    # For a task screen we need to know: which entity is the template (has FieldDefinition)
+    # and which is the instance (references the template).
+    def _task_form_info(cap_name: str) -> dict | None:
+        """Return {taskInstance, taskTemplate, completeAction} for a task screen cap, or None."""
+        cap = next((c for c in (capabilities or []) if c.get("name") == cap_name), None)
+        if not cap:
+            return None
+        de = domain_entities or {}
+        reads = cap.get("reads") or []
+        template_name = None
+        instance_name = None
+        for ent_name in reads:
+            ent = de.get(ent_name) or {}
+            if any(a.get("name") == "FieldDefinition" for a in (ent.get("attributes") or [])):
+                template_name = ent_name
+        for ent_name in reads:
+            if ent_name == template_name:
+                continue
+            ent = de.get(ent_name) or {}
+            refs = ent.get("references") or []
+            if template_name and template_name in refs:
+                instance_name = ent_name
+                break
+        if template_name and instance_name:
+            return {"taskInstance": instance_name, "taskTemplate": template_name,
+                    "completeAction": "CompleteTask"}
+        return None
+
     screens = []
     for i, s in enumerate(screen_names):
         # bind each screen to a consumed entity round-robin so the app shows real producer data
         ent = read_entities[i % len(read_entities)] if read_entities else None
-        screens.append(_list_screen(s, s, ent))
+        screen = _list_screen(s, s, ent)
+        # Stamp dynamicForm when this screen is a task screen (D7, D8).
+        if s in task_screen_set:
+            info = _task_form_info(s)
+            if info:
+                screen["dynamicForm"] = info
+        screens.append(screen)
     if not screens:
         screens = [_list_screen("home", "Home", read_entities[0] if read_entities else None)]
     if screens:
@@ -232,6 +427,8 @@ def expand_system(system: dict, domain: dict | None = None) -> dict:
     Each spec is app_spec.v0.2-valid; libraries are returned separately (own recipe path)."""
     domain_entities = _domain_entities(domain)
     capabilities = (domain.get("domain") or domain).get("capabilities", []) if domain else []
+    # Compute once: does the domain have a bulk-load integration? (D9, guards None domain)
+    bulk_load = _has_bulk_load_integration(domain)
     specs: dict[str, dict] = {}
     libraries: list[str] = []
     for app in _apps(system):
@@ -239,12 +436,12 @@ def expand_system(system: dict, domain: dict | None = None) -> dict:
         if layer == "foundation":
             libraries.append(app["name"])
         elif layer == "core":
-            specs[app["name"]] = _core_spec(app, domain_entities)
+            specs[app["name"]] = _core_spec(app, domain_entities, capabilities, bulk_load)
         elif layer == "orchestration":
             specs[app["name"]] = (_workflow_spec(app) if app.get("kind") == "BusinessProcess"
                                   else _agent_spec(app))
         elif layer == "enduser":
-            specs[app["name"]] = _enduser_spec(app, capabilities)
+            specs[app["name"]] = _enduser_spec(app, capabilities, domain_entities)
     return {"specs": specs, "libraries": libraries}
 
 

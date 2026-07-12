@@ -1441,6 +1441,158 @@ def test_G3d_library_import_bogus_mode_raises():
         pr.render("library-import", {"mode": "bogus"})
 
 
+# ── emitter unit tests (plan_from_spec -> workflow-engine / dynamic-form / library-import) ──────
+
+def _engine_spec(actions, entities=None, core_app="WorkflowCore", extra_logic=None):
+    """Helper: build a minimal spec with an engine block and optional logic units."""
+    spec = {
+        "specVersion": "0.2",
+        "app": {"name": core_app, "roles": ["User"]},
+        "dataModel": {"entities": []},
+        "screens": [],
+        "engine": {"coreApp": core_app, "actions": actions,
+                   "entities": entities or {"task_template": "TaskTemplate",
+                                            "task_instance": "TaskInstance"}},
+    }
+    if extra_logic:
+        spec["logic"] = extra_logic
+    return spec
+
+
+def test_emitter_workflow_engine_8_actions_produces_2_chunks():
+    """8 actions -> exactly 2 workflow-engine steps, each len<=4 (D6)."""
+    from harness.prompt_recipes import _ENGINE_ACTIONS
+    spec = _engine_spec(_ENGINE_ACTIONS)
+    steps = pr.plan_from_spec(spec)
+    wf = [s for s in steps if s["recipe"] == "workflow-engine"]
+    assert len(wf) == 2, f"expected 2 chunks, got {len(wf)}"
+    assert wf[0]["params"]["actions"] == _ENGINE_ACTIONS[:4]
+    assert wf[1]["params"]["actions"] == _ENGINE_ACTIONS[4:]
+    for s in wf:
+        assert len(s["params"]["actions"]) <= 4
+
+
+def test_emitter_workflow_engine_core_app_and_entities_passthrough():
+    """core_app and entities are passed to each chunk unchanged."""
+    from harness.prompt_recipes import _ENGINE_ACTIONS
+    entities = {"task_template": "TaskTemplate", "task_instance": "TaskInstance"}
+    spec = _engine_spec(_ENGINE_ACTIONS, entities=entities, core_app="MyCore")
+    steps = pr.plan_from_spec(spec)
+    for s in [s for s in steps if s["recipe"] == "workflow-engine"]:
+        assert s["params"]["core_app"] == "MyCore"
+        assert s["params"]["entities"] == entities
+
+
+def test_emitter_workflow_engine_renders_each_chunk():
+    """Each chunk renders (no exception) and mentions the core_app."""
+    from harness.prompt_recipes import _ENGINE_ACTIONS
+    spec = _engine_spec(_ENGINE_ACTIONS, core_app="WorkflowCore")
+    for s in [s for s in pr.plan_from_spec(spec) if s["recipe"] == "workflow-engine"]:
+        prompt = pr.render("workflow-engine", s["params"])
+        assert "WorkflowCore" in prompt
+
+
+def test_emitter_no_engine_block_produces_no_workflow_engine_step():
+    """A spec without an engine block produces no workflow-engine step."""
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": []}, "screens": []}
+    assert not [s for s in pr.plan_from_spec(spec) if s["recipe"] == "workflow-engine"]
+
+
+def test_emitter_engine_dedupe_removes_engine_names_from_logic():
+    """D4: a serviceAction in logic whose name is in engine.actions is skipped; non-engine SAs stay."""
+    from harness.prompt_recipes import _ENGINE_ACTIONS
+    spec = _engine_spec(
+        [_ENGINE_ACTIONS[0]],  # e.g. "ResolveScenario"
+        extra_logic=[
+            {"kind": "serviceAction", "name": _ENGINE_ACTIONS[0]},   # same name -> dedupe
+            {"kind": "serviceAction", "name": "SaveLibraryElement"},  # non-engine -> keep
+            {"kind": "serviceAction", "name": "SubmitIntake"},        # non-engine -> keep
+        ]
+    )
+    steps = pr.plan_from_spec(spec)
+    service_actions = [s["params"]["name"] for s in steps if s["recipe"] == "service-action"]
+    assert _ENGINE_ACTIONS[0] not in service_actions, "engine action should be deduped from logic"
+    assert "SaveLibraryElement" in service_actions
+    assert "SubmitIntake" in service_actions
+    assert len([s for s in steps if s["recipe"] == "workflow-engine"]) == 1
+
+
+def test_emitter_non_engine_core_logic_unchanged():
+    """A non-engine Core's logic serviceActions are emitted unchanged (no engine block)."""
+    spec = {"specVersion": "0.2", "app": {"name": "OrderingCore", "roles": ["User"]},
+            "dataModel": {"entities": []}, "screens": [],
+            "logic": [{"kind": "serviceAction", "name": "PlaceOrder"},
+                      {"kind": "globalEvent", "name": "OrderPlaced"}]}
+    steps = pr.plan_from_spec(spec)
+    sa_names = [s["params"]["name"] for s in steps if s["recipe"] == "service-action"]
+    assert "PlaceOrder" in sa_names
+    ev_names = [s["params"]["name"] for s in steps if s["recipe"] == "global-event"]
+    assert "OrderPlaced" in ev_names
+
+
+def test_emitter_dynamic_form_from_screen_field():
+    """A screen with dynamicForm -> 1 dynamic-form step with correct entities/complete_action."""
+    spec = {"specVersion": "0.2", "app": {"name": "WorkerApp", "roles": ["Worker"]},
+            "dataModel": {"entities": []},
+            "screens": [{
+                "id": "mywork", "name": "MyWork",
+                "components": [{"id": "c1", "type": "Label", "label": "x"}],
+                "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c1"}]},
+                "dynamicForm": {"taskInstance": "TaskInstance", "taskTemplate": "TaskTemplate",
+                                "completeAction": "CompleteTask"}
+            }]}
+    steps = pr.plan_from_spec(spec)
+    df = [s for s in steps if s["recipe"] == "dynamic-form"]
+    assert len(df) == 1
+    p = df[0]["params"]
+    assert p["entities"] == {"task_template": "TaskTemplate", "task_instance": "TaskInstance"}
+    assert p["complete_action"] == "CompleteTask"
+    assert p["screen"] == "MyWork"
+
+
+def test_emitter_dynamic_form_renders():
+    """dynamic-form step renders without exception."""
+    params = {"block_name": "DynamicTaskForm", "screen": "MyWork",
+              "entities": {"task_template": "TaskTemplate", "task_instance": "TaskInstance"},
+              "complete_action": "CompleteTask"}
+    prompt = pr.render("dynamic-form", params)
+    assert "DynamicTaskForm" in prompt and "TaskTemplate" in prompt
+
+
+def test_emitter_no_dynamic_form_field_produces_no_step():
+    """A screen without dynamicForm produces no dynamic-form step."""
+    spec = {"specVersion": "0.2", "app": {"name": "WorkerApp", "roles": ["W"]},
+            "dataModel": {"entities": []},
+            "screens": [{"id": "home", "name": "Home",
+                         "components": [{"id": "c", "type": "Label", "label": "x"}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "c"}]}}]}
+    assert not [s for s in pr.plan_from_spec(spec) if s["recipe"] == "dynamic-form"]
+
+
+def test_emitter_library_import_seed_default():
+    """libraryImport block -> 1 library-import step, mode seed, FK-ordered entities, renders."""
+    lib_ents = ["TaskTemplate", "Scenario", "ScenarioStep", "TransitionRule", "DecisionRow"]
+    spec = {"specVersion": "0.2", "app": {"name": "WorkflowCore", "roles": ["User"]},
+            "dataModel": {"entities": []}, "screens": [],
+            "libraryImport": {"mode": "seed", "libraryEntities": lib_ents}}
+    steps = pr.plan_from_spec(spec)
+    li = [s for s in steps if s["recipe"] == "library-import"]
+    assert len(li) == 1
+    p = li[0]["params"]
+    assert p["mode"] == "seed"
+    assert p["library_entities"] == lib_ents
+    prompt = pr.render("library-import", p)
+    assert "seed" in prompt.lower() and "TaskTemplate" in prompt
+
+
+def test_emitter_no_library_import_produces_no_step():
+    """A spec without libraryImport produces no library-import step."""
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": []}, "screens": []}
+    assert not [s for s in pr.plan_from_spec(spec) if s["recipe"] == "library-import"]
+
+
 # ── T-REG: registry checks ────────────────────────────────────────────────────
 
 def test_REG_new_recipes_in_registry(capsys):

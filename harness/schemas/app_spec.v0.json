@@ -135,6 +135,14 @@
         "$ref": "#/$defs/process"
       },
       "description": "Batch C: Business Processes (BPT). plan_from_spec emits one `workflow` step each, last."
+    },
+    "engine": {
+      "$ref": "#/$defs/engineBlock",
+      "description": "Dynamic-workflow engine block (Core layer). Emitted by expand.py when the Core owns engine capabilities. plan_from_spec emits chunked workflow-engine steps (<=4 actions each)."
+    },
+    "libraryImport": {
+      "$ref": "#/$defs/libraryImportBlock",
+      "description": "Library import block (Core layer). Emitted by expand.py when the Core owns library entities and the domain has a bulk-load integration. plan_from_spec emits a library-import step."
     }
   },
   "$defs": {
@@ -414,6 +422,10 @@
         "detail": {
           "$ref": "#/$defs/detailSpec",
           "description": "PRODUCT-UI: make this a rich case-detail screen (stage stepper + parallel reviews + audit timeline) — authored via the `detail` recipe."
+        },
+        "dynamicForm": {
+          "$ref": "#/$defs/dynamicFormBlock",
+          "description": "Dynamic task form on this screen — authored via the `dynamic-form` recipe. Emitted by expand.py for worker task screens that read TaskInstance+TaskTemplate."
         }
       }
     },
@@ -1596,6 +1608,72 @@
           "items": {
             "$ref": "#/$defs/processActivity"
           }
+        }
+      }
+    },
+    "engineBlock": {
+      "type": "object",
+      "required": ["coreApp", "actions", "entities"],
+      "additionalProperties": false,
+      "description": "Workflow engine configuration stamped by expand.py onto a Core-layer spec that owns engine capabilities.",
+      "properties": {
+        "coreApp": {
+          "type": "string",
+          "description": "Name of the Core app that owns the engine service actions."
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered list of engine action names (canonical _ENGINE_ACTIONS order)."
+        },
+        "entities": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Role-to-entity-name map (e.g. task_template -> TaskTemplate). Roles not in owns are omitted; recipe _en() falls back to defaults."
+        }
+      }
+    },
+    "libraryImportBlock": {
+      "type": "object",
+      "required": ["mode", "libraryEntities"],
+      "additionalProperties": false,
+      "description": "Library import configuration stamped by expand.py onto a Core that owns library entities and has a bulk-load integration.",
+      "properties": {
+        "mode": {
+          "enum": ["seed", "etl"],
+          "description": "Import mode: seed (dev-only DELETE-then-INSERT) or etl (natural-key upsert)."
+        },
+        "libraryEntities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ordered list of library entity names (FK parent-before-child order)."
+        }
+      }
+    },
+    "dynamicFormBlock": {
+      "type": "object",
+      "required": ["taskInstance", "taskTemplate"],
+      "additionalProperties": false,
+      "description": "Dynamic task form configuration stamped by expand.py onto a worker task screen.",
+      "properties": {
+        "taskInstance": {
+          "type": "string",
+          "description": "Name of the TaskInstance entity for this form."
+        },
+        "taskTemplate": {
+          "type": "string",
+          "description": "Name of the TaskTemplate entity (carries FieldDefinition)."
+        },
+        "completeAction": {
+          "type": "string",
+          "default": "CompleteTask",
+          "description": "Service action name the form calls on submit."
         }
       }
     }
