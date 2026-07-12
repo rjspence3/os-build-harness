@@ -1376,6 +1376,48 @@ def test_G2b_dynamic_form_custom_entities_and_types():
     assert "checkbox" not in p
 
 
+def test_G2c_dynamic_form_live_proven_parse_gotchas():
+    """The dynamic-form recipe must carry the ODC parse mechanics learned by hand-building the live
+    demo: reserved-word FType, case-sensitive JSONDeserialize + key normalization, the FormField
+    structure shape, and the select->text fallback. Omitting any reproduces a live bug."""
+    p = pr.render("dynamic-form", {})
+    # reserved word + structure shape
+    assert "FType" in p and "'Type' is a reserved word" in p
+    assert "FormField" in p
+    assert "Required (Boolean)" in p and "Options (List of Text)" in p
+    # case-sensitive deserialize + normalization of the JSON property names
+    assert "CASE-SENSITIVE" in p
+    assert "normali" in p.lower()          # NORMALIZED / normalize
+    assert "Replace()" in p
+    assert '-> "Label":' in p              # the concrete key-normalization mapping
+    assert "empty-label" in p
+    # select fallback limitation
+    assert "SELECT LIMITATION" in p and "text Input" in p
+    # the parse driver + submit serialization
+    assert "LoadActiveForm" in p and "JSONSerialize" in p
+
+
+def test_G1d_workflow_engine_frontier_not_a_count():
+    """The workflow-engine recipe must warn NEVER to advance by counting completed tasks (the live
+    over-advance bug on a rework/loop-back), and must describe the reject->rework routing."""
+    p = pr.render("workflow-engine", {"actions": ["AdvanceInstance", "CompleteTask"]})
+    assert "FRONTIER" in p
+    assert "over-advance" in p
+    assert "COUNTING" in p                 # never pick the next step by counting done tasks
+    assert "rework" in p and "loop-back" in p
+    # CompleteTask carries the approval-reject routing
+    assert "Reject" in p and "does NOT mark the instance Completed" in p
+
+
+def test_agent_recipe_carries_cold_start_timeout_caveat():
+    """The agent recipe must warn about the 10s client-side cold-start timeout when a screen invokes
+    an agent synchronously (live-proven OS-CLRT-60900)."""
+    p = pr.render("agent", {"agent_name": "TriageAgent", "system_prompt": "You triage tickets."})
+    assert "OS-CLRT-60900" in p
+    assert "10s" in p
+    assert "cold" in p.lower()
+
+
 def test_G2c_dynamic_form_role_gate():
     """T-G2c: role_gate default -> ln_current_user present; False -> absent, Anonymous still present."""
     p_default = pr.render("dynamic-form", {})
