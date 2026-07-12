@@ -1273,3 +1273,184 @@ def test_dashboard_aggregates_are_uniquely_named_per_card():
         {"label": "Open Cases", "entity": "QualificationCase"},
         {"label": "Overdue", "entity": "QualificationCase", "filter": 'SlaState = "OVERDUE"'}]})
     assert "CountOpenCases.Count" in bind and "CountOverdue.Count" in bind
+
+
+# ── G1: workflow-engine ───────────────────────────────────────────────────────
+
+def test_G1a_workflow_engine_defaults():
+    """T-G1a: render with no params; check all default-action names + doctrine substrings."""
+    p = pr.render("workflow-engine", {})
+    assert "WorkflowEngineCore" in p
+    # Default 4 actions
+    for name in ["ResolveScenario", "InstantiateWorkflow", "AdvanceInstance", "CompleteTask"]:
+        assert name in p
+    assert "OS-DPL-50205" in p
+    assert "AdvanceInstance->AdvanceInternal" in p
+    assert "N-invariant" in p
+    assert "off-by-one" in p
+    assert "co-locate" in p
+    assert "do not publish" in p.lower()
+
+
+def test_G1b_workflow_engine_custom_entities():
+    """T-G1b: custom entities override; defaults fill in the rest."""
+    p = pr.render("workflow-engine", {
+        "entities": {"scenario": "Flow", "transition_rule": "Rule", "task_instance": "Unit"}
+    })
+    assert "Flow" in p
+    assert "Rule" in p
+    assert "Unit" in p
+    # These roles weren't overridden — defaults apply
+    assert "TaskTemplate" in p
+    assert "AuditEvent" in p
+
+
+def test_G1c_workflow_engine_subset_and_chunk():
+    """T-G1c: ClaimTask only; chunk warning when full set; Bogus filtered; empty no crash."""
+    # ClaimTask only: present + wipes-unset-columns + fetch; off-by-one NOT needed
+    p_claim = pr.render("workflow-engine", {"actions": ["ClaimTask"]})
+    assert "ClaimTask" in p_claim
+    assert "wipes unset columns" in p_claim
+    assert "fetch" in p_claim.lower()
+    assert "off-by-one" not in p_claim
+    assert "OS-DPL-50205" in p_claim
+    assert "co-locate" in p_claim
+
+    # Full set: all 8 names + 900s chunk warning + doctrine substrings
+    p_full = pr.render("workflow-engine", {"actions": pr._ENGINE_ACTIONS})
+    for name in pr._ENGINE_ACTIONS:
+        assert name in p_full
+    assert "900s" in p_full
+    assert "no orphan" in p_full
+    assert "never invents a task" in p_full
+    assert "nothing runs unvalidated" in p_full
+
+    # Unknown action filtered; known one present
+    p_mixed = pr.render("workflow-engine", {"actions": ["ClaimTask", "Bogus"]})
+    assert "ClaimTask" in p_mixed
+    assert "Bogus" not in p_mixed
+
+    # Empty list: OS-DPL-50205 still emitted, no crash
+    p_empty = pr.render("workflow-engine", {"actions": []})
+    assert "OS-DPL-50205" in p_empty
+
+
+# ── G2: dynamic-form ─────────────────────────────────────────────────────────
+
+def test_G2a_dynamic_form_defaults():
+    """T-G2a: render with no params; all doctrine substrings present."""
+    p = pr.render("dynamic-form", {})
+    assert "SPIKE" in p
+    assert "FieldDefinition" in p
+    assert "no dynamic widget" in p
+    assert "Switch" in p
+    for ft in ["text", "textarea", "number", "date", "select", "checkbox"]:
+        assert ft in p
+    assert "InputData" in p
+    assert "OutputData" in p
+    assert "CompleteTask" in p
+    assert "TransitionRule.Condition" in p
+    assert "Structure" in p
+    assert "cannot live in a BPT app" in p
+    assert "first '{'" in p
+    assert "last '}'" in p
+    assert "data-spec-id" in p
+    assert "Anonymous" in p
+    assert "do not publish" in p.lower()
+
+
+def test_G2b_dynamic_form_custom_entities_and_types():
+    """T-G2b: custom entities, field_types subset, custom complete_action."""
+    p = pr.render("dynamic-form", {
+        "entities": {"task_template": "WorkTemplate", "task_instance": "WorkItem"},
+        "field_types": ["text", "select"],
+        "complete_action": "FinishTask",
+    })
+    assert "WorkTemplate" in p
+    assert "FieldDefinition" in p   # attribute name stays constant
+    assert "WorkItem" in p
+    assert "FinishTask" in p
+    assert "text" in p
+    assert "select" in p
+    assert "textarea" not in p
+    assert "checkbox" not in p
+
+
+def test_G2c_dynamic_form_role_gate():
+    """T-G2c: role_gate default -> ln_current_user present; False -> absent, Anonymous still present."""
+    p_default = pr.render("dynamic-form", {})
+    assert "ln_current_user" in p_default
+
+    p_no_gate = pr.render("dynamic-form", {"role_gate": False})
+    assert "ln_current_user" not in p_no_gate
+    assert "Anonymous" in p_no_gate
+
+
+# ── G3: library-import ────────────────────────────────────────────────────────
+
+def test_G3a_library_import_seed_defaults():
+    """T-G3a: seed mode defaults — all doctrine substrings present."""
+    p = pr.render("library-import", {})
+    assert "LoadLibrary" in p
+    assert "NON-PUBLIC" in p
+    assert "OS-DPL-50205" in p
+    assert "FK order" in p
+    # All 5 default entities present in FK order
+    entities = ["TaskTemplate", "Scenario", "ScenarioStep", "TransitionRule", "DecisionRow"]
+    for e in entities:
+        assert e in p
+    # FK order: each entity appears before the next in the string
+    positions = [p.index(e) for e in entities]
+    assert positions == sorted(positions)
+    assert "DELETE-then-INSERT" in p
+    assert "IsInDevStage" in p
+    assert "OnReady" in p
+    assert "headless" in p.lower()
+    assert "do not publish" in p.lower()
+
+
+def test_G3b_library_import_etl():
+    """T-G3b: etl mode doctrine substrings."""
+    p = pr.render("library-import", {"mode": "etl"})
+    assert "REST" in p
+    assert "natural-key upsert" in p
+    assert "Code" in p
+    assert "fetch" in p.lower()
+    assert "wipes unset columns" in p
+    assert "FK order" in p
+    assert "DELETE-then-INSERT" not in p
+
+
+def test_G3c_library_import_etl_custom():
+    """T-G3c: etl with custom natural_key and library_entities subset."""
+    p = pr.render("library-import", {
+        "mode": "etl",
+        "natural_key": "ExternalId",
+        "library_entities": ["Scenario", "DecisionRow"],
+    })
+    assert "ExternalId" in p
+    assert "Scenario" in p
+    assert "DecisionRow" in p
+    assert "TaskTemplate" not in p
+
+
+def test_G3d_library_import_bogus_mode_raises():
+    """T-G3d: unknown mode raises ValueError."""
+    import pytest
+    with pytest.raises(ValueError):
+        pr.render("library-import", {"mode": "bogus"})
+
+
+# ── T-REG: registry checks ────────────────────────────────────────────────────
+
+def test_REG_new_recipes_in_registry(capsys):
+    """T-REG: all three new names in RECIPES; each renders with 'do not publish'; --list shows all."""
+    for name in ("workflow-engine", "dynamic-form", "library-import"):
+        assert name in pr.RECIPES, f"{name!r} missing from RECIPES"
+        p = pr.render(name, {})
+        assert "do not publish" in p.lower(), f"{name!r} missing 'do not publish'"
+
+    prompt_step.main(["--list"])
+    out = capsys.readouterr().out
+    for name in ("workflow-engine", "dynamic-form", "library-import"):
+        assert name in out, f"{name!r} missing from --list output"

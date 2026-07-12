@@ -772,6 +772,14 @@ def agent(params: dict) -> str:
     verification endpoint, strip for production), tools?:[ str | {name, description, parameters?, required?} ]
     (function-calling tools; grounding covers most needs, tools add multi-step action).
 
+    JSON-OUTPUT CONSUMERS (live-proven dynamic_workflow 2026-07-11): when this agent is prompted to emit
+    JSON, its Response STILL arrives wrapped in a ```json ... ``` markdown fence even with a strict
+    "raw JSON only" system_prompt — the model ignores that instruction reliably enough that you must NOT
+    trust the prompt. Any downstream action that deserializes the Response MUST extract robustly: take the
+    substring from the first '{' to the LAST '}' (JsonStart = Index(Response,"{"); JsonEnd =
+    Index(Response,"}",0,True) reverse-search; guard JsonStart<>-1 and JsonEnd>JsonStart) BEFORE
+    JSONDeserialize — never deserialize the raw Response. This survived the fence and returned Valid=true.
+
     Why this shape (the stock ABC boilerplate agent, inspected live 2026-07-10): an ODC agent runs
     headless, and the LLM is invoked by the native "Call Agent" widget inside AgentFlow (Agent +
     Messages) — NOT a hand-written model call. Function-calling is NATIVE: tools are Server Actions
@@ -1210,6 +1218,24 @@ def _sig(items) -> str:
                      for i in (items or [])) or "none"
 
 
+# ── Dynamic-workflow engine constants ─────────────────────────────────────────
+_ENGINE_ACTIONS = [
+    "ResolveScenario", "InstantiateWorkflow", "AdvanceInstance", "CompleteTask",
+    "ClaimTask", "EscalateOverdue", "ValidateComposition", "ComposeInstance",
+]
+_ENGINE_ENTITY_DEFAULTS = {
+    "task_template": "TaskTemplate", "scenario": "Scenario", "scenario_step": "ScenarioStep",
+    "transition_rule": "TransitionRule", "decision_row": "DecisionRow",
+    "workflow_instance": "WorkflowInstance", "task_instance": "TaskInstance",
+    "audit_event": "AuditEvent",
+}
+
+
+def _en(entities: dict, role: str) -> str:
+    """Resolve an entity role to its name, falling back to _ENGINE_ENTITY_DEFAULTS."""
+    return (entities or {}).get(role, _ENGINE_ENTITY_DEFAULTS[role])
+
+
 def service_action(params: dict) -> str:
     """Author a PUBLIC Service Action — the cross-app-callable API unit (also how an AI agent's Tools are
     exposed). A Server Action CANNOT be Public in an app (OS-BLD-40409); a Service Action IS the exposed
@@ -1222,8 +1248,10 @@ def service_action(params: dict) -> str:
       2. Its signature must use only PORTABLE types — primitives, Structures, Lists thereof. NO Entity
          Record and NO Entity Identifier parameters. Take an entity key as a plain Long Integer input and
          cast internally with LongIntegerToIdentifier(x) where the FK comparison needs the identifier type.
-    (OS-DPL-50205 is a generic bucket — also fires for a cross-app-entity FK and a public raise-event
-    action; always diagnose the specific element read-only.)"""
+    (OS-DPL-50205 is a generic bucket — also fires for a cross-app-entity FK, a public raise-event
+    action, and consuming a Service Action cross-app from a SCREEN-BEARING reactive (CrossDevice)
+    producer — for that last case co-locate the orchestration INSIDE the producer so the calls stay
+    local (see app_reference); always diagnose the specific element read-only.)"""
     name = _p(params, "name", required=True)
     wraps = _p(params, "wraps")
     writes = _p(params, "writes", False)  # does the wrapped operation mutate entities?
@@ -1241,7 +1269,11 @@ def service_action(params: dict) -> str:
             f"Structure / List types in the signature — NO Entity Record or Entity Identifier parameters; take "
             f"an entity key as Long Integer and cast with LongIntegerToIdentifier() internally. PUBLIC-WRITE "
             f"RULE: this action must NOT Create/Update/Delete/DeleteAll any entity — keep writes in a separate "
-            f"non-public Server Action. Build the flow with Start + End nodes and the operation between. After "
+            f"non-public Server Action. TESTABILITY: this public-Service -> private *Internal-Server split is ALSO "
+            f"how the logic becomes runtime-testable — the ASE test harness (exec_in_app) exposes ONLY Server Actions, "
+            f"never Service Actions, so put the real logic in a private *Internal Server Action and have this Service "
+            f"Action delegate to it (mirrors AdvanceInstance->AdvanceInternal; live-proven dynamic_workflow 2026-07-11). "
+            f"Build the flow with Start + End nodes and the operation between. After "
             f"authoring, run model validation and report errors. Do not publish.")
 
 
@@ -1473,8 +1505,15 @@ def app_reference(params: dict) -> str:
             f"A referenced ENTITY is CONSUME-ONLY: read it via an aggregate/read logic — do NOT create a local entity "
             f"with a FOREIGN KEY to a cross-app referenced entity; that FK constraint cannot be materialized across app "
             f"database boundaries and FAILS the deploy with OS-DPL-50205 'Model features validation failed' (verified "
-            f"2026-07-07, static AND regular). Referenced Service Actions + Global Events are call/consume targets and "
-            f"deploy fine (proven, wfprobe). Import EVERY entity you touch INCLUDING any STATIC entity — an entity "
+            f"2026-07-07, static AND regular). Referenced Global Events + Service Actions from a HEADLESS Service/Core "
+            f"producer are call/consume targets and deploy fine (proven, wfprobe) — BUT consuming a Service Action "
+            f"cross-app from a SCREEN-BEARING reactive producer (a CrossDevice app that owns screens / a portal) ALSO "
+            f"trips OS-DPL-50205 at publish (live-proven dynamic_workflow 2026-07-11: the reactive producer's UI model "
+            f"features leak into the consumer's validation surface, 0 in-session errors then a failed publish). When the "
+            f"producer is screen-bearing, do NOT build a separate consumer/orchestrator app that calls its Service "
+            f"Actions — CO-LOCATE the orchestration action INSIDE that producer (its own Service/Server Actions become "
+            f"local calls) and keep only genuinely-headless refs (e.g. an AI agent) external. Import EVERY entity you "
+            f"touch INCLUDING any STATIC entity — an entity "
             f"referenced only by Id (a hidden Id-only stub, not fully imported) can make the OML invalid at publish "
             f"(OS-APPS-40028); recover in-session via TryParseGlobalKey + AddDependency + RefreshDependencies. After "
             f"authoring, run model validation. Do not publish.")
@@ -1536,6 +1575,284 @@ def kpi_rebind(params: dict) -> str:
     )
 
 
+def workflow_engine(params: dict) -> str:
+    """Author the FIXED, N-invariant data-driven state-machine engine inside a producer Core app.
+    The engine is a set of public Service Actions, each delegating to a private *Internal Server Action
+    (the OS-DPL-50205 split + ASE-testability rule). params: entities (role->name dict), actions (list
+    of engine action names to author this turn; default 4-action set), core_app (default
+    WorkflowEngineCore), model_output_consumer (bool; default True — emit robust-JSON paragraph)."""
+    entities = _p(params, "entities", {})
+    requested = _p(params, "actions", _ENGINE_ACTIONS[:4])
+    core_app = _p(params, "core_app", "WorkflowEngineCore")
+    model_output_consumer = _p(params, "model_output_consumer", True)
+
+    # Filter unknown actions; preserve order; tolerate empty list
+    valid_set = set(_ENGINE_ACTIONS)
+    actions = [a for a in (requested or []) if a in valid_set]
+
+    # Entity name shortcuts
+    tt = _en(entities, "task_template")
+    sc = _en(entities, "scenario")
+    ss = _en(entities, "scenario_step")
+    tr = _en(entities, "transition_rule")
+    dr = _en(entities, "decision_row")
+    wi = _en(entities, "workflow_instance")
+    ti = _en(entities, "task_instance")
+    ae = _en(entities, "audit_event")
+
+    # Cross-cutting split rule (always emitted even for empty action list)
+    split_rule = (
+        f"SPLIT RULE (OS-DPL-50205, live-proven): every engine operation is a PUBLIC Service Action that "
+        f"delegates ALL logic (including every entity write) to a NON-public *Internal Server Action "
+        f"(mirrors AdvanceInstance->AdvanceInternal). The public action may NOT Create/Update/Delete any "
+        f"entity — that trips OS-DPL-50205 at publish. The split ALSO makes the logic runtime-testable: "
+        f"the ASE harness exposes only Server Actions, so the real logic lives in the *Internal Server "
+        f"Action. co-locate all engine Service Actions INSIDE {core_app} (the producer Core) — do NOT "
+        f"author engine actions in a separate consumer/orchestrator app (also OS-DPL-50205 when the "
+        f"producer is screen-bearing)."
+    )
+
+    chunk_warning = ""
+    if len(actions) > 4:
+        chunk_warning = (
+            f"\nCHUNK WARNING: {len(actions)} actions requested. Authoring all in one turn risks the "
+            f"900s Mentor session timeout (WALL-005). Recommend splitting into ≤4 actions per turn.\n"
+        )
+
+    # Per-action doctrine blocks
+    action_blocks = []
+
+    _action_docs = {
+        "ResolveScenario": (
+            f"ResolveScenario (Public Service Action -> ResolveScenarioInternal Server Action): "
+            f"given a context/criteria input, look up the matching {sc}.Id by scoring against {dr} rows "
+            f"(indexed priority match — each {dr} row has a priority/rank; pick the highest-priority "
+            f"matching row). This lookup MUST be N-invariant: never scans the full {dr} table "
+            f"unconditionally; the filter is indexed on the priority/matching columns so it scales with "
+            f"any N rows. Returns the resolved {sc}.Id."
+        ),
+        "InstantiateWorkflow": (
+            f"InstantiateWorkflow (Public Service Action -> InstantiateWorkflowInternal Server Action): "
+            f"create a {wi} record (State=Running), then spawn the FIRST wave of {ti}(s): "
+            f"all {ss} rows in the first ParallelGroup (or all steps with no unmet DependsOnStep "
+            f"dependency). Write an {ae} row for the instantiation. Return the new {wi}.Id."
+        ),
+        "AdvanceInstance": (
+            f"AdvanceInstance (Public Service Action -> AdvanceInstanceInternal Server Action — "
+            f"load-bearing; called by CompleteTask): check if ALL Active {ti}(s) for the {wi} are Done. "
+            f"If not, nothing to advance yet (return early). If yes, evaluate {tr}.Condition expressions "
+            f"over the completed {ti}.OutputData to pick the next transition (first-match wins). Spawn "
+            f"next {ti}(s) honoring ParallelGroup (all steps in the group) and DependsOnStep (only spawn "
+            f"a step when all its declared dependencies are Done). Set {wi}.State to Running (more steps "
+            f"remain) or Completed (all steps done). Write an {ae} for the transition. "
+            f"BRANCHING + PARALLELISM (off-by-one bug — live-proven): iterate the target steps and spawn "
+            f"EXACTLY ONE {ti} INSIDE the loop body per step. Do NOT carry a single 'chosen step' variable "
+            f"out of the loop and spawn once after it — that pattern keeps only the LAST iteration's step "
+            f"(the off-by-one bug: it spawned the last step instead of each). One Create per iteration "
+            f"guarantees every step in a ParallelGroup is spawned exactly once."
+        ),
+        "CompleteTask": (
+            f"CompleteTask (Public Service Action -> CompleteTaskInternal Server Action): set the "
+            f"{ti}.State to Done, write the OutputData payload, write an {ae} row, THEN call "
+            f"AdvanceInstance to evaluate whether the workflow can progress. Sequence matters: "
+            f"persist the task completion BEFORE advancing."
+        ),
+        "ClaimTask": (
+            f"ClaimTask (Public Service Action -> ClaimTaskInternal Server Action): set the "
+            f"{ti}.Assignee to the claiming user. FETCH-THEN-MODIFY: fetch the {ti} record first "
+            f"(GetTaskInstanceById aggregate), then set only the Assignee field on the fetched record, "
+            f"then Update — a bare {{Id, Assignee}} record blanks all other columns (wipes unset columns, "
+            f"live-proven ODC bug). Write an {ae} for the claim."
+        ),
+        "EscalateOverdue": (
+            f"EscalateOverdue (Public Service Action -> EscalateOverdueInternal Server Action): a Timer "
+            f"sweep over active {ti} rows whose DueAt is past the current timestamp. Set State to "
+            f"Escalated (or equivalent). This action is called BY A TIMER ONLY — do not wire it to any "
+            f"screen or user-triggered event."
+        ),
+        "ValidateComposition": (
+            f"ValidateComposition (Public Service Action -> ValidateCompositionInternal Server Action): "
+            f"validate a proposed workflow composition before instantiation. Checks: every {ss} step "
+            f"resolves to a real {tt} (no orphan {ss} with an invalid {tt}Id); every {tt}.DefaultRole "
+            f"exists and is non-empty; no orphan steps and no cycle in the DependsOnStep graph; "
+            f"{ss}.SlaHours is positive and sane. Invalid compositions are rejected with a clear error — "
+            f"nothing runs unvalidated."
+        ),
+        "ComposeInstance": (
+            f"ComposeInstance (Public Service Action -> ComposeInstanceInternal Server Action): "
+            f"assemble the {ss} step graph from the GOVERNED library of {tt} TaskTemplates — read the "
+            f"{sc} + its {ss} rows, resolve each to the declared {tt}, and build the composition. "
+            f"This action is composition only: never invents a task not in the {tt} library."
+        ),
+    }
+
+    for action in actions:
+        if action in _action_docs:
+            action_blocks.append(f"- {_action_docs[action]}")
+
+    actions_section = "\n".join(action_blocks) if action_blocks else "(no actions selected this turn)"
+
+    robust_json = ""
+    if model_output_consumer:
+        robust_json = (
+            f"\nROBUST JSON EXTRACTION (for any action that deserializes a model/agent Response): "
+            f"the Response arrives wrapped in a ```json ... ``` markdown fence even with a strict "
+            f"'raw JSON only' system prompt. Extract robustly: JsonStart = Index(Response,\"{{\"); "
+            f"JsonEnd = Index(Response,\"}}\",0,True) (reverse-search for the last '}}'); "
+            f"guard JsonStart<>-1 and JsonEnd>JsonStart; extract the substring [first '{{' .. last '}}'] "
+            f"BEFORE JSONDeserialize — never deserialize the raw Response. "
+            f"Index(Response,\"}}\",0,True) with the reverse flag finds the last '}}' (avoiding fence "
+            f"chars after the JSON block). Guard -1 means not-yet-found (no JSON in Response).\n"
+        )
+
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Author the FIXED N-invariant state-machine engine inside the producer Core app {core_app}. "
+        f"This engine is DATA-DRIVEN: the workflow shape, steps, transitions, and rules are stored in "
+        f"entities ({tt}, {sc}, {ss}, {tr}, {dr}) — the engine code never changes for new workflow types, "
+        f"only the data does.\n\n"
+        f"{split_rule}\n"
+        f"{chunk_warning}"
+        f"Author the following engine Service Actions this turn:\n"
+        f"{actions_section}\n"
+        f"{robust_json}"
+        f"After authoring each action, run model validation and report errors. Do not publish."
+    )
+
+
+def dynamic_form(params: dict) -> str:
+    """Author a reactive Web Block that renders a TaskTemplate.FieldDefinition JSON array at runtime
+    via a FIXED Switch/If over known field types — no dynamic widget. params: block_name (default
+    DynamicTaskForm), screen (default TaskDetail), entities dict (roles task_template/task_instance),
+    field_types (default 6-set), complete_action (default CompleteTask), structure_name (default FieldDef),
+    role_gate (bool, default True)."""
+    block_name = _p(params, "block_name", "DynamicTaskForm")
+    screen = _p(params, "screen", "TaskDetail")
+    entities = _p(params, "entities", {})
+    field_types = _p(params, "field_types", ["text", "textarea", "number", "date", "select", "checkbox"])
+    complete_action = _p(params, "complete_action", "CompleteTask")
+    structure_name = _p(params, "structure_name", "FieldDef")
+    role_gate = _p(params, "role_gate", True)
+
+    tt = _en(entities, "task_template")
+    ti = _en(entities, "task_instance")
+
+    field_types_str = ", ".join(field_types)
+
+    # Only emit Switch branches for the chosen field_types
+    branch_lines = "\n".join(
+        f"   - type='{ft}': render the appropriate {ft} input widget" for ft in field_types
+    )
+
+    role_gate_block = ""
+    if role_gate:
+        role_gate_block = (
+            f"\nROLE GATE: before rendering the submit/complete action, gate actioning via "
+            f"ln_current_user — check the current user's role matches the TaskInstance.AssignedRole. "
+            f"Non-assignees see the form read-only; only the assignee (matched via ln_current_user) "
+            f"can submit. Keep the screen Anonymous (the role gate is enforced in logic, not as a "
+            f"platform Role).\n"
+        )
+    else:
+        role_gate_block = (
+            f"\nNO role gate requested — the form is writable by any authenticated user. "
+            f"Keep the screen Anonymous.\n"
+        )
+
+    robust_json = (
+        f"ROBUST JSON EXTRACTION for FieldDefinition parsing: the FieldDefinition column is a JSON "
+        f"string. Parse it via the {structure_name} Structure (author {structure_name} in the producer "
+        f"Core — cannot live in a BPT app; import it here). Extract robustly before JSONDeserialize: "
+        f"JsonStart = Index(FieldDefJson,\"{{\"); JsonEnd = Index(FieldDefJson,\"}}\",0,True) (finds "
+        f"the last '}}'); guard JsonStart<>-1 and JsonEnd>JsonStart; take the substring [first '{{' .. "
+        f"last '}}'] — this handles any wrapper text or fence chars."
+    )
+
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"SPIKE — prototype this block carefully; the FieldDefinition rendering pattern is novel in this "
+        f"codebase. Author a reactive Web Block named {block_name} on the {screen} screen that renders "
+        f"a {tt}.FieldDefinition JSON array at RUNTIME — the field list is DATA, not hardcoded widgets.\n\n"
+        f"FIXED FIELD-TYPE SET (no dynamic widget): render inputs via a Switch/If over the known field "
+        f"types only. Do NOT create a dynamic widget or a generic renderer — use a Switch node with one "
+        f"branch per known type. Branches for this form: {field_types_str}.\n"
+        f"Switch branches:\n{branch_lines}\n\n"
+        f"PRE-FILL: read {ti}.InputData (JSON) and pre-fill each input with the matching key's value "
+        f"from InputData before the user edits.\n\n"
+        f"SUBMIT: on submit, serialize the field values to JSON -> write to {ti}.OutputData -> call "
+        f"{complete_action}. For approval-type fields (Approve/Reject), write the outcome into "
+        f"OutputData so a TransitionRule.Condition can branch on it.\n\n"
+        f"{robust_json}\n"
+        f"{role_gate_block}"
+        f"Set data-spec-id on each rendered input widget (data-spec-id=\"<field-key>\" from the "
+        f"FieldDef entry) so harness-capture can resolve inputs exactly. Keep the screen Anonymous. "
+        f"After authoring, run model validation and report errors. Do not publish."
+    )
+
+
+def library_import(params: dict) -> str:
+    """Author a deterministic library loader for any N library rows — two modes.
+    seed: NON-PUBLIC LoadLibrary orchestrator; FK order; DELETE-then-INSERT; IsInDevStage-gated.
+    etl: consumed/exposed REST bulk endpoint; natural-key upsert; FK order; NOT delete-then-insert.
+    params: mode ('seed'|'etl'), library_entities (default FK-ordered 5), source (mode-dependent
+    default), natural_key (default 'Code'), loader_name (default LoadLibrary/BulkImportLibrary)."""
+    mode = _p(params, "mode", "seed")
+    if mode not in ("seed", "etl"):
+        raise ValueError(f"library_import: unknown mode {mode!r}; expected 'seed' or 'etl'")
+
+    default_entities = ["TaskTemplate", "Scenario", "ScenarioStep", "TransitionRule", "DecisionRow"]
+    library_entities = _p(params, "library_entities", default_entities)
+    natural_key = _p(params, "natural_key", "Code")
+
+    if mode == "seed":
+        loader_name = _p(params, "loader_name", "LoadLibrary")
+        source = _p(params, "source", "a JSON resource file bundled with the app")
+        entities_ordered = ", ".join(f"{i+1}. {e}" for i, e in enumerate(library_entities))
+
+        return (
+            f"{_PREAMBLE}\n\n"
+            f"Author a NON-PUBLIC Server Action named {loader_name} that seeds the workflow library "
+            f"entities for any N rows (N-invariant — not hardcoded row counts). This loader is "
+            f"NON-PUBLIC (OS-DPL-50205: a public action may not perform entity writes; the loader "
+            f"writes every entity — keep it non-public and call it from a non-public orchestrator).\n\n"
+            f"SOURCE: read library data from {source}.\n\n"
+            f"FK ORDER (parents before children): create rows in this order so FK references resolve:\n"
+            f"{entities_ordered}\n\n"
+            f"DELETE-then-INSERT (re-runnable): before inserting, DELETE all existing rows in REVERSE "
+            f"FK order (children before parents) so re-runs are idempotent and safe.\n\n"
+            f"IsInDevStage GATE: wrap the entire loader in an IsInDevStage() check — this seed runs "
+            f"ONLY in development/test stages, never in production.\n\n"
+            f"HEADLESS-CORE CAVEAT: if the Core app has no screens (screens:[]), its OnReady action "
+            f"never fires and the seed never runs. Give the Core a minimal bootstrap screen and call "
+            f"{loader_name} from that screen's OnReady — do not rely on a timer or a WhenPublished "
+            f"trigger alone for a headless data-owner (live-proven: headless core cannot seed via OnReady).\n\n"
+            f"After authoring, run model validation and report errors. Do not publish."
+        )
+    else:
+        # mode == "etl"
+        loader_name = _p(params, "loader_name", "BulkImportLibrary")
+        source = _p(params, "source", "a REST API caller (consumed endpoint)")
+        entities_ordered = ", ".join(f"{i+1}. {e}" for i, e in enumerate(library_entities))
+
+        return (
+            f"{_PREAMBLE}\n\n"
+            f"Author a REST bulk-import endpoint named {loader_name} for any N rows (N-invariant). "
+            f"Expose it as a consumed/exposed REST endpoint so external systems can push library data.\n\n"
+            f"NATURAL-KEY UPSERT — natural-key upsert (not delete-then-insert): for each incoming "
+            f"record, look up by {natural_key} (the natural key). If found: fetch the existing record "
+            f"first (fetch-then-modify to avoid wipes unset columns — a bare {{Id, changed_field}} "
+            f"record blanks all other columns), then Update only the changed fields. If not found: "
+            f"Create a new row.\n\n"
+            f"FK ORDER / FK order (parents before children): process rows in this order so FK "
+            f"references resolve:\n"
+            f"{entities_ordered}\n\n"
+            f"NOT delete-then-insert: the ETL upsert is incremental — do not DELETE rows before "
+            f"importing (that would wipe live data; delete-then-insert is only for the seed/dev mode).\n\n"
+            f"SOURCE: data arrives from {source}.\n\n"
+            f"After authoring, run model validation and report errors. Do not publish."
+        )
+
+
 RECIPES = {
     "data-model": data_model,
     "static-entity": static_entity,
@@ -1569,6 +1886,9 @@ RECIPES = {
     "dashboard": dashboard,
     "detail": detail,
     "kpi-rebind": kpi_rebind,
+    "workflow-engine": workflow_engine,
+    "dynamic-form": dynamic_form,
+    "library-import": library_import,
 }
 
 
