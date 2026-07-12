@@ -279,7 +279,7 @@
         "service": "CompleteTask",
         "callsService": "AdvanceInstance",
         "engine": true,
-        "note": "worker submits a task's OutputData -> CompleteTask -> AdvanceInstance."
+        "note": "ROLE-ENFORCED completion: CompleteTaskInternal refuses if ActorRole <> the step's TaskTemplate.DefaultRole (server-side gate); the public wrapper derives ActorRole from GetUserId->role mapping, never from the client. On accept: mark Done, write audit, AdvanceInstance. worker submits a task's OutputData -> CompleteTask -> AdvanceInstance."
       },
       {
         "name": "GetInstanceStatus",
@@ -291,6 +291,17 @@
         "service": "GetInstanceStatus",
         "engine": true,
         "note": "READ (no writes): returns WorkflowInstance.State + the first still-open TaskInstance (Id, StepCode) + OpenCount for an instance. The task-queue/worker-UI read; also the runtime drive/observe reader (ASE db_query is v1 template-only). Non-public Server Action (no write-split needed)."
+      },
+      {
+        "name": "GetOpenTasksForActor",
+        "reads": [
+          "TaskInstance",
+          "TaskTemplate",
+          "WorkflowInstance"
+        ],
+        "service": "GetOpenTasksForActor",
+        "engine": true,
+        "note": "READ (no writes): role-scoped worker queue \u2014 open TaskInstances (across all instances) whose TaskTemplate.DefaultRole = the actor's role. Makes >1 KIND of worker real (each role sees only its tasks). Non-public Server Action; production wrapper derives role from authenticated identity."
       },
       {
         "name": "ClaimTask",

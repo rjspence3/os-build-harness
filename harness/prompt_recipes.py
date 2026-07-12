@@ -1227,7 +1227,7 @@ def _sig(items) -> str:
 _ENGINE_ACTIONS = [
     "ResolveScenario", "InstantiateWorkflow", "AdvanceInstance", "CompleteTask",
     "ClaimTask", "EscalateOverdue", "ValidateComposition", "ComposeInstance",
-    "GetInstanceStatus",
+    "GetInstanceStatus", "GetOpenTasksForActor",
 ]
 _ENGINE_ENTITY_DEFAULTS = {
     "task_template": "TaskTemplate", "scenario": "Scenario", "scenario_step": "ScenarioStep",
@@ -1676,10 +1676,26 @@ def workflow_engine(params: dict) -> str:
             f"transitions/dependencies, never by how many tasks have completed."
         ),
         "CompleteTask": (
-            f"CompleteTask (Public Service Action -> CompleteTaskInternal Server Action): set the "
-            f"{ti}.State to Done, write the OutputData payload, write an {ae} row, THEN call "
-            f"AdvanceInstance to evaluate whether the workflow can progress. Sequence matters: "
-            f"persist the task completion BEFORE advancing. APPROVAL OUTCOME: an approval task whose "
+            f"CompleteTask (Public Service Action -> CompleteTaskInternal Server Action): inputs "
+            f"TaskInstanceId, OutputData, and ActorRole (Text — the acting user's role). Output Accepted "
+            f"(Boolean). "
+            f"ROLE ENFORCEMENT (server-side gate — routing is not enforcement): BEFORE any write, fetch "
+            f"the {ti} -> its {tt}.DefaultRole (the RequiredRole for this step). If RequiredRole is "
+            f"non-empty AND ActorRole <> RequiredRole, REFUSE: do NOT set Done, do NOT advance, write an "
+            f"{ae} row ('refused: <ActorRole> may not complete step requiring <RequiredRole>'), set "
+            f"Accepted=False, and return. Only a role-matched (or unrestricted, empty-RequiredRole) "
+            f"completion proceeds. A filtered queue is UX only; this match-check in the NON-public "
+            f"*Internal Server Action is the real boundary. "
+            f"IDENTITY TRUST BOUNDARY (never trust a client-supplied role): the PUBLIC CompleteTask "
+            f"Service Action (and any screen action) must DERIVE ActorRole from the authenticated user — "
+            f"GetUserId() -> look up that user's role in the app's user/role mapping — and pass THAT to "
+            f"CompleteTaskInternal. It must NOT accept a role value from the client request; a "
+            f"client-passed role is spoofable. The Internal action enforces the match; the public wrapper "
+            f"sources the role from identity. (Because the wrapper sources identity, and the Internal is "
+            f"non-public, a client cannot bypass the gate.) "
+            f"On an accepted completion: set the {ti}.State to Done, write the OutputData payload, write an "
+            f"{ae} row, THEN call AdvanceInstance to evaluate whether the workflow can progress. Sequence "
+            f"matters: persist the task completion BEFORE advancing. APPROVAL OUTCOME: an approval task whose "
             f"OutputData carries a Reject outcome must route (via its {tr}) BACK to a rework {ss} — a "
             f"loop, not forward progress — and does NOT mark the instance Completed (see AdvanceInstance "
             f"FRONTIER rule); an Approve outcome advances normally. DETECT THE VALUE, NOT A BARE TOKEN "
@@ -1734,8 +1750,22 @@ def workflow_engine(params: dict) -> str:
             f"{ti}.WorkflowInstanceId = the input AND {ti}.Status <> \"Done\" (use <> \"Done\" as the open "
             f"test — do NOT hardcode a specific open-status literal), sorted by {ti}.Id ascending; "
             f"OpenCount = its count; if > 0 set OpenTaskId + OpenStepCode from the first row, else leave "
-            f"them empty. A worker-queue variant (GetOpenTasksForActor: same read-only shape, filtered by "
-            f"Assignee/role across instances) follows this exact pattern for the worker portal."
+            f"them empty. The role-scoped queue variant is GetOpenTasksForActor (below)."
+        ),
+        "GetOpenTasksForActor": (
+            f"GetOpenTasksForActor — the role-scoped WORKER QUEUE read (this is what makes 'more than one "
+            f"KIND of worker' real: each role sees only its own tasks). Same READ character as "
+            f"GetInstanceStatus — EXCEPTION TO THE SPLIT RULE (no writes -> NON-public Server Action, no "
+            f"public/*Internal split; add a thin public Service Action wrapper only for cross-app read). "
+            f"INPUT: ActorRole (Text). OUTPUT: a List of open tasks (each row: TaskInstanceId ({ti} "
+            f"Identifier), StepCode (Text = {tt}.Code), WorkflowInstanceId ({wi} Identifier), InstanceNo "
+            f"(Text)) plus Count (Integer). LOGIC: aggregate {ti} JOINed to {tt} ({ti}.{tt}Id = {tt}.Id) "
+            f"and to {wi} ({ti}.WorkflowInstanceId = {wi}.Id), filtered to {tt}.DefaultRole = ActorRole "
+            f"AND {ti}.Status <> \"Done\" (open across ALL instances), sorted by {ti}.Id ascending; return "
+            f"the rows + Count. This is N-invariant: the filter is indexed on DefaultRole + Status, never a "
+            f"full scan. IDENTITY NOTE: like CompleteTask, the production wrapper/screen should derive "
+            f"ActorRole from the authenticated user (GetUserId -> role mapping), not from a client param — "
+            f"the queue is scoped to who you ARE, not to a role you claim."
         ),
     }
 
