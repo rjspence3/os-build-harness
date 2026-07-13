@@ -63,6 +63,7 @@ def _p(params: dict, key: str, default=None, required: bool = False):
 UI_CLASS_CONTRACT = (
     "app-sidebar nav-section nav-item is-active nav-tag nav-badge sidebar-brand sidebar-user "
     "app-topbar breadcrumb env-chip cell-id chip badge tag avatar glyph "
+    "page-header page-title page-subtitle header-actions btn-primary btn-secondary "
     "kpi-card kpi-icon kpi-value kpi-label kpi-trend "
     "stepper step is-done is-active is-pending review-grid review-card review-status "
     "timeline timeline-item"
@@ -101,9 +102,11 @@ def _cell_instruction(col, entity: str) -> str:
         return (f'`{label}`: a monospace id cell — an Expression showing {q} inside a Container '
                 f'whose Style class is "cell-id".')
     if kind in ("chip", "badge", "tag"):
-        return (f'`{label}`: a status {kind} — an Expression showing {q} INSIDE a Container whose '
-                f'Style is the EXPRESSION "{kind} {kind}-" + ToLower({q}) (so ".{kind}" makes the '
-                f'rounded pill and ".{kind}-<value>" tints it per the theme). Do NOT hardcode one class.')
+        return (f'`{label}`: a status {kind} — an Expression showing {q} INSIDE a Container (the Container '
+                f'is REQUIRED — without it the value renders as bare text, not a pill; live-proven '
+                f'structure-drop, harvest #2) whose Style is the EXPRESSION "{kind} {kind}-" + ToLower({q}) '
+                f'(so ".{kind}" makes the rounded pill and ".{kind}-<value>" tints it per the theme). Do '
+                f'NOT hardcode one class and do NOT drop the Container.')
     if kind == "avatar":
         return (f'`{label}`: a round avatar cell — a Container Style class "avatar" containing an '
                 f'Expression = ToUpper(Substr({q}, 0, 2)) (the initials). The theme rounds + colors it.')
@@ -256,6 +259,77 @@ def place_nav(params: dict) -> str:
         f'"app-sidebar" class; the theme positions it as a fixed left rail (the screen body is padded left to '
         f"make room). After authoring, confirm each listed screen has exactly one {block} instance, then run "
         f"validation. Do not publish.")
+
+
+def top_bar(params: dict) -> str:
+    """Author the app-shell TOP BAR as a shared Web Block placed above the content on every screen —
+    breadcrumb + env chip + a primary CTA. This horizontal band is the single biggest 'modern app'
+    element; without it a themed app reads as unfinished (live-proven on the Rivian portal). Author it
+    ONCE as a shared block (like nav_block) with a Crumb input, then place it. params: block_name
+    (default AppTopBar), app_label, env_label (default 'ODC · PROD'), cta_label?, cta_screen?|cta_action?,
+    screens?(to place on)."""
+    block = _p(params, "block_name", "AppTopBar")
+    app_label = _p(params, "app_label", "App")
+    env_label = _p(params, "env_label", "ODC · PROD")
+    cta_label = _p(params, "cta_label")
+    cta_target = _p(params, "cta_screen") or _p(params, "cta_action")
+    screens = _p(params, "screens", [])
+    cta_txt = (f' a right-aligned primary Button labelled "{cta_label}" (Style class "btn-primary", '
+               f'data-spec-id="topbarcta") wired to {cta_target}' if cta_label and cta_target else
+               (f' a right-aligned primary Button labelled "{cta_label}" (Style class "btn-primary", '
+                f'data-spec-id="topbarcta")' if cta_label else " no CTA button"))
+    place_txt = (f" Then place ONE instance as the FIRST widget (above the content) on each of: "
+                 f"{', '.join(screens)}, passing that screen's name as Crumb." if screens else
+                 " Place ONE instance above the content area on each screen, passing the screen name as Crumb.")
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"Author a reusable Web Block named {block} — the app-shell TOP BAR — with a single Text input "
+        f"parameter Crumb (the current screen label). Its root Container has Style class \"app-topbar\" "
+        f"(a horizontal flex row, data-spec-id=\"apptopbar\") containing, left-to-right: (1) a breadcrumb "
+        f"(Style class \"breadcrumb\") showing \"{app_label} / \" then the Crumb input inside a <b> "
+        f"(Expression, bold current segment); (2) an env chip (Style class \"env-chip\", mono) showing "
+        f"\"{env_label}\"; (3){cta_txt}. The theme paints .app-topbar/.breadcrumb/.env-chip/.btn-primary "
+        f"(see the UI class contract) — do NOT inline colors.{place_txt} Author the block ONCE; never "
+        f"rebuild it per screen. Do not publish.")
+
+
+def page_header(params: dict) -> str:
+    """A screen's lead header: a big title + optional subtitle + optional status/tier tag + a
+    right-aligned row of action buttons (composes action-buttons into the header — mockup:
+    'Acme Drivetrains — Regen Brake Module  T1·CRITICAL' + Approve/Send Back/Activate). params:
+    screen, title (literal text or an Expression), subtitle?, tag?{text, kind?}, actions?:[{label,
+    screen?|action?, primary?}]."""
+    screen = _p(params, "screen", required=True)
+    title = _p(params, "title", required=True)
+    subtitle = _p(params, "subtitle")
+    tag = _p(params, "tag")
+    actions = _p(params, "actions", [])
+    tag_txt = ""
+    if tag:
+        kind = _slug(tag.get("kind", "")) if isinstance(tag, dict) else ""
+        text = tag.get("text", "") if isinstance(tag, dict) else str(tag)
+        klass = f"tag tag-{kind}" if kind else "tag"
+        tag_txt = f' followed inline by a tag (Container Style class "{klass}") showing "{text}"'
+    sub_txt = f' Below the title, a subtitle (Style class "page-subtitle") showing {subtitle}.' if subtitle else ""
+    if actions:
+        btns = []
+        for a in actions:
+            label = a.get("label", "Action")
+            target = a.get("screen") or a.get("action") or ""
+            klass = "btn-primary" if a.get("primary") else "btn-secondary"
+            wire = f" wired to {target}" if target else ""
+            btns.append(f'a Button "{label}" (Style class "{klass}", data-spec-id="hdr{_slug(label)}btn"){wire}')
+        act_txt = (f' A right-aligned action row (Container Style class "header-actions") with: '
+                   f'{"; ".join(btns)}.')
+    else:
+        act_txt = ""
+    return (
+        f"{_PREAMBLE}\n\n"
+        f"On the {screen} screen, add a PAGE HEADER at the top of the content area (below the top bar, "
+        f"right of the nav). It is a Container (Style class \"page-header\", data-spec-id=\"pageheader\") "
+        f"containing: a heading (Style class \"page-title\") showing {title}{tag_txt}.{sub_txt}{act_txt} "
+        f"The theme paints .page-title/.page-subtitle/.tag/.header-actions/.btn-primary — do NOT inline "
+        f"colors. Every button must be a real Button widget with its data-spec-id. Do not publish.")
 
 
 def list_screen(params: dict) -> str:
@@ -906,33 +980,70 @@ def agent(params: dict) -> str:
         f"call). The app MUST then publish to `succeeded` with NO OS-APPS-40028. Do not publish.")
 
 
+# ODC ships EXACTLY these 7 chart widgets (Highcharts 12.5.0 under the hood). Anything else
+# (gauge/scatter/bubble/waterfall/heatmap/funnel/…) is NOT a widget — reach it via the
+# SetHighcharts*Configs escape hatch off a base widget, or treat as a spec wall.
+_CHART_TYPES = ("Area", "Bar", "Column", "Line", "Pie", "Donut", "Radar")
+_CHART_SINGLE_SERIES = ("Pie", "Donut")
+_CHART_TYPE_NOTES = {
+    "Area":   'stacked area: set StackingType = Entities.StackingType.Stacked (else overlaid).',
+    "Bar":    'horizontal bars — axes are inverted, so ChartXAxis addon controls the VERTICAL axis.',
+    "Column": 'vertical bars; set ShowDataPointValues on ChartSeriesStyling for on-bar data labels.',
+    "Line":   'set Spline=True for a smoothed curve; add point Markers via ChartSeriesStyling.Marker.',
+    "Pie":    'SINGLE series — each DataPoint is a slice, SeriesName is unused; delete the ChartLegend addon to hide the legend.',
+    "Donut":  'Pie + InnerSize (a percentage string, default "50%") for the center hole; single series.',
+    "Radar":  'polar/multi-series; mix a series\' render type via ChartSeriesStyling.SeriesType.',
+}
+
+
 def chart(params: dict) -> str:
-    """Add a native OutSystemsCharts widget (the ColumnChart 'wall' is retired — native charts author
-    via MCP; only DATA wiring is grammar-friction). params: screen, chart_type(Column|Pie),
-    category_field, series:[{name,value_field}], source_aggregate?."""
+    """Author a NATIVE ODC chart widget (ODC charts are toolbox widgets — NOT a referenced
+    OutSystemsCharts block; that is O11 framing). params: screen, chart_type (one of the 7 ODC
+    widgets: Area|Bar|Column|Line|Pie|Donut|Radar), category_field, series:[{name,value_field}],
+    source_aggregate?, advanced?(free-text Highcharts config note for the SetHighcharts* escape hatch)."""
     scr = _p(params, "screen", required=True)
     ctype = _p(params, "chart_type", "Column")
+    if ctype not in _CHART_TYPES:
+        raise ValueError(
+            f"chart: unknown chart_type {ctype!r}; ODC has exactly {_CHART_TYPES}. For gauge/scatter/"
+            f"bubble/etc. author a base widget + the SetHighcharts*Configs escape hatch (pass `advanced`).")
     cat = _p(params, "category_field", required=True)
     series = _p(params, "series", [], required=True)
     src = _p(params, "source_aggregate")
+    advanced = _p(params, "advanced")
+    single = ctype in _CHART_SINGLE_SERIES
     stxt = "; ".join(f'{s.get("name", s.get("value_field"))} = {s.get("value_field")}' for s in series)
-    src_txt = (f" Source the DataPoints from the {src} aggregate" if src else
-               " Source the DataPoints from a screen aggregate")
+    src_txt = (f"the {src} aggregate" if src else "a screen aggregate")
+    axis_txt = ("" if single else
+                f"3. Add the ChartXAxis + ChartYAxis addons (drop into the chart's AddOns placeholder). "
+                f"For a Bar chart remember the axes are inverted. Add a ChartLegend addon (set Position, "
+                f"e.g. Entities.LegendPosition.TopRight) when there are multiple series; delete it to hide.\n")
+    series_txt = ("each DataPoint is a slice (single series — do NOT set SeriesName)" if single else
+                  f"set SeriesName per series ({stxt}) so the {len(series) or 'N'} series render grouped/stacked")
+    adv_txt = (f"\n5. ADVANCED (escape hatch): {advanced} — apply via the SetHighcharts"
+               f"{{Chart,XAxis,YAxis,Series}}Configs client actions with raw Highcharts 12.5.0 config "
+               f"(this is also the ONLY way to get gauge/scatter/bubble/tooltips/click-drilldown — none "
+               f"are widget properties)." if advanced else
+               "\n5. For custom tooltips, axis min/max, click/drilldown, or a non-widget series type, use the "
+               "SetHighcharts{Chart,XAxis,YAxis,Series}Configs client actions (raw Highcharts config).")
     return (
         f"{_PREAMBLE}\n\n"
-        f"On the {scr} screen, add a native {ctype}Chart. Do NOT declare this a wall — it authors via MCP:\n"
-        f"1. addReferenceToElements the OutSystemsCharts {ctype}Chart block (it resolves as a ReferenceWebBlock in "
-        f"MobileFlows[\"Charts\"]).\n"
-        f"2. CreateWidget<IMobileBlockInstanceWidget> with SourceBlock = Charts\\{ctype}Chart. Set its data-spec-id via "
-        f"the widget's ExtendedProperties / IObject API (a block-instance widget does NOT support .Attributes.Create()).\n"
-        f"3. Build the DataPoint list(s) — ONE list per series ({stxt}), category = {cat}.{src_txt}. Build the list "
-        f"from a data AGGREGATE, NEVER (System).ListAppend onto a client-action node (it throws 'target of invocation' "
-        f"and rolls back the turn). Bind the DataPointList as an argument expression of shape "
-        f"`<Aggregate>.List` mapped to {{ Value: <numeric valueField>, Label: <categoryField {cat}> }} — Value must be "
-        f"Decimal, so wrap an Integer valueField in IntegerToDecimal(...). Qualify aggregate APIs with the "
-        f"OutSystems.Model.Logic.Aggregates namespace.\n"
-        f"4. Add per-series ChartSeriesStyling for colors — QUOTE hex colors (a bare '#' is a parser error, e.g. use "
-        f"\"#5E6AD2\"). Verify the bars/slices render real values at RUNTIME.\nDo not publish.")
+        f"On the {scr} screen, add a NATIVE {ctype} Chart widget from the toolbox. ODC charts are "
+        f"first-class toolbox WIDGETS — do NOT addReferenceToElements an OutSystemsCharts block and do "
+        f"NOT create a ReferenceWebBlock for the chart (that is O11/monorepo framing and does not exist "
+        f"in ODC). ODC has exactly 7 chart widgets: {', '.join(_CHART_TYPES)}.\n"
+        f"1. Drop the {ctype} Chart widget; set data-spec-id=\"{_slug(scr)}{ctype.lower()}chart\" on it.\n"
+        f"2. DATA: bind the widget's DataPointList to {src_txt} — each DataPoint maps {{ Label: {cat}, "
+        f"Value: <numeric value_field> }}. Value must be Decimal (wrap an Integer in IntegerToDecimal(...)). "
+        f"Build the list from a data AGGREGATE — NEVER (System).ListAppend onto a client-action node (it "
+        f"throws 'target of invocation' and rolls back the turn). {series_txt}. Qualify aggregate APIs with "
+        f"the OutSystems.Model.Logic.Aggregates namespace.\n"
+        f"{axis_txt}"
+        f"4. COLORS: add a ChartSeriesStyling addon (target one series via SeriesName, or leave SeriesName "
+        f"empty to style ALL series) — QUOTE hex colors (a bare '#' is a parser error: use \"#5E6AD2\"). "
+        f"TYPE NOTE: {_CHART_TYPE_NOTES[ctype]}"
+        f"{adv_txt}\n"
+        f"Verify the chart renders REAL values at RUNTIME (an empty DataPointList renders nothing). Do not publish.")
 
 
 # Canonical OutSystemsUI reset — PREPENDED to every theme stylesheet so the UI_CLASS_CONTRACT
@@ -1129,7 +1240,9 @@ def detail(params: dict) -> str:
             src = "each card shows the team name and a placeholder status chip"
         parts.append(
             f'2. A PARALLEL-REVIEW panel (Container Style class "review-grid") with one review card '
-            f'(Style class "review-card") per team: {", ".join(teams)}; {src}.')
+            f'per team: {", ".join(teams)}; {src}. EACH card MUST be its own Container with Style class '
+            f'"review-card" (the theme paints the card chrome) — do NOT emit a bare status without the '
+            f'review-card Container, or it renders as loose text (live-proven structure-drop, harvest #2).')
     if timeline_entity:
         fld = ", ".join(tfields) if tfields else "the event description and timestamp"
         parts.append(
@@ -2032,6 +2145,8 @@ RECIPES = {
     "screen": screen,
     "nav-block": nav_block,
     "place-nav": place_nav,
+    "top-bar": top_bar,
+    "page-header": page_header,
     "action-button": action_button,
     "list-screen": list_screen,
     "role-gate": role_gate,

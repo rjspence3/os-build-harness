@@ -440,9 +440,71 @@ def test_chart_recipe_avoids_listappend_and_uses_aggregate():
     p = pr.render("chart", {"screen": "dashboard", "chart_type": "Column", "category_field": "Week",
                             "series": [{"name": "Income", "value_field": "Income"},
                                        {"name": "Expenses", "value_field": "Expenses"}]})
-    assert "OutSystemsCharts" in p and "Charts\\ColumnChart" in p
     assert "NEVER (System).ListAppend" in p and "aggregate" in p.lower()
     assert "OutSystems.Model.Logic.Aggregates" in p                      # ns qualification note
+
+
+def test_chart_recipe_is_native_widget_not_a_reference_block():
+    """Harvest chart-native-widget: ODC charts are native toolbox widgets, NOT a referenced
+    OutSystemsCharts block (the recipe used the O11 framing). The prompt must forbid the reference."""
+    p = pr.render("chart", {"screen": "dashboard", "chart_type": "Column", "category_field": "Week",
+                            "series": [{"name": "Income", "value_field": "Income"}]})
+    assert "native" in p.lower() and "toolbox" in p.lower()
+    assert "do NOT addReferenceToElements" in p
+    assert "Charts\\ColumnChart" not in p                                # the O11 framing is gone
+
+
+def test_chart_recipe_supports_all_seven_odc_types():
+    """ODC has exactly 7 chart widgets; the recipe renders each with its per-type note."""
+    for t in ("Area", "Bar", "Column", "Line", "Pie", "Donut", "Radar"):
+        p = pr.render("chart", {"screen": "s", "chart_type": t, "category_field": "C",
+                                "series": [{"name": "V", "value_field": "V"}]})
+        assert f"NATIVE {t} Chart" in p
+    # single-series types don't set SeriesName; multi-series do
+    pie = pr.render("chart", {"screen": "s", "chart_type": "Pie", "category_field": "C",
+                              "series": [{"name": "V", "value_field": "V"}]})
+    assert "single series" in pie.lower() and "InnerSize" not in pie
+    donut = pr.render("chart", {"screen": "s", "chart_type": "Donut", "category_field": "C",
+                                "series": [{"name": "V", "value_field": "V"}]})
+    assert "InnerSize" in donut
+    with pytest.raises(ValueError):
+        pr.render("chart", {"screen": "s", "chart_type": "Gauge", "category_field": "C", "series": []})
+
+
+def test_chart_recipe_advanced_escape_hatch():
+    """A non-widget need (gauge/scatter/tooltip) routes through SetHighcharts*Configs."""
+    p = pr.render("chart", {"screen": "s", "chart_type": "Line", "category_field": "C",
+                            "series": [{"name": "V", "value_field": "V"}],
+                            "advanced": "custom tooltip with unit suffix"})
+    assert "SetHighcharts" in p and "custom tooltip with unit suffix" in p
+
+
+def test_top_bar_authors_shell_header_as_shared_block():
+    """P0: the app-shell top bar (breadcrumb + env chip + CTA) as a shared block with a Crumb input."""
+    p = pr.render("top-bar", {"app_label": "Rivian Onboarding", "env_label": "ODC · PROD",
+                              "cta_label": "New request", "cta_screen": "IntakeScreen",
+                              "screens": ["CaseQueue", "Dashboard"]})
+    assert "app-topbar" in p and "breadcrumb" in p and "env-chip" in p
+    assert "Crumb" in p                                   # per-screen breadcrumb input
+    assert "Rivian Onboarding" in p and "ODC · PROD" in p
+    assert "btn-primary" in p and "New request" in p and "IntakeScreen" in p
+    assert "reusable Web Block" in p or "shared" in p.lower()
+
+
+def test_page_header_composes_title_tag_and_action_row():
+    """P0: page header = title + status/tier tag + a right-aligned action-button row (primary/secondary)."""
+    p = pr.render("page-header", {"screen": "CaseDetail", "title": "GetCase.Name",
+                                  "tag": {"text": "T1 · CRITICAL", "kind": "t1"},
+                                  "actions": [{"label": "Approve Case", "action": "ApproveCase", "primary": True},
+                                              {"label": "Send Back", "action": "SendBack"}]})
+    assert "page-header" in p and "page-title" in p and "header-actions" in p
+    assert "tag tag-t1" in p and "T1 · CRITICAL" in p
+    assert "btn-primary" in p and "Approve Case" in p and "ApproveCase" in p
+    assert "btn-secondary" in p and "Send Back" in p
+
+
+def test_top_bar_and_page_header_registered():
+    assert "top-bar" in pr.RECIPES and "page-header" in pr.RECIPES
 
 
 def test_theme_recipe_activates_and_warns_import_stripped():
@@ -1688,3 +1750,14 @@ def test_REG_new_recipes_in_registry(capsys):
     out = capsys.readouterr().out
     for name in ("workflow-engine", "dynamic-form", "library-import"):
         assert name in out, f"{name!r} missing from --list output"
+
+
+def test_list_and_detail_cells_forbid_structure_drop():
+    """P0 harden (harvest #2 class): chip cells and review cards must FORCE the Container, or the
+    value renders bare. The recipe prompts must say so explicitly."""
+    ls = pr.render("list-screen", {"screen": "queue", "entity": "Case", "component_id": "casetbl",
+                                   "columns": [{"field": "Status", "kind": "chip"}]})
+    assert "Container is REQUIRED" in ls and "structure-drop" in ls
+    det = pr.render("detail", {"screen": "CaseDetail", "stages": ["Intake", "Review"],
+                               "review_teams": ["Procurement", "Quality"]})
+    assert "MUST be its own Container" in det and "review-card" in det

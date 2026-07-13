@@ -34,3 +34,19 @@ gap the AI took over to fill, harvested into a harness change + a pinning test.
 - **Harness change:** No code change (verified already-implemented by evidence). Corrected the stale 'harness-leaks-mentor-session-per-step' memory. The behavior is guarded by the existing test.
 - **Pinned by:** test_session_is_reused_across_steps_not_one_per_step
 - **Memory:** harness-leaks-mentor-session-per-step
+
+## 5. chart-native-widget  _(landed)_
+- **Trigger:** The chart recipe supported only Column/Pie and told Mentor to addReferenceToElements an OutSystemsCharts block.
+- **Evidence:** ODC docs research (charts_extensibility, Highcharts 12.5.0) + live-app probe: ODC charts are NATIVE toolbox widgets, NOT a referenced OutSystemsCharts block (that is O11 framing). ODC ships exactly 7: Area/Bar/Column/Line/Pie/Donut/Radar.
+- **Root cause:** The recipe carried the O11/monorepo mental model (ReferenceWebBlock Charts\ColumnChart), which misfires in ODC, and only covered 2 of the 7 widget types.
+- **Harness change:** harness/prompt_recipes.py: chart recipe rewritten — native-widget framing (no reference), validates chart_type against the 7 ODC types, per-type props (StackingType/Spline/InnerSize/SeriesType/inverted), ChartX/YAxis+Legend+SeriesStyling addons, and a SetHighcharts*Configs escape hatch for gauge/scatter/etc.
+- **Pinned by:** test_chart_recipe_is_native_widget_not_a_reference_block, test_chart_recipe_supports_all_seven_odc_types, test_chart_recipe_advanced_escape_hatch
+- **Memory:** odc-charts-are-native-widgets
+
+## 6. structure-drop-harden-cells  _(landed)_
+- **Trigger:** Rivian portal UI read as bare/unmodern; status chips and review cards rendered as loose text.
+- **Evidence:** Live DOM (harvest #2) proved Mentor authors the value and DROPS the styled Container (.kpi-card had zero elements). The same failure mode applies to list-screen chip/avatar cells and detail review cards.
+- **Root cause:** The cell/review-card prompts said 'inside a Container' but did not FORCE it, so Mentor dropped the container and the value rendered bare.
+- **Harness change:** harness/prompt_recipes.py: _cell_instruction (chip/badge/tag) and detail review-grid now state the Container is REQUIRED (without it the value renders bare — live-proven) — the harvest-#2 hardening extended to list cells + review cards. Plus NEW top-bar + page-header recipes for the missing app-shell chrome.
+- **Pinned by:** test_list_and_detail_cells_forbid_structure_drop, test_top_bar_authors_shell_header_as_shared_block, test_page_header_composes_title_tag_and_action_row
+- **Memory:** dashboard-phased-path-needs-structure-step
