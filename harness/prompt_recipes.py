@@ -776,15 +776,25 @@ def data_model(params: dict) -> str:
     body = "\n".join(lines)
     enames = ", ".join(e["name"] for e in entities)
     public_txt = (
-        f"EXPOSE FOR CROSS-APP USE — set EVERY entity's Public property = Yes (exposed in this app's public "
-        f"interface) so other apps can add this app as a dependency and READ its data. This app is a data-owning "
-        f"producer (Core); leaving its entities private (the default) means consumers reference nothing and render "
-        f"empty. After authoring, CONFIRM each entity reports Public=Yes.\n"
+        f"EXPOSE FOR CROSS-APP USE — set EVERY entity's Public property = Yes ON THE EXISTING/ORIGINAL entity "
+        f"(flip the property in place; do NOT create a new public copy — a public duplicate '<Name>2' next to a "
+        f"private original is exactly the bug that crashes a consumer with OS-BEW-COMP-50008) so other apps can add "
+        f"this app as a dependency and READ its data. This app is a data-owning producer (Core); leaving its "
+        f"entities private (the default) means consumers reference nothing and render empty. After authoring, "
+        f"CONFIRM each ORIGINAL entity reports Public=Yes and that NO '<Name>2' duplicate exists.\n"
         if public else "")
     return (
         f"{_PREAMBLE}\n\n"
         f"Create the app's data model. Author ALL of these entities in THIS ONE turn (they may reference each "
         f"other, so they must be created together). Do NOT create any screens or UI in this turn.\n{body}\n"
+        f"IDEMPOTENT — REUSE, NEVER DUPLICATE (load-bearing on a rebuild/resume/reused app): an entity with any "
+        f"of these names may ALREADY EXIST in this app. For EACH entity, FIRST look it up by name; if it exists, "
+        f"UPDATE that EXISTING entity in place (add any missing attributes, and apply the Public setting below to "
+        f"the existing entity) — do NOT create a new one. Only create an entity that does not already exist. NEVER "
+        f"let a second entity share a logical name: ODC auto-suffixes a colliding name to '<Name>2', producing a "
+        f"private original + a public duplicate that consumers then can't use (live-proven OS-BEW-COMP-50008 on a "
+        f"consumer aggregate). If you find any pre-existing '<Name>2' duplicate, do NOT create more; reconcile onto "
+        f"the ORIGINAL name.\n"
         f"{public_txt}"
         f"IDENTIFIER — settle it in THIS turn, before any publish (this is load-bearing: the create/edit form's "
         f"Save action later needs {entities[0]['name'] if entities else 'each entity'}.CreateAction and .Id, which "

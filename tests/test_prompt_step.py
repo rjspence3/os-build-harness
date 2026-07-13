@@ -679,6 +679,21 @@ def test_data_model_public_exposes_entities_for_cross_app_read():
     assert "Public property = Yes" not in priv                # default stays private (back-compat)
 
 
+def test_data_model_is_idempotent_no_duplicate_entities():
+    """Harvest data-model-idempotent (Mentor-confirmed OS-BEW-COMP root cause): re-running the
+    data-model on an app that ALREADY has the entities must UPDATE them in place, never create a
+    '<Name>2' duplicate. The public exposure must flip the EXISTING entity, not create a public copy
+    (a public duplicate next to a private original crashes a consumer aggregate, OS-BEW-COMP-50008)."""
+    ents = [{"name": "Supplier", "attributes": [
+        {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+        {"name": "Code", "dataType": "Text", "mandatory": True}]}]
+    p = pr.render("data-model", {"entities": ents, "public": True})
+    assert "already exist" in p.lower() and "NEVER" in p
+    assert "2" in p and "duplicate" in p.lower()               # warns about the <Name>2 auto-suffix
+    assert "EXISTING/ORIGINAL entity" in p                     # flip in place, don't copy
+    assert "OS-BEW-COMP-50008" in p
+
+
 def test_plan_marks_core_datamodel_public():
     # plan_from_spec passes public=True to the data-model step when the spec marks the app a producer.
     from harness.prompt_recipes import plan_from_spec

@@ -66,3 +66,11 @@ gap the AI took over to fill, harvested into a harness change + a pinning test.
 - **Harness change:** harness/prompt_recipes.py plan_from_spec: dashboard phased emission ordered aggregate -> structure -> bind (harmless/reasonable, aggregate-first). NOTE: this did NOT resolve the OS-BEW-COMP crash — that root cause is still open.
 - **Pinned by:** test_plan_dashboard_count_order_is_aggregate_structure_bind
 - **Memory:** dashboard-phased-path-needs-structure-step
+
+## 9. data-model-idempotent-no-duplicate-entities  _(landed)_
+- **Trigger:** Fresh portal builds crashed OS-BEW-COMP-50008 at the dashboard aggregate; I wrongly chased the aggregate/ordering (harvest 8) for 3 builds. Root cause was elsewhere.
+- **Evidence:** context_entities on RivianOnboardingCore showed 7 DUPLICATE pairs (Supplier+Supplier2, QualificationCase+QualificationCase2, ...): originals private w/ CRUD + real data, '2' versions public read-only + orphaned. Mentor (asked to diagnose, read-only) confirmed: the consumer references the PRIVATE originals -> illegal cross-app dependency -> the build engine rejects it at compile time with OS-BEW-COMP-50008 (the aggregate was a red herring).
+- **Root cause:** The data_model recipe says 'CREATE these entities + set Public=Yes' with NO idempotency guard. When build_system reused an existing Core and re-ran the data-model step (public=True), Mentor created NEW public copies ('<Name>2', ODC's name-collision auto-suffix) instead of flipping the existing private originals -> duplicate entities; consumers reference the private originals and crash.
+- **Harness change:** harness/prompt_recipes.py data_model: added an IDEMPOTENT clause (look up each entity by name; UPDATE in place if it exists, never create a duplicate; never let ODC auto-suffix to '<Name>2') and made the public exposure flip the EXISTING/ORIGINAL entity (not create a public copy).
+- **Pinned by:** test_data_model_is_idempotent_no_duplicate_entities
+- **Memory:** data-model-recipe-must-be-idempotent
