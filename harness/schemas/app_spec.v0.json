@@ -287,7 +287,7 @@
         },
         "naturalKey": {
           "type": "boolean",
-          "description": "SEED-A: mark this attribute as the entity's human-readable natural key — the value a child's sampleData row references a parent by (resolved to the real Id at seed time). Defaults to the first Text non-id non-FK attribute."
+          "description": "SEED-A: mark this attribute as the entity's human-readable natural key \u2014 the value a child's sampleData row references a parent by (resolved to the real Id at seed time). Defaults to the first Text non-id non-FK attribute."
         },
         "default": {
           "description": "Optional default value (any JSON scalar)."
@@ -417,15 +417,64 @@
         },
         "dashboard": {
           "$ref": "#/$defs/dashboardSpec",
-          "description": "PRODUCT-UI: a KPI dashboard header on this screen (stat cards) — authored via the `dashboard` recipe."
+          "description": "PRODUCT-UI: a KPI dashboard header on this screen (stat cards) \u2014 authored via the `dashboard` recipe."
         },
         "detail": {
           "$ref": "#/$defs/detailSpec",
-          "description": "PRODUCT-UI: make this a rich case-detail screen (stage stepper + parallel reviews + audit timeline) — authored via the `detail` recipe."
+          "description": "PRODUCT-UI: make this a rich case-detail screen (stage stepper + parallel reviews + audit timeline) \u2014 authored via the `detail` recipe."
         },
         "dynamicForm": {
           "$ref": "#/$defs/dynamicFormBlock",
-          "description": "Dynamic task form on this screen — authored via the `dynamic-form` recipe. Emitted by expand.py for worker task screens that read TaskInstance+TaskTemplate."
+          "description": "Dynamic task form on this screen \u2014 authored via the `dynamic-form` recipe. Emitted by expand.py for worker task screens that read TaskInstance+TaskTemplate."
+        },
+        "header": {
+          "description": "Page header: title + optional subtitle + status/tier tag + action-button row.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "subtitle": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              }
+            },
+            "actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "screen": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "type": "string"
+                  },
+                  "primary": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -555,7 +604,7 @@
         },
         "stateActions": {
           "type": "array",
-          "description": "PRODUCT-UI: workflow state-transition buttons on the detail (approve/send-back/activate). Each runs a non-public server action that updates the case record (by the screen's id param) — authored via the `action-button` recipe.",
+          "description": "PRODUCT-UI: workflow state-transition buttons on the detail (approve/send-back/activate). Each runs a non-public server action that updates the case record (by the screen's id param) \u2014 authored via the `action-button` recipe.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -801,6 +850,38 @@
               "type": "array",
               "items": {
                 "type": "string"
+              }
+            }
+          ]
+        },
+        "topBar": {
+          "description": "App-shell top bar (breadcrumb + env chip + CTA). Emitted for free when a sidebar exists; set false to disable.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "env": {
+                  "type": "string"
+                },
+                "cta": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "screen": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           ]
@@ -1613,7 +1694,11 @@
     },
     "engineBlock": {
       "type": "object",
-      "required": ["coreApp", "actions", "entities"],
+      "required": [
+        "coreApp",
+        "actions",
+        "entities"
+      ],
       "additionalProperties": false,
       "description": "Workflow engine configuration stamped by expand.py onto a Core-layer spec that owns engine capabilities.",
       "properties": {
@@ -1639,12 +1724,18 @@
     },
     "libraryImportBlock": {
       "type": "object",
-      "required": ["mode", "libraryEntities"],
+      "required": [
+        "mode",
+        "libraryEntities"
+      ],
       "additionalProperties": false,
       "description": "Library import configuration stamped by expand.py onto a Core that owns library entities and has a bulk-load integration.",
       "properties": {
         "mode": {
-          "enum": ["seed", "etl"],
+          "enum": [
+            "seed",
+            "etl"
+          ],
           "description": "Import mode: seed (dev-only DELETE-then-INSERT) or etl (natural-key upsert)."
         },
         "libraryEntities": {
@@ -1658,7 +1749,10 @@
     },
     "dynamicFormBlock": {
       "type": "object",
-      "required": ["taskInstance", "taskTemplate"],
+      "required": [
+        "taskInstance",
+        "taskTemplate"
+      ],
       "additionalProperties": false,
       "description": "Dynamic task form configuration stamped by expand.py onto a worker task screen.",
       "properties": {

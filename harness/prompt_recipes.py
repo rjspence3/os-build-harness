@@ -2549,6 +2549,22 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
             steps.append({"recipe": "place-nav", "why": "instantiate the nav block on every screen",
                           "params": {"block_name": nav_params["block_name"],
                                      "screens": [s.get("name", s["id"]) for s in screens]}})
+        # top-bar: the app-shell header (breadcrumb + env chip + CTA). Emit for FREE whenever the app
+        # has a sidebar (a modern shell has both) — unless navigation.topBar is explicitly false.
+        tb = nav.get("topBar", {})
+        if screens and tb is not False:
+            tb = tb if isinstance(tb, dict) else {}
+            tb_params = {"app_label": nav.get("brand") or (spec.get("app") or {}).get("name") or "App",
+                         "screens": [s.get("name", s["id"]) for s in screens]}
+            if tb.get("env"):
+                tb_params["env_label"] = tb["env"]
+            cta = tb.get("cta") or {}
+            if cta.get("label"):
+                tb_params["cta_label"] = cta["label"]
+            if cta.get("screen") or cta.get("action"):
+                tb_params["cta_screen"] = cta.get("screen") or cta.get("action")
+            steps.append({"recipe": "top-bar", "why": "app-shell top bar (breadcrumb + env chip + CTA)",
+                          "params": tb_params})
 
     if auth.get("provider") == "app-local" and auth.get("userEntity") and auth.get("testUsers"):
         ue, aa = auth["userEntity"], auth.get("adminAttribute")
@@ -2570,6 +2586,14 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                                      "identity_attr": id_attr, "home": home}})
 
     for s in screens:
+        # page-header: a screen's lead header (title + tag + action row), emitted when declared.
+        hdr = s.get("header")
+        if hdr and hdr.get("title"):
+            hp = {"screen": s["id"], "title": hdr["title"]}
+            for k in ("subtitle", "tag", "actions"):
+                if hdr.get(k) is not None:
+                    hp[k] = hdr[k]
+            steps.append({"recipe": "page-header", "why": f"{s['id']} page header", "params": hp})
         for c in s.get("components", []):
             if c.get("type") in _DATA_COMPONENT_TYPES and c.get("boundTo"):
                 entity = c["boundTo"].split(".")[0]

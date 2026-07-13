@@ -50,3 +50,11 @@ gap the AI took over to fill, harvested into a harness change + a pinning test.
 - **Harness change:** harness/prompt_recipes.py: _cell_instruction (chip/badge/tag) and detail review-grid now state the Container is REQUIRED (without it the value renders bare — live-proven) — the harvest-#2 hardening extended to list cells + review cards. Plus NEW top-bar + page-header recipes for the missing app-shell chrome.
 - **Pinned by:** test_list_and_detail_cells_forbid_structure_drop, test_top_bar_authors_shell_header_as_shared_block, test_page_header_composes_title_tag_and_action_row
 - **Memory:** dashboard-phased-path-needs-structure-step
+
+## 7. ui-shell-auto-emission  _(landed)_
+- **Trigger:** top-bar and page-header recipes existed but a spec author had to call them by name — builds didn't get the app-shell for free.
+- **Evidence:** plan_from_spec emitted nav-block/place-nav from app.navigation but nothing emitted top-bar or page-header, so every spec-driven build shipped without the shell chrome (the Rivian 'bare' UI).
+- **Root cause:** No pipeline emission for the new shell recipes; the emitter only knew nav/dashboard/detail/dynamicForm.
+- **Harness change:** harness/prompt_recipes.py plan_from_spec: emit `top-bar` for free whenever a sidebar exists (navigation.topBar, disable with false) placed on all screens, and `page-header` per screen that declares screen.header. Schema: navigation.topBar + screen.header added to app_spec.v0.json.
+- **Pinned by:** test_plan_auto_emits_top_bar_when_nav_exists, test_plan_top_bar_disabled_by_false, test_plan_emits_page_header_from_screen_header
+- **Memory:** —

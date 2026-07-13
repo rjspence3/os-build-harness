@@ -1761,3 +1761,46 @@ def test_list_and_detail_cells_forbid_structure_drop():
     det = pr.render("detail", {"screen": "CaseDetail", "stages": ["Intake", "Review"],
                                "review_teams": ["Procurement", "Quality"]})
     assert "MUST be its own Container" in det and "review-card" in det
+
+
+def _spec_with_nav_and_header():
+    return {
+        "specVersion": "0.3", "app": {"name": "Rivian Onboarding", "roles": ["User"]},
+        "dataModel": {"entities": []},
+        "navigation": {"items": [{"label": "Queue", "toScreen": "CaseQueue"}],
+                       "brand": "RIVIAN",
+                       "topBar": {"env": "ODC · PROD", "cta": {"label": "New request", "screen": "Intake"}}},
+        "screens": [
+            {"id": "CaseQueue", "name": "Case Queue", "route": "/q"},
+            {"id": "CaseDetail", "name": "Case Detail", "route": "/d",
+             "header": {"title": "GetCase.Name", "tag": {"text": "T1 · CRITICAL", "kind": "t1"},
+                        "actions": [{"label": "Approve", "action": "ApproveCase", "primary": True},
+                                    {"label": "Send Back", "action": "SendBack"}]}},
+        ],
+    }
+
+
+def test_plan_auto_emits_top_bar_when_nav_exists():
+    steps = pr.plan_from_spec(_spec_with_nav_and_header())
+    tb = [s for s in steps if s["recipe"] == "top-bar"]
+    assert len(tb) == 1
+    p = tb[0]["params"]
+    assert p["app_label"] == "RIVIAN" and p["env_label"] == "ODC · PROD"
+    assert p["cta_label"] == "New request" and p["cta_screen"] == "Intake"
+    assert "Case Queue" in p["screens"] and "Case Detail" in p["screens"]
+    # rendering the emitted step works
+    assert "app-topbar" in pr.render("top-bar", p)
+
+
+def test_plan_top_bar_disabled_by_false():
+    spec = _spec_with_nav_and_header()
+    spec["navigation"]["topBar"] = False
+    assert not [s for s in pr.plan_from_spec(spec) if s["recipe"] == "top-bar"]
+
+
+def test_plan_emits_page_header_from_screen_header():
+    steps = pr.plan_from_spec(_spec_with_nav_and_header())
+    ph = [s for s in steps if s["recipe"] == "page-header"]
+    assert len(ph) == 1 and ph[0]["params"]["screen"] == "CaseDetail"
+    rendered = pr.render("page-header", ph[0]["params"])
+    assert "T1 · CRITICAL" in rendered and "Approve" in rendered and "btn-primary" in rendered
