@@ -26,9 +26,17 @@ _prompts*/
 builds/gate_demo/
 .playwright-mcp/
 
+# Build-runner state DBs (SQLite despite the .json name) — regenerable per run, never commit
+*.state.json
+_state_final/
+# Throwaway experimental spec variants (superseded by the canonical <App>.app_spec.json)
+*_r.app_spec.json
+*_notopbar.app_spec.json
+
 # Local diagnostic/scratch — internal, never publish (may reference the real tenant)
 TENANT_AGENT_AUDIT.md
 DELETE_MANIFEST.md
+SESSION_HANDOFF.md
 *_console.theme.css
 
 # .claude scratch — keep settings.json + hooks/ public; never publish personal/scratch
