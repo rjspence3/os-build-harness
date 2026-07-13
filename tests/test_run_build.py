@@ -401,8 +401,38 @@ def test_os_bew_comp_crash_halts_fast_with_rebuild_fresh_guidance(tmp_path):
     report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
     outcome = next(s.outcome for s in report.steps if s.recipe == "data-model")
     assert not report.ok
-    assert "COMPILE-WEDGED" in outcome and "REBUILD FRESH" in outcome
+    assert "OML-WEDGED" in outcome and "REBUILD FRESH" in outcome
     assert mcp.start_calls == 2                                            # halt-fast at 2, not 3
+
+
+def test_os_bew_50000_crash_halts_fast_with_rebuild_fresh_guidance(tmp_path):
+    # Harvest corruption-wedge-broaden (live 2026-07-12: QualifyWorkflow Core-import). OS-BEW-50000
+    # ("Internal Error") used to fall through the OS-BEW-COMP-only guard and grind max_attempts,
+    # corrupting the OML. It must now halt-fast after 2 with rebuild-fresh guidance.
+    mcp = FakeMCP()
+    mcp.script_for("data model", _Script(publish_payload={"state": "failed", "code": "OS-BEW-50000",
+                                                          "detail": "Internal Error."}))
+    driver = SpecDriver(mcp, tmp_path / "p", max_attempts=3)
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    outcome = next(s.outcome for s in report.steps if s.recipe == "data-model")
+    assert not report.ok
+    assert "OML-WEDGED" in outcome and "REBUILD FRESH" in outcome
+    assert mcp.start_calls == 2                                            # halt-fast at 2, not 3
+
+
+def test_invalid_oml_40028_halts_fast_with_rebuild_fresh_guidance(tmp_path):
+    # Harvest corruption-wedge-broaden (live 2026-07-12: portal send-back button-wire). OS-APPS-40028
+    # "Input binary does not contain a valid OML" is definitive OML corruption — halt-fast, rebuild fresh.
+    mcp = FakeMCP()
+    mcp.script_for("data model", _Script(publish_payload={
+        "state": "failed", "code": "OS-APPS-40028",
+        "detail": "Input binary does not contain a valid OML"}))
+    driver = SpecDriver(mcp, tmp_path / "p", max_attempts=3)
+    report = _run(driver.build(_spec(), "app-key", app_name="Demo"))
+    outcome = next(s.outcome for s in report.steps if s.recipe == "data-model")
+    assert not report.ok
+    assert "OML-WEDGED" in outcome and "REBUILD FRESH" in outcome
+    assert mcp.start_calls == 2
 
 
 def test_hang_is_cancelled_then_recovered_in_a_fresh_session(tmp_path):

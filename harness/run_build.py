@@ -127,6 +127,22 @@ def _is_cap_halt(detail: str) -> bool:
     return any(sig in d for sig in _CAP_SIGNALS)
 
 
+# Build-engine / OML-corruption signatures: the build engine choked and an IN-PLACE re-author will
+# NOT recover — repeated retries deepen the corruption (the working-copy OML is wedged). After 2 of
+# these on one step, HALT-FAST with rebuild-fresh guidance instead of grinding max_attempts.
+# Live-proven 2026-07-12: OS-BEW-50000 (QualifyWorkflow Core-import) and OS-APPS-40028 "invalid OML"
+# (a portal button-wire publish) both fell THROUGH the old OS-BEW-COMP-only guard and ground into a
+# cascade (the send-back wire corrupted the OML; the resume then failed on step 1).
+_CORRUPTION_MARKERS = ("os-bew-comp", "os-bew-50000", "os-apps-40028", "valid oml")
+
+
+def _is_corruption_wedge(detail: str) -> bool:
+    """True when `detail` carries a build-engine/OML-corruption signature that in-place retries can't
+    fix (rebuild-fresh territory)."""
+    d = (detail or "").lower()
+    return any(sig in d for sig in _CORRUPTION_MARKERS)
+
+
 def classify_terminal(result) -> tuple[str, str]:
     """A terminal MentorRunResult ⇒ (action, reason). HALT on compile errors (deterministic — a
     recipe gap a re-fire won't fix); RETRY on hang/timeout/cancel (fresh-session re-author, R1/R7);
@@ -352,20 +368,24 @@ class SpecDriver:
         last = "not attempted"
         last_run_id = None
         cap_waits = 0
-        compile_wedge = 0
+        corruption_hits = 0
         attempt = 0
         while attempt < self.max_attempts:
             attempt += 1
             action, detail, result = await self._attempt_step(prompt, app_key, row_id)
             last = detail
             last_run_id = result.run_id if result else last_run_id
-            # B1: an OS-BEW-COMP publish crash re-authored in-place WEDGES the app's compiled state, so
-            # grinding max_attempts deepens the corruption. Halt-fast after 2, with rebuild-fresh guidance.
-            if "OS-BEW-COMP" in (detail or ""):
-                compile_wedge += 1
-                if compile_wedge >= 2:
-                    msg = (f"{detail} — app likely COMPILE-WEDGED (repeated OS-BEW-COMP; in-place retries "
-                           f"corrupt the OML). REBUILD FRESH (new app name); do NOT keep retrying in place.")
+            # B1: a build-engine/OML-corruption publish crash re-authored in-place WEDGES the app's
+            # compiled state, so grinding max_attempts deepens the corruption. Halt-fast after 2 (one
+            # transient retry, then bail), with rebuild-fresh guidance. Covers OS-BEW-COMP AND the other
+            # live-proven corruption codes (OS-BEW-50000, OS-APPS-40028 "invalid OML") that used to fall
+            # through and cascade.
+            if _is_corruption_wedge(detail):
+                corruption_hits += 1
+                if corruption_hits >= 2:
+                    msg = (f"{detail} — app likely OML-WEDGED (repeated build-engine/OML-corruption error; "
+                           f"in-place retries corrupt the working OML). REBUILD FRESH (new app name); do NOT "
+                           f"keep retrying in place.")
                     if row_id is not None:
                         self.db.mark_failed(row_id, msg)
                     return StepResult(index, recipe, target, f"halt: {msg}", run_id=last_run_id)
