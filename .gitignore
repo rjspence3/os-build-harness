@@ -24,3 +24,7 @@ builds/*/runner_state.db
 _prompts/
 builds/gate_demo/
 .playwright-mcp/
+
+# .claude scratch — keep settings.json + hooks/ public; never publish personal/scratch
+.claude/settings.local.json
+.claude/plans/
