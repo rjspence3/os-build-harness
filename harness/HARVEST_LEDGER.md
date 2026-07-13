@@ -60,9 +60,9 @@ gap the AI took over to fill, harvested into a harness change + a pinning test.
 - **Memory:** —
 
 ## 8. dashboard-aggregate-order-before-structure  _(landed)_
-- **Trigger:** Harvest #2 added a dashboard 'structure' phase and emitted structure->aggregate->bind; the aggregate step then crashed the ODC compiler on a fresh app (RivianReviewerPortal3 AND 4, deterministic).
-- **Evidence:** Two fresh builds both failed at the dashboard aggregate step with OS-BEW-COMP-50008; the OLD 2-phase order (aggregate->bind, aggregates authored FIRST on a clean screen) had compiled fine. The #3 halt-fast fired correctly both times.
-- **Root cause:** Authoring COUNT aggregates onto a screen that ALREADY has the kpi-card widgets (structure-first) deterministically crashes the compiler; aggregates must be authored first, on a screen without the kpi widgets.
-- **Harness change:** harness/prompt_recipes.py plan_from_spec: reordered the phased dashboard emission to aggregate -> structure -> bind (was structure -> aggregate -> bind). Aggregates land on a clean screen; structure + bind add/point the widgets after (adding widgets after aggregates is proven safe).
+- **Trigger:** Harvest #2's structure-first order was hypothesized to cause the dashboard aggregate OS-BEW-COMP crash.
+- **Evidence:** DISPROVEN by RivianReviewerPortal5: with the reorder to aggregate-FIRST (aggregate on a clean screen, step 5), the aggregate step STILL crashed OS-BEW-COMP-50008. So the crash is NOT caused by the structure-first ordering. The reorder is retained (aggregate-first matches the old working order and is the safe direction) but it does NOT fix the crash.
+- **Root cause:** UNRESOLVED. The dashboard COUNT-aggregate step crashes the ODC compiler (OS-BEW-COMP-50008, opaque — no per-element detail) deterministically on the new portal builds (3/4/5) but the OLD portal (no top-bar recipe) compiled the same aggregates fine. Leading suspect: the new top-bar block placed on the dashboard, but UNCONFIRMED (nav-block is also a placed block and did not crash). Needs an isolation build (navigation.topBar:false) to confirm.
+- **Harness change:** harness/prompt_recipes.py plan_from_spec: dashboard phased emission ordered aggregate -> structure -> bind (harmless/reasonable, aggregate-first). NOTE: this did NOT resolve the OS-BEW-COMP crash — that root cause is still open.
 - **Pinned by:** test_plan_dashboard_count_order_is_aggregate_structure_bind
 - **Memory:** dashboard-phased-path-needs-structure-step
