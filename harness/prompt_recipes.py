@@ -935,10 +935,25 @@ def chart(params: dict) -> str:
         f"\"#5E6AD2\"). Verify the bars/slices render real values at RUNTIME.\nDo not publish.")
 
 
+# Canonical OutSystemsUI reset — PREPENDED to every theme stylesheet so the UI_CLASS_CONTRACT
+# classes actually win over OutSystemsUI defaults. Live-proven gap (RivianReviewerPortal 2026-07-12):
+# a `.nav-item` Container is styled, but its inner Link renders as the browser/OSUI default
+# (color rgb(0,0,238) + underline) because NOTHING resets `.nav-item a`. Design CSS is appended
+# AFTER this block, so a build's own rules still override the reset.
+THEME_RESET_CSS = (
+    "/* harness reset: make the UI class contract beat OutSystemsUI link/button defaults */\n"
+    ".app-sidebar a,.nav-item a,.nav-item a:link,.nav-item a:visited,.app-topbar a{"
+    "color:inherit;text-decoration:none;}\n"
+    ".nav-item:hover a,.nav-item.is-active a{color:inherit;}\n"
+    "a.btn-primary,.btn-primary a,a.is-primary{text-decoration:none;}\n"
+)
+
+
 def theme(params: dict) -> str:
     """Set + ACTIVATE a theme's stylesheet (a fresh theme is inert until activated; @import is stripped
-    at publish). params: css, font_faces?(css @font-face text), activate?(default true)."""
-    css = _p(params, "css", required=True)
+    at publish). Prepends THEME_RESET_CSS so the UI class contract wins over OutSystemsUI link defaults.
+    params: css, font_faces?(css @font-face text), activate?(default true)."""
+    css = THEME_RESET_CSS + "\n" + _p(params, "css", required=True)
     fonts = _p(params, "font_faces")
     fonts_txt = (f" Include these @font-face rules for custom fonts (NOT @import — it is stripped at publish): "
                  f"{fonts}." if fonts else "")
@@ -960,11 +975,13 @@ def dashboard(params: dict) -> str:
     """A KPI dashboard header: a row of stat cards (icon + big value + label + optional trend
     tag), laid out in a responsive columns grid. The theme paints .kpi-card/.kpi-icon/.kpi-value.
     params: screen, cards:[{label, value_field?|aggregate?|value?, icon?, trend?, entity?}],
-    columns?(default 3), phase?("aggregate"|"bind"|None).
+    columns?(default 3), phase?("structure"|"aggregate"|"bind"|None).
 
     Each card's value is a live aggregate COUNT when `entity`/`aggregate` is given, else literal.
 
-    W5b: `phase` enables two-step atomic authoring for COUNT cards (one-step-per-unit, commit 654f038):
+    W5b/W5d: `phase` enables atomic authoring for COUNT cards (one-step-per-unit, commit 654f038):
+      - phase="structure": author the .kpi-card CONTAINERS + value/label/icon widgets (placeholder "0",
+        no aggregate) — W5d fix: without this the bind turn ("do not add widgets") left the value bare.
       - phase="aggregate": author the Count{Ent} screen aggregate for each COUNT card (data-only turn, no bind).
       - phase="bind":      set each KPI Expression Value to Count{Ent}.Count (bind-only turn).
       - phase=None (default): combined single prompt (legacy back-compat — unchanged when no COUNT cards)."""
@@ -1003,6 +1020,34 @@ def dashboard(params: dict) -> str:
     # (OS-BEW-COMP-50008). Naming by the card keeps them distinct.
     def _agg_name(card):
         return "Count" + _pascal(card.get("label") or (card.get("entity") or card.get("aggregate")))
+    if phase == "structure":
+        # W5d (live-proven gap, RivianReviewerPortal 2026-07-12): the phased path authored the
+        # aggregate + the bind but NEVER the card STRUCTURE — the "bind" turn was told "do not add
+        # widgets", so the .kpi-card Container was never created and the value rendered bare (DOM had
+        # .kpi-value but ZERO .kpi-card). This turn authors ONLY the card structure (no aggregates,
+        # no real values) so the bind turn has a .kpi-card/.kpi-value to point at.
+        struct_lines = []
+        for c in cards:
+            icon = c.get("icon", "chart-bar")
+            label = c.get("label", "")
+            trend = f' plus a trend tag (Style class "kpi-trend") "{c["trend"]}"' if c.get("trend") else ""
+            struct_lines.append(
+                f'  - a KPI card: a Container (Style class "kpi-card", data-spec-id="kpi{_slug(label)}") — '
+                f'the card CHROME the theme paints; it MUST be this Container, not a bare value — containing '
+                f'a CSS-icon (Container Style class "kpi-icon glyph-{icon}"), a big value Expression (Style '
+                f'class "kpi-value") showing the literal "0" as a placeholder (the bind turn sets the real '
+                f'count), and a label (Style class "kpi-label") "{label}"{trend}.')
+        return (
+            f"{_PREAMBLE}\n\n"
+            f"On the {screen} screen, author ONLY the KPI card STRUCTURE — a row of {len(cards)} stat cards in "
+            f"a {ncols}-column responsive grid (a flex Container with Style class \"kpi-row\"), placed at the "
+            f"top of the content area. NO screen aggregates and NO real values this turn — every value "
+            f"Expression is the placeholder \"0\". Each card MUST be a Container whose Style class is "
+            f"\"kpi-card\" (without this container the value renders bare — live-proven):\n"
+            + "\n".join(struct_lines)
+            + "\nDo not publish."
+        )
+
     if phase == "aggregate" and count_cards:
         agg_lines = []
         for c in count_cards:
@@ -2526,10 +2571,13 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
             has_count_card = any(c.get("entity") or c.get("aggregate") for c in dash["cards"])
             if has_count_card:
                 steps.append({"recipe": "dashboard",
-                              "why": f"{s['id']} KPI dashboard — author COUNT aggregates (atomic step 1/2)",
+                              "why": f"{s['id']} KPI dashboard — author card STRUCTURE (.kpi-card containers, atomic step 1/3)",
+                              "params": {**p_base, "phase": "structure"}})
+                steps.append({"recipe": "dashboard",
+                              "why": f"{s['id']} KPI dashboard — author COUNT aggregates (atomic step 2/3)",
                               "params": {**p_base, "phase": "aggregate"}})
                 steps.append({"recipe": "dashboard",
-                              "why": f"{s['id']} KPI dashboard — bind KPI Expressions to Count.Count (atomic step 2/2)",
+                              "why": f"{s['id']} KPI dashboard — bind KPI Expressions to Count.Count (atomic step 3/3)",
                               "params": {**p_base, "phase": "bind"}})
                 # W5c: deterministic Model-API corrective — only when explicitly requested.
                 if kpi_model_api_fallback:

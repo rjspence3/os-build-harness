@@ -1200,16 +1200,43 @@ def _spec_with_dashboard_count_cards() -> dict:
     }
 
 
-def test_plan_splits_dashboard_count_into_aggregate_then_bind():
-    """T-W5b: plan_from_spec on a spec with a COUNT card emits two dashboard steps —
-    an aggregate step (phase='aggregate') BEFORE a bind step (phase='bind')."""
+def test_plan_splits_dashboard_count_into_structure_aggregate_then_bind():
+    """T-W5b/W5d: plan_from_spec on a spec with a COUNT card emits THREE dashboard steps —
+    structure (author the .kpi-card containers) BEFORE aggregate BEFORE bind. The structure
+    phase is the W5d fix: without it the bind turn ('do not add widgets') left the value bare
+    (live-proven — DOM had .kpi-value but zero .kpi-card)."""
     spec = _spec_with_dashboard_count_cards()
     steps = pr.plan_from_spec(spec)
     dash_steps = [s for s in steps if s["recipe"] == "dashboard"]
-    assert len(dash_steps) == 2, f"expected 2 dashboard steps, got {len(dash_steps)}"
+    assert len(dash_steps) == 3, f"expected 3 dashboard steps, got {len(dash_steps)}"
     phases = [s["params"]["phase"] for s in dash_steps]
-    assert "aggregate" in phases and "bind" in phases
-    assert phases.index("aggregate") < phases.index("bind")
+    assert phases == ["structure", "aggregate", "bind"], phases
+
+
+def test_theme_includes_outsystemsui_reset():
+    """Harvest theme-outsystemsui-reset: every theme stylesheet must PREPEND the reset so the
+    UI class contract wins over OutSystemsUI link defaults (live-proven: nav-item's inner <a>
+    rendered blue+underline because nothing reset `.nav-item a`)."""
+    p = pr.render("theme", {"css": ".x{color:red}"})
+    assert ".nav-item a" in p
+    assert "color:inherit" in p
+    assert "text-decoration:none" in p
+    # the design CSS is still present (reset does not replace it)
+    assert ".x{color:red}" in p
+
+
+def test_dashboard_structure_phase_authors_kpi_card_container():
+    """Harvest dashboard-kpi-card-structure: the structure phase authors the .kpi-card CONTAINER
+    (not a bare value) with a placeholder, so the bind phase has a card to point at."""
+    p = pr.render("dashboard", {"screen": "dash", "phase": "structure", "cards": [
+        {"label": "Open Cases", "entity": "QualificationCase"},
+        {"label": "Suppliers", "entity": "Supplier"}]})
+    assert "kpi-card" in p
+    assert "kpi-value" in p
+    assert "STRUCTURE" in p                 # authors structure only
+    assert "no real values" in p.lower() or 'placeholder' in p.lower()
+    # explicit: each card MUST be a Container (the live gap was a missing container)
+    assert "Container" in p and "without this container" in p.lower()
 
 
 def test_plan_single_dashboard_step_for_literal_cards():
