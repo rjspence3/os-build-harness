@@ -14,6 +14,46 @@ which are as important as the runner.
 > Extracted from a working lab and curated for reuse. The **`home_banking`** build is the
 > complete worked example / benchmark (build #0); it clones an OutSystems first-party demo app.
 
+## Quickstart — kick it off with Claude Code
+
+From an **empty folder with [Claude Code](https://claude.com/claude-code) running**, paste this
+one prompt and let the agent do the setup and then walk you through building an app:
+
+```
+Clone https://github.com/rjspence3/os-build-harness.git into this folder, then read AGENTS.md and
+set it up: create a venv, install the deps, and run the tests. Then help me connect my ODC tenant
+(<MY-TENANT>.outsystems.dev) and build my first app.
+```
+
+The agent follows [`AGENTS.md`](AGENTS.md): it installs the harness, then guides you
+spec → preview → build → verify. **Two steps only you can do**, and the agent will pause for them:
+
+1. **MCP login** — when prompted, run `/mcp` in Claude Code and complete the OAuth in your browser
+   (tokens last ~24h; re-run `/mcp` if a build later says "re-authorize").
+2. **Confirm your tenant has the Mentor MCP** enabled (it may be preview/limited on your tenant).
+
+Prefer to do it by hand? The equivalent commands:
+
+```bash
+git clone https://github.com/rjspence3/os-build-harness.git && cd os-build-harness
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
+pytest tests/ -q                                         # offline sanity — must pass
+export OUTSYSTEMS_MCP_TENANT=<MY-TENANT>.outsystems.dev   # no working default
+claude mcp add --transport http outsystems https://<MY-TENANT>.outsystems.dev/mcp -s user
+#   → then, inside Claude Code, run /mcp and finish the browser login
+```
+
+Then preview + build the example app (see [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md) "Path A+"):
+
+```bash
+python -m harness.run_build examples/task_tracker/app_spec.json --plan-only   # preview, no tenant needed
+python -m harness.run_build examples/task_tracker/app_spec.json \
+  --create --name MyFirstApp --kind CrossDevice --tenant $OUTSYSTEMS_MCP_TENANT --state /tmp/first.state.json
+```
+
+---
+
 **New here? Read [`docs/GETTING_STARTED.md`](docs/GETTING_STARTED.md).** It takes you from
 clone → install → your first build, and explains the one thing the rest of this README assumes:
 
