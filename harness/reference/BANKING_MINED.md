@@ -1,4 +1,4 @@
-<!-- Mined from the home_banking clone build (the benchmark ODC build) — kyleAccounts/data/MCP_RECIPES/.
+<!-- Mined from the home_banking clone build (the benchmark ODC build) — builds/home_banking/MCP_RECIPES/.
      Feeds CAPABILITY_MATRIX.md (coverage) + SEAMS.md (thrash-free notes). Each row cites its source recipe. -->
 
 # Banking-clone build intelligence (coverage + thrash)

@@ -77,14 +77,12 @@ UNVERIFIED/suspect. **Status: OPEN** (surfaced on ReviewerApp2).
 QualifyWorkflow, ScreeningAgent, SupplierApp built earlier against the PRIVATE OnboardingCore (pre-fix) or
 not gated. Must rebuild/gate against public CoreV2. **Status: OPEN.**
 
-### B8 — CLEANUP: misdiagnosis commit + tenant sprawl + push
-- `a4a54fe` "unique COUNT-aggregate name … fixes OS-BEW-COMP-50008 collision" — the collision theory is
+### B8 — CLEANUP: misdiagnosis commit + tenant sprawl
+- The "unique COUNT-aggregate name … fixes OS-BEW-COMP-50008 collision" commit — the collision theory is
   **disproven** (R8 + probe compile with duplicate/referenced aggregates). The distinct-naming is harmless
-  hygiene, but the message is wrong. **Action: amend the message (keep the code) or note it.**
-- **~18 throwaway Rivian apps** on the tenant (no MCP app-delete exists) — manual Portal cleanup; frees
-  Mentor session slots. **Action: user deletes; keep only RivianCoreV2 + the final built set.**
-- **`git push` BLOCKED** (credential `imaglide` lacks write to `rjspence3/os-build-harness`, 403) — 19
-  commits local-only, UNBACKED. **Action: user fixes credential. HIGHEST external priority.**
+  hygiene, but the message is wrong. **Action: note the correction (keep the code).**
+- **Throwaway build apps accumulate** on the tenant (no MCP app-delete exists) — manual Portal cleanup
+  frees Mentor session slots. **Action: delete the disposable apps; keep the Core + the final built set.**
 
 ---
 

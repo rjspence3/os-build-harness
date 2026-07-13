@@ -114,7 +114,7 @@ The harness supports two ways of defining "the source of truth" — a build root
 - **spec-driven** — the source of truth is an `app_spec` (see `harness/schemas/app_spec.v0.json`).
   `scripts/build_from_spec.py` renders the full natural-language build plan (entities → screens →
   verify); `harness-verify` checks structure against live system state. Live-proven end-to-end on
-  `task_tracker` (`--phase live` → **9/9**); the 47-spec kyleCohorts corpus renders **zero-gap** on
+  `task_tracker` (`--phase live` → **9/9**); a 47-spec internal corpus renders **zero-gap** on
   both the entity and screen layers.
 
 ## The verify + author loop (spec-driven — offline except the build)

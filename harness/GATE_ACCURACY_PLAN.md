@@ -7,7 +7,7 @@ taxonomy, action-screen anchoring, edit-via-nav driver, KPI assertion, reliable 
 any spec.
 **Status:** ready for `/build` (plan → implement-with-tests → review). Drive from the harness session.
 **Branch:** `feat/autonomous-harness-and-rivian`. Keep the 418-suite green; add tests per workstream.
-**Origin:** surfaced by the RivianReviewer4/R7 gate review, 2026-07-09 (kyleAccounts session `3cc53a9f`).
+**Origin:** surfaced by the RivianReviewer4/R7 gate review, 2026-07-09.
 
 ---
 

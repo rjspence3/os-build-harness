@@ -48,13 +48,16 @@ FILES=(
   tests/fixtures/domain_retail.json
 )
 
-# Default targets: the private lab, and a clean clone if present.
-DEFAULT_TARGETS=(
-  /Users/rob/Development/buildHarness
-  /tmp/obh_clean_e2e
-)
-TARGETS=("${@:-}")
-[ -z "${TARGETS[0]:-}" ] && TARGETS=("${DEFAULT_TARGETS[@]}")
+# Targets come from args, or the HARNESS_SYNC_TARGETS env var (colon-separated dirs).
+# Example: HARNESS_SYNC_TARGETS=/path/to/lab:/tmp/clean_clone scripts/sync_harness.sh
+IFS=':' read -r -a DEFAULT_TARGETS <<< "${HARNESS_SYNC_TARGETS:-}"
+TARGETS=("$@")
+[ "${#TARGETS[@]}" -eq 0 ] && TARGETS=("${DEFAULT_TARGETS[@]}")
+if [ "${#TARGETS[@]}" -eq 0 ]; then
+  echo "usage: scripts/sync_harness.sh <target_dir> [target_dir ...]"
+  echo "   or: HARNESS_SYNC_TARGETS=<dir>[:<dir>...] scripts/sync_harness.sh"
+  exit 2
+fi
 
 echo "== sync_harness: source = $SRC"
 for T in "${TARGETS[@]}"; do

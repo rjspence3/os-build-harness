@@ -22,8 +22,14 @@ builds/*/runner_state.db
 
 # build artifacts
 _prompts/
+_prompts*/
 builds/gate_demo/
 .playwright-mcp/
+
+# Local diagnostic/scratch — internal, never publish (may reference the real tenant)
+TENANT_AGENT_AUDIT.md
+DELETE_MANIFEST.md
+*_console.theme.css
 
 # .claude scratch — keep settings.json + hooks/ public; never publish personal/scratch
 .claude/settings.local.json

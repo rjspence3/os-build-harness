@@ -26,10 +26,13 @@ set -uo pipefail
 readonly SOURCE_REPO="${SOURCE_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 readonly CLONE_DIRNAME="os-build-harness_cloneproof"
 readonly EXPECTED_FAILS=0
-readonly FORBIDDEN_PATH="/Users/rob"
-# Host-path fragments + private sibling-repo names that must never ship in the
-# public repo's *.py/*.md. Extending this guard stops the leak class regressing.
-readonly LEAK_PATTERN='~/Development/|-Users-rob-|kyleCohorts|kyleAccounts|mentorMCP|osMCP|buildHarness'
+# The absolute home path of whoever runs this; any occurrence in *.py is a leak.
+# Override with CLONEPROOF_FORBIDDEN_PATH to check a specific author path.
+readonly FORBIDDEN_PATH="${CLONEPROOF_FORBIDDEN_PATH:-$HOME}"
+# Generic host-path fragments that must never ship in the public repo's *.py/*.md.
+# Absolute home dirs (macOS /Users/<user>/, Linux /home/<user>/) and their
+# path-slug form (-Users-<user>-). Add project-private names via CLONEPROOF_LEAK_EXTRA.
+readonly LEAK_PATTERN="/Users/[^/ ]+/|/home/[^/ ]+/|-Users-[^-/ ]+-${CLONEPROOF_LEAK_EXTRA:+|}${CLONEPROOF_LEAK_EXTRA:-}"
 
 # --- State -------------------------------------------------------------------
 
@@ -180,8 +183,8 @@ else
     printf '%s\n' "${HITS}" | sed 's/^/    > /'
 fi
 
-# 6b. Host-path fragments (~/Development/, -Users-rob-) + private sibling-repo
-#     names in *.py, *.md AND *.js — so this whole class of leak cannot regress.
+# 6b. Absolute host-home paths (/Users/<user>/, /home/<user>/, -Users-<user>-)
+#     in *.py, *.md AND *.js — so this whole class of leak cannot regress.
 LEAK_HITS="$(grep -rInE --include='*.py' --include='*.md' --include='*.js' "${LEAK_PATTERN}" "${CLONE_DIR}" \
             --exclude-dir='.venv' --exclude-dir='node_modules' 2>/dev/null)"
 
