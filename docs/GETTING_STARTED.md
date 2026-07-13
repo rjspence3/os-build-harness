@@ -156,9 +156,47 @@ Best starting point for a brand-new app. The flow:
    example. *(Only `harness-capture`'s CDP visual diff and the auto-fetch channel are
    unbuilt — you fetch the snapshot yourself, as above.)*
 
-> The spec-driven runner is still being generalized (see [`ROADMAP.md`](../ROADMAP.md));
-> the doctrine and verifier are the mature parts. Expect to drive more of the loop by
-> hand than the recipe/clone path.
+### Path A+ — autonomous build (`run_build` and `build_system`)
+
+Path A above drives the loop conversationally. For a hands-off build, the harness ships two
+**autonomous runners** that render every step, drive the MCP, publish per step, and self-recover
+from transient failures — this is the "little direction" path.
+
+**One app** — `run_build` takes an `app_spec` and builds it end-to-end into a fresh (or existing) ODC app:
+
+```bash
+export OUTSYSTEMS_MCP_TENANT=<your-tenant>.outsystems.dev     # REQUIRED — no placeholder default
+python -m harness.run_build builds/my_app/spec/app_spec.json \
+  --create --name MyApp --kind CrossDevice \
+  --tenant $OUTSYSTEMS_MCP_TENANT \
+  --state /tmp/myapp.state.json          # resumable: re-run to continue after a halt
+```
+
+It is **resumable** (the StateDB tracks each step) and **cap-aware** (a session-cap hit backs off
+and rides freed slots rather than failing). On a build-engine wedge it halts fast with
+rebuild-fresh guidance (see [ODC_GOTCHAS](ODC_GOTCHAS.md) #7).
+
+**A whole modular system** — for a producer-Core + consumer-portals topology, describe it as a
+`domain_spec` and let the pipeline decompose → expand → build every app in producer-before-consumer
+order, cross-app references resolved by construction:
+
+```bash
+python -m harness.build_system system_spec.json \
+  --prefix MyOrg --domain domain_spec.json \
+  --specs-dir path/to/enriched/app_specs \
+  --state-dir /tmp/mysystem_state \
+  --plan-only        # first: print the topo order + per-app step counts (no tenant needed)
+# drop --plan-only to actually build
+```
+
+The pipeline is `decompose(domain) → expand_system → plan_from_spec(app_spec) → render(recipe) →
+Mentor`. Inspect any stage offline (`--plan-only`, `--dry-run`) before spending a session.
+
+> **The actuator is an LLM (Mentor).** These runners are deterministic *orchestration* over a
+> stochastic *authoring* engine — they render pre-corrected prompts and verify results, but you
+> should still review the built app. When the harness falls short and you fix a gap by hand,
+> **harvest it** back into a recipe + a pinning test (`python -m harness.learning`); that loop is
+> how the harness gets better — see [`harness/HARVEST_LEDGER.md`](../harness/HARVEST_LEDGER.md).
 
 ### Path B — recipe/clone (study the worked example)
 
@@ -188,6 +226,11 @@ confirms it.
 
 ## Where to read next
 
+- [`docs/ODC_GOTCHAS.md`](ODC_GOTCHAS.md) — **read this before your first real build.** The
+  non-obvious ODC rules (cross-app publicity, `OS-DPL-50205`, `OS-BEW-COMP`, charts, theming)
+  that only surface at publish/runtime, and how the recipes handle them.
+- [`harness/RECIPE_GAPS.md`](../harness/RECIPE_GAPS.md) — what the recipes cover vs. don't (ODC REST, chart types, form patterns).
+- [`harness/HARVEST_LEDGER.md`](../harness/HARVEST_LEDGER.md) — the harness's self-improvement log: each fix, its evidence, its pinning test.
 - [`harness/CLAUDE.md`](../harness/CLAUDE.md) — the shared build-loop doctrine (start here for the loop).
 - [`builds/home_banking/MCP_RECIPES/DISPATCH_PLAYBOOK.md`](../builds/home_banking/MCP_RECIPES/DISPATCH_PLAYBOOK.md) — the canonical turn loop.
 - [`builds/home_banking/MCP_RECIPES/RUNBOOK.md`](../builds/home_banking/MCP_RECIPES/RUNBOOK.md) — cap hygiene + known walls and fixes.
