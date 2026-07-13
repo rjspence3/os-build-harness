@@ -202,6 +202,26 @@
             "componentId": "caseBody"
           }
         ]
+      },
+      "header": {
+        "title": "Supplier Qualification Case",
+        "subtitle": "Regen Brake Module \u00b7 Acme Drivetrains",
+        "tag": {
+          "text": "T1 \u00b7 CRITICAL",
+          "kind": "t1"
+        },
+        "actions": [
+          {
+            "label": "Approve Case",
+            "primary": true
+          },
+          {
+            "label": "Send Back"
+          },
+          {
+            "label": "Activate Supplier"
+          }
+        ]
       }
     },
     {
@@ -389,6 +409,13 @@
         "badge": "4",
         "section": "OPERATIONS"
       }
-    ]
+    ],
+    "topBar": {
+      "env": "ODC \u00b7 PROD",
+      "cta": {
+        "label": "New request",
+        "screen": "queue"
+      }
+    }
   }
 }
