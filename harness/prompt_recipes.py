@@ -2709,12 +2709,16 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                 p_base["columns"] = dash["columns"]
             has_count_card = any(c.get("entity") or c.get("aggregate") for c in dash["cards"])
             if has_count_card:
+                # W5e (live-proven OS-BEW-COMP crash, RivianReviewerPortal3/4): author the COUNT aggregates
+                # FIRST, onto a screen WITHOUT the kpi widgets. Adding aggregates AFTER the kpi-card
+                # structure exists deterministically crashes the ODC compiler (OS-BEW-COMP-50008); the
+                # old aggregate-first order compiled fine. So: aggregate -> structure -> bind.
                 steps.append({"recipe": "dashboard",
-                              "why": f"{s['id']} KPI dashboard — author card STRUCTURE (.kpi-card containers, atomic step 1/3)",
-                              "params": {**p_base, "phase": "structure"}})
-                steps.append({"recipe": "dashboard",
-                              "why": f"{s['id']} KPI dashboard — author COUNT aggregates (atomic step 2/3)",
+                              "why": f"{s['id']} KPI dashboard — author COUNT aggregates on a clean screen (atomic step 1/3)",
                               "params": {**p_base, "phase": "aggregate"}})
+                steps.append({"recipe": "dashboard",
+                              "why": f"{s['id']} KPI dashboard — author card STRUCTURE (.kpi-card containers, atomic step 2/3)",
+                              "params": {**p_base, "phase": "structure"}})
                 steps.append({"recipe": "dashboard",
                               "why": f"{s['id']} KPI dashboard — bind KPI Expressions to Count.Count (atomic step 3/3)",
                               "params": {**p_base, "phase": "bind"}})

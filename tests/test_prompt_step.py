@@ -1262,17 +1262,18 @@ def _spec_with_dashboard_count_cards() -> dict:
     }
 
 
-def test_plan_splits_dashboard_count_into_structure_aggregate_then_bind():
-    """T-W5b/W5d: plan_from_spec on a spec with a COUNT card emits THREE dashboard steps —
-    structure (author the .kpi-card containers) BEFORE aggregate BEFORE bind. The structure
-    phase is the W5d fix: without it the bind turn ('do not add widgets') left the value bare
-    (live-proven — DOM had .kpi-value but zero .kpi-card)."""
+def test_plan_dashboard_count_order_is_aggregate_structure_bind():
+    """T-W5d/W5e: plan_from_spec on a COUNT-card spec emits THREE dashboard steps in the order
+    aggregate -> structure -> bind. structure (W5d) authors the .kpi-card containers so the value
+    isn't bare; but the aggregates must be authored FIRST, onto a screen WITHOUT the kpi widgets —
+    adding aggregates after the structure deterministically crashes the compiler (W5e, OS-BEW-COMP-50008,
+    live-proven RivianReviewerPortal3/4; the old aggregate-first order compiled fine)."""
     spec = _spec_with_dashboard_count_cards()
     steps = pr.plan_from_spec(spec)
     dash_steps = [s for s in steps if s["recipe"] == "dashboard"]
     assert len(dash_steps) == 3, f"expected 3 dashboard steps, got {len(dash_steps)}"
     phases = [s["params"]["phase"] for s in dash_steps]
-    assert phases == ["structure", "aggregate", "bind"], phases
+    assert phases == ["aggregate", "structure", "bind"], phases
 
 
 def test_theme_includes_outsystemsui_reset():

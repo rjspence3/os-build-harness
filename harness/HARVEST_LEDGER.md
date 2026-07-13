@@ -16,7 +16,7 @@ gap the AI took over to fill, harvested into a harness change + a pinning test.
 - **Evidence:** Live DOM: ZERO '.kpi-card' elements; '.kpi-value' existed with an empty parent class; the theme DID have a '.kpi-card' rule — so the container was never authored.
 - **Root cause:** The phased dashboard path emitted aggregate + bind but no STRUCTURE step; the bind turn was told 'do not add widgets', so the .kpi-card Container was never created.
 - **Harness change:** harness/prompt_recipes.py: added dashboard phase='structure' (authors the .kpi-card containers + placeholder value/label/icon); plan_from_spec now emits structure->aggregate->bind for COUNT cards.
-- **Pinned by:** test_dashboard_structure_phase_authors_kpi_card_container, test_plan_splits_dashboard_count_into_structure_aggregate_then_bind
+- **Pinned by:** test_dashboard_structure_phase_authors_kpi_card_container, test_plan_dashboard_count_order_is_aggregate_structure_bind
 - **Memory:** dashboard-phased-path-needs-structure-step
 
 ## 3. corruption-wedge-broaden  _(landed)_
@@ -58,3 +58,11 @@ gap the AI took over to fill, harvested into a harness change + a pinning test.
 - **Harness change:** harness/prompt_recipes.py plan_from_spec: emit `top-bar` for free whenever a sidebar exists (navigation.topBar, disable with false) placed on all screens, and `page-header` per screen that declares screen.header. Schema: navigation.topBar + screen.header added to app_spec.v0.json.
 - **Pinned by:** test_plan_auto_emits_top_bar_when_nav_exists, test_plan_top_bar_disabled_by_false, test_plan_emits_page_header_from_screen_header
 - **Memory:** —
+
+## 8. dashboard-aggregate-order-before-structure  _(landed)_
+- **Trigger:** Harvest #2 added a dashboard 'structure' phase and emitted structure->aggregate->bind; the aggregate step then crashed the ODC compiler on a fresh app (RivianReviewerPortal3 AND 4, deterministic).
+- **Evidence:** Two fresh builds both failed at the dashboard aggregate step with OS-BEW-COMP-50008; the OLD 2-phase order (aggregate->bind, aggregates authored FIRST on a clean screen) had compiled fine. The #3 halt-fast fired correctly both times.
+- **Root cause:** Authoring COUNT aggregates onto a screen that ALREADY has the kpi-card widgets (structure-first) deterministically crashes the compiler; aggregates must be authored first, on a screen without the kpi widgets.
+- **Harness change:** harness/prompt_recipes.py plan_from_spec: reordered the phased dashboard emission to aggregate -> structure -> bind (was structure -> aggregate -> bind). Aggregates land on a clean screen; structure + bind add/point the widgets after (adding widgets after aggregates is proven safe).
+- **Pinned by:** test_plan_dashboard_count_order_is_aggregate_structure_bind
+- **Memory:** dashboard-phased-path-needs-structure-step
