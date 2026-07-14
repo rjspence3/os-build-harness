@@ -41,6 +41,7 @@ from harness.banking_runner.spec_adapter import (  # noqa: E402
     render_spec_screens_nl,
     spec_to_entities,
 )
+from harness.prompt_recipes import plan_gaps_from_spec  # noqa: E402
 
 SCHEMA_PATH = REPO_ROOT / "harness" / "schemas" / "app_spec.v0.json"
 _RULE = "=" * 78
@@ -129,6 +130,23 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  - {g}")
     if not entity_gaps and not screen_gaps:
         print("\nMapping gaps: none")
+
+    # Production-coverage gaps: every spec ask classified against what the harness + ODC
+    # can deliver — surfaced, never dropped silently. Four verdicts (see plan_gaps_from_spec).
+    plan_gaps = plan_gaps_from_spec(spec)
+    if plan_gaps:
+        print(f"\n⚠ Gaps between spec and production build ({len(plan_gaps)}):")
+        for kind, meaning in (("spec-wiring", "fix the spec"),
+                              ("platform-native", "ODC covers it — configure/author + harden"),
+                              ("demo-stub", "demo-only — replace for production"),
+                              ("recipe-missing", "no recipe — learning-mode or git note")):
+            group = [g for g in plan_gaps if g["kind"] == kind]
+            if group:
+                print(f"  {kind} ({meaning}):")
+                for g in group:
+                    print(f"    - [{g['capability']}] {g['detail']} — {g['where']}")
+    else:
+        print("\nProduction gaps: none")
 
     # ── PHASE 1 · entities (NL intent — the proven authoring path) ─────────────
     print(f"\n{_SUB}")

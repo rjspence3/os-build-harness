@@ -2926,3 +2926,227 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                 steps.append({"recipe": "workflow-add", "why": f"{proc['name']} += human approval",
                               "params": {"process": proc["name"], "kind": "human", **human}})
     return annotate_weights(steps)
+
+
+# Action verbs plan_from_spec can turn into a build step today; everything else is classified.
+_BUILDABLE_DOES = {"Navigate", "CreateEntity", "UpdateEntity", "DeleteEntity"}
+_FORM_BUTTON_LABELS = ("save", "submit", "create", "add", "new")
+
+# ── ODC-capability knowledge (developed 2026-07-13, doc-verified) ────────────────
+# Each row maps keywords in an integration/verb to a VERDICT. ODC-only — never O11.
+#   platform-native = ODC covers it; may carry a one-time ODC Portal CONFIG prerequisite,
+#                     and (for outbound calls) a PRODUCTION HARDENING requirement.
+#   recipe-missing  = buildable on ODC but needs a hardened recipe or an external component.
+_HARDENING = ("PRODUCTION: harden the call — secret from app config (never hardcoded), bounded "
+              "timeout + retry, OnException handler, no secret/PII in logs")
+_PORTAL = "PREREQ: one-time config in the ODC Portal"
+
+# (keywords, verdict, capability, resolution) — first match wins; order matters.
+_INTEGRATION_RULES: list[tuple[tuple[str, ...], str, str, str]] = [
+    (("smtp", "email", "e-mail", "mail", "notification", "microsoft 365", "office 365", "o365", "sendgrid"),
+     "platform-native", "email",
+     f"ODC native Email element + Send Email action. {_PORTAL}: configure SMTP/OAuth."),
+    (("soap", "wsdl"),
+     "recipe-missing", "soap-consume",
+     "ODC has no native SOAP — needs a .NET External Library wrapper; harvest a recipe."),
+    (("docusign", "e-signature", "esignature", "e-sign", "signature envelope"),
+     "recipe-missing", "esignature",
+     "e-signature (envelope + signer webhook) is an external SaaS integration; harvest a recipe."),
+    (("payment", "gateway", "stripe", "card processing", "tokeniz"),
+     "recipe-missing", "payment-gateway",
+     "payment/card tokenization (PCI-sensitive) is an external SaaS integration; harvest a recipe."),
+    (("pdf generation", "document generation", "report generation", "generate pdf", "docx", "pdf viewer",
+      "document preview"),
+     "recipe-missing", "document-generation",
+     "PDF/document generation & preview needs a Forge/external library; harvest a recipe."),
+    (("dynatrace", "apm", "observability", "siem", "keystore", "secrets manager"),
+     "recipe-missing", "infra-integration",
+     "APM/SIEM/secrets are infra concerns — escalate to WALLS.md, not a build recipe."),
+    (("oracle", "external database", "sql server", "odbc", "operational database", "customer database",
+      "core banking"),
+     "platform-native", "external-database",
+     f"ODC native External Databases (connect + expose as entities). {_PORTAL}: add the DB connection."),
+    (("blob", "s3", "object storage", "sharepoint", "document storage", "file storage", "binary"),
+     "platform-native", "file-storage",
+     "ODC native Binary Data for typical files; HIGH-VOLUME/large files → external-object-store "
+     "(S3/Azure via Forge) recipe — harvest if scale demands it."),
+    (("sso", "saml", "oidc", "okta", "auth0", "entra", "azure ad", "identity provider", "idp"),
+     "platform-native", "external-identity",
+     f"ODC native end-user identity (auth.provider=platform-idp). {_PORTAL}: configure the IdP. "
+     "This REPLACES app-local login for production."),
+    (("rest", "api", "salesforce", "crm", "credit bureau", "fraud", "policy admin", "ipeds", "webhook",
+      "integration"),
+     "platform-native", "rest-consume",
+     f"ODC native Consume REST (live-proven). {_HARDENING}."),
+]
+
+# Action-verb (does[]) → verdict, for verbs outside _BUILDABLE_DOES.
+_VERB_RULES: list[tuple[tuple[str, ...], str, str, str]] = [
+    (("email", "notify", "sendmail"),
+     "platform-native", "email",
+     f"ODC native Send Email action. {_PORTAL}: configure SMTP."),
+    (("upload", "attach"),
+     "platform-native", "file-storage",
+     "ODC native Binary Data upload/download."),
+    (("export", "generate", "download", "pdf", "report"),
+     "recipe-missing", "document-generation",
+     "generating a downloadable document artifact needs a Forge/external library; harvest a recipe."),
+    (("approve", "reject", "transition", "submit", "escalate", "route", "assign"),
+     "recipe-missing", "workflow-transition",
+     "a status transition with side-effects / approval routing extends the workflow recipe; harvest it."),
+]
+
+
+def _classify_keyword(text: str, rules) -> tuple[str, str, str] | None:
+    """First rule whose keyword appears in `text` (lowercased) wins -> (verdict, capability, resolution)."""
+    t = text.lower()
+    for keywords, verdict, capability, resolution in rules:
+        if any(k in t for k in keywords):
+            return verdict, capability, resolution
+    return None
+
+
+def plan_gaps_from_spec(spec: dict) -> list[dict]:
+    """Surface what the spec ASKS FOR relative to what the harness + ODC can deliver —
+    instead of silently dropping it (the failure that yields a hollow plan).
+
+    Returns a list of gap dicts, each ``{kind, capability, detail, where, resolution}``.
+    ``kind`` is one of four VERDICTS that route the fix (ODC-only; never O11):
+      - ``spec-wiring``     — the spec under-specifies a *buildable* feature; FIX THE SPEC
+                              (a Table with no ``boundTo``; prose capabilities never wired).
+      - ``platform-native`` — ODC covers it natively; CONFIGURE/AUTHOR it (may carry a one-time
+                              ODC Portal config prereq, and for outbound calls a production
+                              hardening requirement). NOT a wall.
+      - ``recipe-missing``  — buildable on ODC but no hardened recipe / needs an external
+                              component; route to LEARNING MODE to harvest a recipe or a git note.
+      - ``demo-stub``       — shipped only as a demo shortcut; MUST BE REPLACED for production
+                              (app-local login is the archetype → ODC end-user IdP).
+
+    Production is the default target. Pure + offline."""
+    gaps: list[dict] = []
+    screens = spec.get("screens", [])
+
+    for s in screens:
+        sid = s.get("id", "?")
+        comps = s.get("components", []) or []
+        does_all: set[str] = set()
+        for a in s.get("actions", []) or []:
+            does_all |= set(a.get("does", []) or [])
+
+        # A) a data component with no binding renders EMPTY — no list-screen is emitted.
+        for c in comps:
+            if c.get("type") in _DATA_COMPONENT_TYPES and not c.get("boundTo"):
+                gaps.append({
+                    "kind": "spec-wiring", "capability": "data-binding",
+                    "detail": f"{c.get('type')} '{c.get('id', '?')}' has no boundTo — it renders no rows",
+                    "where": f"screens[{sid}].components[{c.get('id', '?')}]",
+                    "resolution": "add \"boundTo\": \"<Entity>\" so a list-screen step is generated",
+                })
+
+        # B) Save/Submit/Form affordances but no write-path action -> no create/edit is built.
+        has_form_affordance = any(
+            c.get("type") == "Form" or
+            (c.get("type") == "Button" and any(k in c.get("label", "").lower() for k in _FORM_BUTTON_LABELS))
+            for c in comps)
+        if has_form_affordance and not (_MUTATING & does_all):
+            gaps.append({
+                "kind": "spec-wiring", "capability": "write-path",
+                "detail": "screen has Save/Submit/Form affordances but no action with does:[CreateEntity|UpdateEntity]",
+                "where": f"screens[{sid}].actions",
+                "resolution": "add an action with \"does\": [\"CreateEntity\"] (and/or UpdateEntity) so "
+                              "create-form/row-actions steps are generated",
+            })
+
+        # C) action verbs outside the buildable set -> classify (email/upload are platform-native;
+        #    transitions/doc-gen are recipe-missing) rather than blanket "no recipe builds".
+        for a in s.get("actions", []) or []:
+            name = a.get("name", "?")
+            for verb in a.get("does", []) or []:
+                if verb in _BUILDABLE_DOES:
+                    continue
+                hit = _classify_keyword(verb, _VERB_RULES)
+                if hit:
+                    verdict, capability, resolution = hit
+                else:
+                    verdict, capability, resolution = ("recipe-missing", f"action:{verb}",
+                        "no recipe builds this verb — learning mode to harvest one, or a git note to defer.")
+                gaps.append({
+                    "kind": verdict, "capability": capability,
+                    "detail": f"action '{name}' does '{verb}'",
+                    "where": f"screens[{sid}].actions[{name}]",
+                    "resolution": resolution,
+                })
+
+    # D) auth model — app-local login is a DEMO stub that must be replaced for production;
+    #    platform-idp is ODC-native (with a portal prereq).
+    auth = spec.get("auth") or {}
+    provider = auth.get("provider")
+    role_gated = [s for s in screens if (s.get("access") or {}).get("requiresRole")]
+    if provider == "app-local" or (not provider and role_gated):
+        gaps.append({
+            "kind": "demo-stub", "capability": "auth:app-local",
+            "detail": "app-local login (localStorage identity) is a demo-only shortcut, not production auth",
+            "where": "auth.provider",
+            "resolution": "PRODUCTION: replace with ODC end-user identity — auth.provider=platform-idp "
+                          "+ configure the IdP (Entra/Okta) in the ODC Portal.",
+        })
+    elif provider == "platform-idp":
+        gaps.append({
+            "kind": "platform-native", "capability": "auth:platform-idp",
+            "detail": "ODC end-user identity provider",
+            "where": "auth.provider",
+            "resolution": f"ODC native external identity. {_PORTAL}: configure the IdP.",
+        })
+
+    # D2) non-Admin roles — ODC native Roles cover these; the app-local role-gate recipe is Admin-only.
+    other_roles = sorted({(s.get("access") or {}).get("requiresRole") for s in role_gated
+                          if (s.get("access") or {}).get("requiresRole") not in (None, "Admin")})
+    if other_roles:
+        if provider == "platform-idp":
+            gaps.append({
+                "kind": "platform-native", "capability": "role-model",
+                "detail": f"roles beyond Admin: {', '.join(other_roles)}",
+                "where": "screens[].access.requiresRole",
+                "resolution": "ODC native Roles enforce these server-side; author role checks (not role-gate, "
+                              "which is app-local Admin-only).",
+            })
+        else:
+            gaps.append({
+                "kind": "demo-stub", "capability": "role-model",
+                "detail": f"roles beyond Admin ({', '.join(other_roles)}) but auth is app-local (Admin-only gate)",
+                "where": "screens[].access.requiresRole",
+                "resolution": "DEMO collapses these to Admin-vs-not; PRODUCTION: use ODC native Roles "
+                              "(auth.provider=platform-idp).",
+            })
+
+    # E) integrations — classify each against ODC capability (platform-native vs recipe-missing).
+    for integ in spec.get("integrations", []) or []:
+        name = integ.get("name") or ""
+        blob = f"{name} {integ.get('kind', '')} {integ.get('description', '')}"
+        hit = _classify_keyword(blob, _INTEGRATION_RULES)
+        if hit:
+            verdict, capability, resolution = hit
+        else:
+            verdict, capability, resolution = ("platform-native", "rest-consume",
+                f"treat as ODC Consume REST. {_HARDENING}.")
+        gaps.append({
+            "kind": verdict, "capability": capability,
+            "detail": f"integration '{name or integ.get('kind', 'integration')}'",
+            "where": "integrations",
+            "resolution": resolution,
+        })
+
+    # F) capabilities described in PROSE only, with no screen wired to an entity -> hollow plan.
+    caps = spec.get("capabilities") or []
+    any_bound = any(c.get("boundTo") for s in screens for c in s.get("components", []) or [])
+    if caps and screens and not any_bound:
+        gaps.append({
+            "kind": "spec-wiring", "capability": "capabilities-only",
+            "detail": f"{len(caps)} capabilities are described in prose but NO screen component is "
+                      "boundTo an entity — the plan will be hollow",
+            "where": "capabilities",
+            "resolution": "wire behavior onto screens (boundTo + actions[].does); capabilities[] alone "
+                          "drives no build steps",
+        })
+
+    return gaps

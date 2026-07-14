@@ -22,7 +22,33 @@ import json
 import sys
 from pathlib import Path
 
-from harness.prompt_recipes import RECIPES, render, plan_from_spec
+from harness.prompt_recipes import RECIPES, render, plan_from_spec, plan_gaps_from_spec
+
+
+# Verdict → (heading, one-line meaning). ODC-only taxonomy (see plan_gaps_from_spec).
+_VERDICT_ORDER = [
+    ("spec-wiring", "fix the spec so a build step is generated"),
+    ("platform-native", "ODC covers it — configure/author (mind portal prereqs + hardening)"),
+    ("demo-stub", "demo-only shortcut — MUST be replaced for production"),
+    ("recipe-missing", "no recipe yet — learning-mode harvest or a git note to defer"),
+]
+
+
+def _print_gap_report(gaps: list[dict]) -> None:
+    """Surface every spec ask against what the harness + ODC can deliver — nothing dropped
+    silently. Four verdicts route the fix (see harness.prompt_recipes.plan_gaps_from_spec)."""
+    if not gaps:
+        print("\nproduction gaps: none — the plan covers the whole spec.")
+        return
+    print(f"\n⚠ {len(gaps)} gap(s) between this spec and a production build:")
+    for kind, meaning in _VERDICT_ORDER:
+        group = [g for g in gaps if g["kind"] == kind]
+        if not group:
+            continue
+        print(f"\n  {kind} ({len(group)}) — {meaning}:")
+        for g in group:
+            print(f"    • [{g['capability']}] {g['detail']}")
+            print(f"        at {g['where']}  →  {g['resolution']}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -51,9 +77,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"spec is not valid JSON: {e}", file=sys.stderr)
             return 1
         steps = plan_from_spec(spec)
+        gaps = plan_gaps_from_spec(spec)
         if args.json:
-            out = [dict(s, prompt=render(s["recipe"], s["params"])) for s in steps] if args.render else steps
-            print(json.dumps(out, indent=2))
+            plan_out = [dict(s, prompt=render(s["recipe"], s["params"])) for s in steps] if args.render else steps
+            print(json.dumps({"plan": plan_out, "gaps": gaps}, indent=2))
             return 0
         print(f"build plan — {len(steps)} step(s) derived from {args.plan.name}:")
         for i, s in enumerate(steps, 1):
@@ -62,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(render(s["recipe"], s["params"]))
             else:
                 print(f"    params: {json.dumps(s['params'])}")
+        _print_gap_report(gaps)
         return 0
 
     if args.list:
