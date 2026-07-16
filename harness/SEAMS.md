@@ -467,9 +467,9 @@ diagnosis.
 
 ## M1 Wave 1 runtime proof — live drive of the 5 new recipes on one probe app (2026-07-15)
 Drove all five Wave-1 recipes through Mentor on ONE consolidated probe app (`w1probe`, key `9abefbc9…`,
-tenant robertjspencedemos, Dev env). Session-optimal: one app, fresh session per committing edit, publish
+tenant <tenant>, Dev env). Session-optimal: one app, fresh session per committing edit, publish
 each turn, ~9 sessions total (well under the 100/24h cap). **Result: 4/5 runtime-proven (2 DOM-verified),
-1 deploy-wall root-caused.** Deployed app: https://robertjspencedemos-dev.outsystems.app/w1probe (rev 8).
+1 deploy-wall root-caused.** Deployed app: https://<tenant>-dev.outsystems.app/w1probe (rev 8).
 
 | Construct | Recipe | Result |
 |---|---|---|

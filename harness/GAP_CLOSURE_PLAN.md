@@ -136,7 +136,7 @@ the verifier confirms it at runtime. Matrix row → ✓/✓/✓/✓. Log each ne
     action), `rest-consume`, `conditional` + `derived-field` (on the screen). Drive it per doctrine: one
     committing concern per fresh Mentor session, publish once per logical group from the main loop, cancel
     after publish. rest-consume needs a real reachable base URL (a public echo/test API) for a live 2xx.
-  - **RUNTIME PROOF DONE 2026-07-15 (w1probe rev 8, https://robertjspencedemos-dev.outsystems.app/w1probe):**
+  - **RUNTIME PROOF DONE 2026-07-15 (w1probe rev 8, https://<tenant>-dev.outsystems.app/w1probe):**
     **4/5 proven, 1 deploy-wall** (full ledger in SEAMS.md §"M1 Wave 1 runtime proof"). ✅ **conditional (B2-4)**
     + **derived-field (B2-5)**: DOM-verified (EmployerBlock visible; NetWorthExpr renders "60"=100−40). ✅
     **rest-consume (B2-1)** + **excel-import (B2-3)**: authored clean + deployed (live 2xx / .xlsx-run are the
