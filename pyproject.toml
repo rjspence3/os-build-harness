@@ -15,6 +15,7 @@ harness-capture = "harness.capture:main"
 harness-prompt-step = "harness.prompt_step:main"
 harness-gate = "harness.gate:main"
 harness-mitre = "harness.mitre:main"
+harness-ingest = "harness.spec_ingest:main"
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }

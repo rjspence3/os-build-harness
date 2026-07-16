@@ -42,6 +42,7 @@ from harness.banking_runner.spec_adapter import (  # noqa: E402
     spec_to_entities,
 )
 from harness.prompt_recipes import plan_gaps_from_spec  # noqa: E402
+from harness.spec_ingest import plan_gaps_with_fidelity  # noqa: E402
 
 SCHEMA_PATH = REPO_ROOT / "harness" / "schemas" / "app_spec.v0.json"
 _RULE = "=" * 78
@@ -91,6 +92,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--emit-csharp", action="store_true",
                         help="Also print the legacy applyModelApiCode C# entity batch "
                              "(superseded for authoring by the NL intent; kept for reference).")
+    parser.add_argument("--fidelity", choices=["demo", "production"], default="demo",
+                        help="Gap fidelity mode: demo (default, no blocking flags) or "
+                             "production (auth:app-local + unhardened REST become blocking).")
     args = parser.parse_args(argv)
 
     spec_path: Path = args.from_spec
@@ -133,9 +137,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # Production-coverage gaps: every spec ask classified against what the harness + ODC
     # can deliver — surfaced, never dropped silently. Four verdicts (see plan_gaps_from_spec).
-    plan_gaps = plan_gaps_from_spec(spec)
+    # --fidelity production adds a [BLOCKING] marker on auth:app-local + unhardened REST.
+    plan_gaps = plan_gaps_with_fidelity(spec, args.fidelity)
     if plan_gaps:
-        print(f"\n⚠ Gaps between spec and production build ({len(plan_gaps)}):")
+        print(f"\n⚠ Gaps between spec and production build ({len(plan_gaps)}) "
+              f"[fidelity={args.fidelity}]:")
         for kind, meaning in (("spec-wiring", "fix the spec"),
                               ("platform-native", "ODC covers it — configure/author + harden"),
                               ("demo-stub", "demo-only — replace for production"),
@@ -144,7 +150,8 @@ def main(argv: list[str] | None = None) -> int:
             if group:
                 print(f"  {kind} ({meaning}):")
                 for g in group:
-                    print(f"    - [{g['capability']}] {g['detail']} — {g['where']}")
+                    blocking_marker = " [BLOCKING]" if g.get("blocking") else ""
+                    print(f"    - [{g['capability']}]{blocking_marker} {g['detail']} — {g['where']}")
     else:
         print("\nProduction gaps: none")
 
