@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -432,10 +433,57 @@ def _check_unique(names: list[str], label: str, gap) -> None:
         gap(f"duplicate {label}", f"'{d}' declared more than once")
 
 
+# An array-valued dataType: a trailing "[]" ("Text[]", "Image[]") or a List/Array
+# wrapper ("List<Text>", "Array of Text", "list of image").
+_ARRAY_DATATYPE_RE = re.compile(r"\[\s*\]\s*$|^\s*(list|array)\s*(<|\bof\b)", re.IGNORECASE)
+
+
+def _is_array_datatype(dt) -> bool:
+    return isinstance(dt, str) and bool(_ARRAY_DATATYPE_RE.search(dt))
+
+
+def _datamodel_lint(spec: dict) -> list[Finding]:
+    """B1 (RECIPE_GAPS): ODC entity/structure attributes CANNOT be list-valued — the
+    dataType allow-list is basic types + Identifier only. Catch an array-valued attribute
+    ('Image[]', 'Text[]', 'List<Text>') and emit the actionable 'promote to a child entity
+    + FK' guidance, instead of the cryptic enum failure JSON-Schema would raise. Runs
+    ALONGSIDE the schema layer (see validate_spec) so this message survives even though the
+    array dataType also violates the odcDataType enum. Defensive against malformed shape —
+    it also runs before the schema has vouched for the spec."""
+    findings: list[Finding] = []
+
+    def scan(owner_kind: str, owner_name: str, attrs) -> None:
+        if not isinstance(attrs, list):
+            return
+        for attr in attrs:
+            if isinstance(attr, dict) and _is_array_datatype(attr.get("dataType")):
+                findings.append(Finding(
+                    "spec-gap",
+                    "array-valued attribute is not representable in ODC",
+                    f"{owner_kind} {owner_name}.{attr.get('name', '?')} has dataType "
+                    f"'{attr.get('dataType')}'. ODC entity/structure attributes cannot be "
+                    f"list-valued (allow-list = basic types + Identifier). Model it as a CHILD "
+                    f"ENTITY (one row per element, FK -> {owner_name}), or a denormalized CSV "
+                    f"Text column."))
+
+    dm = spec.get("dataModel")
+    if isinstance(dm, dict):
+        for e in dm.get("entities", []) or []:
+            if isinstance(e, dict):
+                scan("entity", e.get("name", "?"), e.get("attributes"))
+    for st in spec.get("structures", []) or []:
+        if isinstance(st, dict):
+            scan("structure", st.get("name", "?"), st.get("attributes"))
+    return findings
+
+
 def validate_spec(spec: dict) -> list[Finding]:
     """Full spec-phase validation. Cross-ref checks run only if the schema shape
-    is sound (otherwise they'd trip over the same structural problem)."""
-    findings = _schema_findings(spec)
+    is sound (otherwise they'd trip over the same structural problem). The data-model
+    lint runs alongside the schema layer so an array-valued attribute yields its
+    actionable message even though it also fails the schema enum (which short-circuits
+    cross-ref)."""
+    findings = _datamodel_lint(spec) + _schema_findings(spec)
     if any(f.severity == "spec-gap" for f in findings):
         return findings
     return findings + _crossref_findings(spec)

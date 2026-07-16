@@ -83,6 +83,110 @@ Gap: #7 + sustainability.
 
 ---
 
+## Phase 7 — Real-spec coverage breadth (close every RECIPE_GAP; milestones M1→M2→M3)
+Source: `RECIPE_GAPS.md` — gaps surfaced by three real BRDs (Trust Banking / Credit Decisioning /
+Lifecycle Management) and classified vs **ODC-native capability** (verified against ODC docs, not O11).
+Those three BRDs are the **acceptance specs**: Phase 7 is done when they build clean-room, first-try.
+
+**The closing template (every gap = 5 artifacts; DONE only at runtime proof).** For each gap: add the
+`RECIPES` function in `prompt_recipes.py` (ODC gotcha baked in + `Do not publish` tail) · a first-class
+`app_spec` block · `plan_from_spec` emission in dependency order · a `harness-verify --phase live` and/or
+`harness-capture --behavioral` assertion + unit tests · then a from-scratch build authors it first-try and
+the verifier confirms it at runtime. Matrix row → ✓/✓/✓/✓. Log each new thrash note in `SEAMS.md`.
+
+**Milestone gate rule:** do NOT start a milestone until the prior one is matrix-green (every row ✓/✓/✓/✓
++ a clean-room build proved it). Each milestone has its own exit gate.
+
+### M1 — ODC-native recipes, no external dependency (RECIPE_GAPS B1 + B2). Highest value/risk ratio.
+- **Wave 0 (pure Python; no Mentor/tenant) — DONE 2026-07-14:**
+  - B1-1 array-attribute **lint** — **DONE**. `_datamodel_lint` (verify.py) runs ALONGSIDE the schema layer
+    (the array dataType also fails the odcDataType enum, which short-circuits cross-ref) so the actionable
+    "promote to a child entity + FK / CSV column" message always surfaces; `plan_from_spec` raises fail-closed;
+    schema `odcDataType.$comment` documents the constraint for the spec factory. 7 tests, full suite 352 green,
+    live-CLI-proven on an `Image[]` spec (exit 1, actionable message first). Matrix row added (✓/✓/✓).
+  - **Schema audit (findings, drives M1/M2/M3 emission):**
+    - `integrations` EXISTS but is thin: `kind` enum = `RestApi` only, fields = name/baseUrl/description; NO
+      operations, auth, or consume-vs-expose distinction. **B2-1 REST-consume needs this widened** (add
+      `direction: consume|expose`, `operations[]`, `auth`). Not a blocker for authoring, but the plan can't
+      emit a consume step from today's block.
+    - `capabilities` is the USER-FLOW layer (roles→screens→actions→entities), NOT device capabilities —
+      unrelated to B2-8 mobile plugins. **A new `capabilities`/`plugins` block is needed for M3** (name collision
+      to avoid: call it `devicePlugins`).
+    - Timers: no timer/schedule block at all today (seed-entity hardcodes WhenPublished). **B2-2 needs a
+      `timers[]` block** (`{name, action, schedule: whenPublished|daily|weekly|interval, at?}`).
+    - MISSING blocks to add as their wave lands (all additive, backward-compatible): `settings[]` (B2-10),
+      `notifications[]` email/sms (B2-6/B3-6), field-level `masking` (B2-14), `offline`/`sync` + `devicePlugins`
+      (M3), `derivedFields`/`conditional` (B2-4/B2-5 — may ride on existing component `props`).
+    - Confirmed already-present + reusable: `structures` (Core-hosted parse DTOs for B2-3 Excel),
+      `logic[]` (service/client/SQL actions), `appReferences` (Forge-component references for M2), `processes`
+      (maker-checker B2-16), `design.theme` (unaffected). No schema change needed for those.
+  - **Net:** Wave 0 closes the one true platform gap and yields a concrete per-wave schema-change list, so each
+    M1/M2/M3 recipe lands with its spec block already scoped. Blocks are added JUST-IN-TIME per wave (not all now)
+    to keep every intermediate schema shape valid + tested.
+- **Wave 1 (native, 2–3 specs each — do first) — OFFLINE HALF DONE 2026-07-15:** `rest-consume` (B2-1) ·
+  `scheduled-timer` recurrent (B2-2) · `excel-import` (B2-3, `ExcelToRecordList`+ForEach insert; Structure in a
+  normal app/**Core**, [[odc-bpt-app-cannot-contain-structures]]) · `conditional` If-render (B2-4) ·
+  `derived-field` Expression (B2-5). **All 5 recipes + schema blocks (integration.direction/methods, top-level
+  `timers`, logic.kind=excelImport, component.visibleWhen/computed) + `plan_from_spec` emission + unit tests
+  landed; full suite 365 green; CLI-visible.** REMAINING = the runtime proof (below) to reach ✓/✓/✓/✓ per row.
+  - **Runtime-proof strategy (Mentor-optimal):** prove all 5 in ONE consolidated probe app, NOT five apps —
+    the harness leaks a Mentor session per committing step and the tenant caps at 100 sessions/24h
+    ([[harness-leaks-mentor-session-per-step]]), so minimize `app_create` + session count. One normal app
+    (Structures + a target entity + a screen) exercises `excel-import`, `scheduled-timer` (Timer→the import
+    action), `rest-consume`, `conditional` + `derived-field` (on the screen). Drive it per doctrine: one
+    committing concern per fresh Mentor session, publish once per logical group from the main loop, cancel
+    after publish. rest-consume needs a real reachable base URL (a public echo/test API) for a live 2xx.
+  - **RUNTIME PROOF DONE 2026-07-15 (w1probe rev 8, https://robertjspencedemos-dev.outsystems.app/w1probe):**
+    **4/5 proven, 1 deploy-wall** (full ledger in SEAMS.md §"M1 Wave 1 runtime proof"). ✅ **conditional (B2-4)**
+    + **derived-field (B2-5)**: DOM-verified (EmployerBlock visible; NetWorthExpr renders "60"=100−40). ✅
+    **rest-consume (B2-1)** + **excel-import (B2-3)**: authored clean + deployed (live 2xx / .xlsx-run are the
+    only residuals). ⚠ **scheduled-timer (B2-2): DEPLOY-WALL** — a recurrent (cron) Timer authors clean but
+    fails deploy `OS-DPL-50205`; the SAME timer as WhenPublished deploys → the recurrent schedule is the
+    trigger (a 4th distinct OS-DPL-50205 cause; memory [[odc-recurrent-timer-deploy-wall-os-dpl-50205]]).
+    Recipe fixes applied from the run: `rest-consume` response is auto-generated (not pre-mapped). Doctrine
+    learned: [[mentor-fresh-session-forks-from-model-not-deployed]] (a broken undeployed rev poisons
+    downstream publishes). **M1 Wave 1 exit-gate status: 4/5 ✓/✓/✓/✓; B2-2 blocked on the timer wall.**
+- **Wave 2 (native app-level):** `native-email` (B2-6; Email element, SMTP is external Portal config) ·
+  `web-block` (B2-9) · `settings` (B2-10) · `audit-log` (B2-11, append-only entity + write-on-mutate) ·
+  `role-limit` (B2-12, extend `role-gate` with a numeric threshold) · `draft-resume` (B2-13) · `field-mask`
+  (B2-14) · `org-scope` RLS (B2-15) · maker-checker breadth (B2-16, generalize `workflow`).
+- **Wave 3 (agentic depth — PCM brief; the agentic slice is the most under-served):** extend the `agent`
+  recipe with a **structured-output** variant (B2-17 — Structured output tab → a Structure with a Decimal
+  confidence field + rationale, the field downstream logic reads) · a **batch-agentic-loop** recipe (B2-18 —
+  chunked idempotent Timer loop calling the agent per row, respecting the 60s client / 300s BPT-activity /
+  ≤30min Timer limits; fix the `agent` recipe's 120s `ServerRequestTimeout` vs the 60s client max) · a thin
+  `guardrail`/decision recipe if warranted (B2-19 — service-action + If/Switch; low priority, buildable today).
+- **M1 exit gate:** slimmed TBS + Credit + PCM specs build clean-room first-try; every B1/B2 row ✓/✓/✓/✓;
+  behavioral gate proves over-limit blocked, draft reloads, cross-org blocked, a mutation writes an audit row,
+  AND (PCM) an agent returns a typed confidence score that a deterministic guardrail routes on over a batch.
+
+### M2 — Forge / external-component recipes (RECIPE_GAPS B3). Gate: M1 green.
+- **Shared infra FIRST:** a Forge-dependency `IMPORT_INSTRUCTIONS` generator (a `needs-human` wall per
+  `harness/CLAUDE.md` fall-out): Forge component name → tenant-install steps → `addReferenceToElements`.
+  Every B3 recipe gates on the component being installed + referenced — that human step is part of the plan,
+  never silently assumed.
+- **Per-component recipes:** Data Grid (B3-1) · Maps/heatmap (B3-2) · PDF/Ultimate PDF (B3-3) · QR-gen/QRCoder
+  (B3-4) · CSV/CsvToolkit (B3-5) · SMS via external REST (B3-6). Verify = component instantiated + its behavior
+  renders at runtime.
+- **M2 exit gate:** a spec exercising each B3 component builds clean-room (with the documented install step
+  performed once), each verified at runtime; install-wall instructions proven executable.
+
+### M3 — Mobile / offline cluster (RECIPE_GAPS B2-7, B2-8). Gate: M2 green. Highest uncertainty.
+- **Spike FIRST (research, not a recipe):** (a) is ODC mobile/offline authoring even MCP-reachable? — no
+  evidence in the matrix today; (b) a mobile verification channel — `harness-capture` is headless web and
+  cannot exercise a native mobile/offline app. Resolve the PWA path (IndexedDB, partially headless-testable)
+  vs native (SQLite + device plugins → structural-only verify + documented manual runtime).
+- **Recipes (post-spike):** offline local-entities + `OnSync` + a conflict pattern (B2-7) · device-plugin
+  references — camera / barcode-scan / GPS (B2-8, OS-supported plugins referenced into the app).
+- **M3 exit gate:** the LMS field-app spec builds clean-room; offline-sync + device-plugin rows verified by
+  the chosen channel (PWA behavioral where possible; structural + a logged manual-runtime step otherwise —
+  no silent pass).
+
+**Phase 7 program exit:** all three source BRDs build clean-room, first-try, gate-green — the harness now
+covers the real-world app shapes that motivated the gap review.
+
+---
+
 ## Sequencing & dependencies
 - **0 → 1** first (prove current, then unlock the spec so recipes are reachable). 1 is the critical path — it gates 2/3/4.
 - **2 and 3 run in parallel** after 1 (verification depth + fidelity are independent).
@@ -99,3 +203,4 @@ Not "recipes written" but **matrix rows at ✓/✓/✓/✓** and **# of distinct
 - **2026-07-07:** Phase 5 FULLY CLOSED. Headless smoke proved a `claude -p` build-root session runs the harness CLIs + certifies `harness-gate` unattended (SEAM-001 holds headless). Defined the auth boundary: OutSystems MCP OAuth is interactive → `RUN_MODE=session` is the Mentor DRIVE vehicle (inherits the live token); `RUN_MODE=headless` drives Mentor only with a pre-provisioned tenant JWT (a cold headless session is unauthenticated). launch_build.sh encodes it (OUTSYSTEMS_MCP_TOKEN preflight + bypassPermissions).
 - **2026-07-07:** Phase 4 breadth — Batch A (static entity, structure, input-validation, exception-handler) + Batch B (service/client/SQL actions, aggregate join, global event, index) BOTH recipe·spec·plan·tests + RUNTIME-PROVEN (batcha, batchb — batchb 0-thrash). Batch C: **workflow/BPT RUNTIME-PROVEN from scratch** (wfprobe — cracked the multi-app + verify-cache-corruption problem); app-reference event+SA deploy-proven, static-entity FK authors-clean but deploy-walls OS-DPL-50205 (open); external-library recipe-complete, prereq-blocked (.NET assembly). The create-form widgets phantom wall was closed en route (cfwall). 316 tests.
 - **Phase 0, 1, 2, 3, 5 = DONE. Phase 4 substantially DONE** (13 constructs recipe·plan·verify; the standout: workflows now build from scratch). Remaining: 1 open Batch-C deploy wall (OS-DPL-50205) + 1 prereq-blocked (external .NET), and Phase 6 (hardening/flywheel).
+- **2026-07-14:** Phase 7 PLANNED. Reviewed three real BRDs (Trust Banking / Credit Decisioning / Lifecycle Management) for recipe gaps and classified each vs **ODC-native capability** (verified against ODC docs — `RECIPE_GAPS.md`): only ONE true platform constraint (array-valued attributes, B1); ~16 ODC-native-but-unrecipe'd gaps (B2 — REST-consume, scheduled timer, Excel-import, If/Expression, email, offline+sync, device plugins, Web Blocks, Settings, audit-log, role-limit, draft/resume, masking, org-scope, maker-checker); 6 Forge/external (B3). Folded into three gated milestones: **M1** native (Waves 0–2), **M2** Forge (install-wall infra + per-component), **M3** mobile/offline (spike-first — MCP-authorability + a mobile verify channel are unproven). The three BRDs are the acceptance specs. NOT STARTED — this is the plan, not built.

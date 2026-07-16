@@ -23,6 +23,11 @@ from harness import prompt_step
     ("list-screen", {"screen": "documents", "entity": "Document", "columns": ["Title"]}),
     ("role-gate", {"screen": "settings"}),
     ("seed-entity", {"entity": "Document", "rows": [{"Title": "Q3 Plan"}]}),
+    ("rest-consume", {"name": "BureauAPI", "base_url": "https://x", "methods": [{"name": "Pull", "http": "GET"}]}),
+    ("scheduled-timer", {"name": "Nightly", "action": "RunBatch", "schedule": "daily"}),
+    ("excel-import", {"name": "ImportRows", "target_entity": "RawCode", "row_structure": "RawCodeRow"}),
+    ("conditional", {"screen": "s1", "component_id": "employerBlock", "visible_when": "Status = \"Employed\""}),
+    ("derived-field", {"screen": "s1", "component_id": "netWorth", "formula": "Assets - Liabilities"}),
 ])
 def test_every_recipe_carries_the_preamble_corrections(name, params):
     prompt = pr.render(name, params)
@@ -255,6 +260,107 @@ def test_missing_required_param_raises():
 def test_unknown_recipe_raises():
     with pytest.raises(KeyError):
         pr.render("nope", {})
+
+
+def test_plan_refuses_array_valued_attribute():
+    # B1 (RECIPE_GAPS): ODC can't represent a list-valued attribute — the plan must fail
+    # closed rather than emit an unbuildable data-model step.
+    spec = _spec_with_first_class_fields()
+    spec["dataModel"]["entities"][0]["attributes"].append({"name": "Photos", "dataType": "Image[]"})
+    with pytest.raises(ValueError, match="not representable in ODC"):
+        pr.plan_from_spec(spec)
+
+
+# ── M1 Wave 1 recipes (RECIPE_GAPS B2-1..B2-5) ───────────────────────────────
+def test_rest_consume_is_consume_not_expose_and_sets_base_url_once():
+    prompt = pr.render("rest-consume", {"name": "BureauAPI", "base_url": "https://bureau.example",
+                                         "methods": [{"name": "PullScore", "http": "GET", "path": "/score",
+                                                      "response_struct": "ScoreResp"}], "auth": "ApiKey"})
+    assert "CONSUMED REST" in prompt and "NOT an exposed endpoint" in prompt
+    assert "https://bureau.example" in prompt and "per-stage" in prompt
+    assert "PullScore" in prompt and "ScoreResp" in prompt and "ApiKey" in prompt
+
+
+def test_scheduled_timer_is_recurrent_and_demands_idempotency():
+    prompt = pr.render("scheduled-timer", {"name": "NightlyBatch", "action": "SettleTrades",
+                                           "schedule": "daily", "at": "02:00"})
+    assert "recur DAILY at 02:00" in prompt
+    assert "NOT only WhenPublished" in prompt          # the whole point vs seed-entity
+    assert "IDEMPOTENT" in prompt and "60 minutes" in prompt
+
+
+def test_excel_import_needs_structure_and_foreach_insert():
+    prompt = pr.render("excel-import", {"name": "ImportCodes", "target_entity": "RawCode",
+                                        "row_structure": "RawCodeRow"})
+    assert "Excel to Record List" in prompt and "RawCodeRow" in prompt
+    assert "ForEach" in prompt and "RawCode" in prompt
+    assert "cannot be created in a BusinessProcess" in prompt   # the Structure-in-Core rule
+    assert "Assign PER attribute" in prompt and "inline record literal" in prompt
+
+
+def test_conditional_sets_visible_without_recreating():
+    prompt = pr.render("conditional", {"screen": "app", "component_id": "employerBlock",
+                                       "visible_when": "EmploymentStatus = \"Employed\""})
+    assert "Visible" in prompt and "SetVisible" in prompt
+    assert "EmploymentStatus = \"Employed\"" in prompt
+    assert "do NOT delete and recreate" in prompt
+
+
+def test_derived_field_uses_expression_not_text_widget():
+    prompt = pr.render("derived-field", {"screen": "app", "component_id": "netWorth",
+                                         "formula": "TotalAssets - TotalLiabilities", "label": "Net Worth"})
+    assert "EXPRESSION widget" in prompt and "NOT a Text widget" in prompt
+    assert "TotalAssets - TotalLiabilities" in prompt and "Net Worth" in prompt
+
+
+def _spec_with_wave1_constructs():
+    """A minimal valid spec exercising all five Wave-1 recipes."""
+    return {
+        "specVersion": "0.2",
+        "app": {"name": "w1", "roles": ["User"]},
+        "structures": [{"name": "ScoreResp", "attributes": [{"name": "Score", "dataType": "Integer"}]},
+                       {"name": "RawCodeRow", "attributes": [{"name": "Code", "dataType": "Text"}]}],
+        "dataModel": {"entities": [{"name": "RawCode", "attributes": [
+            {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+            {"name": "Code", "dataType": "Text"}]}]},
+        "integrations": [{"name": "BureauAPI", "kind": "RestApi", "direction": "consume",
+                          "baseUrl": "https://bureau.example", "auth": "ApiKey",
+                          "methods": [{"name": "PullScore", "http": "GET", "path": "/score",
+                                       "responseStruct": "ScoreResp"}]}],
+        "logic": [{"kind": "excelImport", "name": "ImportCodes",
+                   "targetEntity": "RawCode", "rowStructure": "RawCodeRow"}],
+        "timers": [{"name": "NightlyBatch", "action": "ImportCodes", "schedule": "daily", "at": "02:00"}],
+        "screens": [{"id": "app", "name": "App", "route": "/app",
+                     "components": [
+                         {"id": "codesTable", "type": "Table", "boundTo": "RawCode",
+                          "columns": [{"field": "Code", "kind": "text"}]},
+                         {"id": "employerBlock", "type": "Container",
+                          "visibleWhen": "EmploymentStatus = \"Employed\""},
+                         {"id": "netWorth", "type": "Label", "label": "Net Worth",
+                          "computed": "TotalAssets - TotalLiabilities"}],
+                     "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "codesTable"}]}}],
+    }
+
+
+def test_plan_emits_all_five_wave1_steps():
+    recipes = [s["recipe"] for s in pr.plan_from_spec(_spec_with_wave1_constructs())]
+    for r in ("rest-consume", "scheduled-timer", "excel-import", "conditional", "derived-field"):
+        assert r in recipes, f"plan did not emit {r}"
+
+
+def test_plan_orders_rest_consume_before_screens_and_timer_after_logic():
+    steps = pr.plan_from_spec(_spec_with_wave1_constructs())
+    recipes = [s["recipe"] for s in steps]
+    # a consumed integration is authored before the screens that might use it
+    assert recipes.index("rest-consume") < recipes.index("screen")
+    # a Timer's action (the excel-import here) must exist before the Timer
+    assert recipes.index("excel-import") < recipes.index("scheduled-timer")
+
+
+def test_wave1_spec_passes_schema_and_crossref():
+    from harness.verify import validate_spec
+    gaps = [f for f in validate_spec(_spec_with_wave1_constructs()) if f.severity == "spec-gap"]
+    assert gaps == [], f"unexpected spec-gaps: {[g.summary for g in gaps]}"
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

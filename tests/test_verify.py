@@ -87,6 +87,33 @@ def test_bad_datatype_is_schema_gap() -> None:
     assert any("schema violation" in f.summary for f in gaps)
 
 
+# ── B1 (RECIPE_GAPS): array-valued attributes are not representable in ODC ──────
+@pytest.mark.parametrize("dt", ["Text[]", "Image[]", "Text []", "List<Text>", "Array of Image", "list of text"])
+def test_array_attribute_gets_actionable_lint(dt: str) -> None:
+    # The array dataType also fails the schema enum, but the lint's actionable message
+    # must survive the schema short-circuit (validate_spec runs the lint alongside schema).
+    spec = _completed_example()
+    spec["dataModel"]["entities"][0]["attributes"].append({"name": "Photos", "dataType": dt})
+    gaps = [f for f in validate_spec(spec) if f.severity == "spec-gap"]
+    lint = [f for f in gaps if "array-valued attribute" in f.summary]
+    assert lint, f"expected the array lint to fire for dataType {dt!r}"
+    assert "child entity" in lint[0].context.lower()
+    assert "Account.Photos" in lint[0].context
+
+
+def test_array_attribute_lint_fires_on_structures_too() -> None:
+    spec = _completed_example()
+    spec["structures"] = [{"name": "RiskDTO", "attributes": [{"name": "Factors", "dataType": "Text[]"}]}]
+    gaps = [f for f in validate_spec(spec) if f.severity == "spec-gap"]
+    assert any("array-valued attribute" in f.summary and "structure RiskDTO.Factors" in f.context for f in gaps)
+
+
+def test_scalar_attributes_do_not_trip_the_array_lint() -> None:
+    # Regression guard: normal specs must stay clean (no false positive on basic types).
+    from harness.verify import _datamodel_lint
+    assert _datamodel_lint(_completed_example()) == []
+
+
 def test_screen_role_not_in_app_roles_is_crossref_gap() -> None:
     spec = _completed_example()
     spec["screens"][0]["roles"] = ["Manager"]  # app.roles is just ["Customer"]

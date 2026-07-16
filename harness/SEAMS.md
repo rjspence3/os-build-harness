@@ -454,3 +454,36 @@ for the human+AI workflow: it uses SA refs (call) + screen refs (navigate), NO c
 is NOT blocked by this. Residual (minor, deferred): entref2's no-FK build reported succeeded but
 no_changes_detected + deploy_list=0 — a deploy-dedup/tracking ambiguity, separate from the OS-DPL-50205
 diagnosis.
+
+---
+
+## Agent recipe: ServerRequestTimeout=120 exceeds the 60s client max (2026-07-15, from the PCM gap review)
+
+| # | Seam | Status | Fix |
+|---|------|--------|-----|
+| AG-1 | The `agent` recipe (`prompt_recipes.py`) hardcodes **`ServerRequestTimeout=120`** on the `Call<name>` service-action call node AND the `AgentAPI/Ask` REST call node (to absorb LLM latency). But ODC caps the **client-initiated server request timeout at 60s** (default 10s, max 60s — [long_server_requests_timeout](https://success.outsystems.com/documentation/outsystems_developer_cloud/monitoring_and_troubleshooting_apps/manage_technical_debt_in_odc/performance_findings/long_server_requests_timeout/)). A synchronous 120s value is therefore either silently clamped to 60s or a technical-debt finding — and any caller that genuinely needs >60s (a slow LLM, or a per-row batch loop) times out regardless. Surfaced by the RECIPE_GAPS B2-18 batch-agentic-loop analysis (2026-07-15). | **OPEN** (recipe-authoring; deferred to M1 Wave 3 agentic depth) | Two parts: (a) drop the `agent` recipe's call-node timeout to a documented-valid value (≤60s), OR confirm empirically whether the ODC AI-agent call node honors a distinct, higher timeout than the client server-request cap — the dedicated "[dealing_with_timeouts_on_ai_agent_calls](https://success.outsystems.com/documentation/outsystems_developer_cloud/building_apps/build_ai_powered_apps/agentic_apps_in_odc/dealing_with_timeouts_on_ai_agent_calls/)" doc exists but its exact per-call number is UNCONFIRMED (JS-rendered page). (b) For >60s work (batch, slow model), the recipe must steer to the ASYNC pattern (chunked idempotent Timer, ≤30min windows), never a synchronous call — the B2-18 batch-agentic-loop recipe. VERIFY in-product before changing the constant; the 120s may already be a silent no-op. |
+
+---
+
+## M1 Wave 1 runtime proof — live drive of the 5 new recipes on one probe app (2026-07-15)
+Drove all five Wave-1 recipes through Mentor on ONE consolidated probe app (`w1probe`, key `9abefbc9…`,
+tenant robertjspencedemos, Dev env). Session-optimal: one app, fresh session per committing edit, publish
+each turn, ~9 sessions total (well under the 100/24h cap). **Result: 4/5 runtime-proven (2 DOM-verified),
+1 deploy-wall root-caused.** Deployed app: https://robertjspencedemos-dev.outsystems.app/w1probe (rev 8).
+
+| Construct | Recipe | Result |
+|---|---|---|
+| B2-1 REST consume | `rest-consume` | **PROVEN** — `BureauAPI` consumed integration + `GetInfo` GET @ httpbin authored clean (0 err), deployed rev 4. (A live 2xx call was not separately exercised — integration deploy proven.) |
+| B2-3 Excel import | `excel-import` | **PROVEN** — `ImportCodes` (ExcelToRecordList → ForEach → CreateRawCode + RowsInserted) authored clean (0 err), deployed rev 3. `Excel to Record List` built-in resolved. |
+| B2-4 conditional | `conditional` | **PROVEN + DOM-VERIFIED** — `EmployerBlock` Container `Visible=ShowDetails` renders visible ("Details are visible") at runtime. |
+| B2-5 derived-field | `derived-field` | **PROVEN + DOM-VERIFIED** — `NetWorthExpr` **Expression** widget `Value=Assets-Liabilities` renders **"60"** (100−40) at runtime — a computed formula, not a literal. |
+| B2-2 scheduled-timer | `scheduled-timer` | **DEPLOY-WALL (WALL-TIMER-50205).** A RECURRENT (cron `0 2 * * *`) Timer authors clean in-model (0 err) but its publish FAILS `OS-DPL-50205` "Model features validation failed" — 3× (once via `ImportCodes`, once via a **parameterless** `RunNightlyImportJob`, ruling out the mandatory-input hypothesis). Switching the SAME timer to **WhenPublished deployed clean (rev 8)** → the recurrent schedule specifically is the trigger. A NEW cause of OS-DPL-50205 (single app; no cross-app refs, no stage-detection built-in, no cross-app FK — none of the three known causes). |
+
+### Findings that change the recipes / doctrine
+| # | Finding | Status | Fix |
+|---|---------|--------|-----|
+| W1-timer | **Recurrent-schedule Timer authored via Model API fails deploy `OS-DPL-50205`; WhenPublished deploys fine.** Root cause not fully isolated: platform constraint on recurrent Timers vs a Mentor/Model-API authoring gap (the recurrent-schedule properties may be set in a way the deploy-time model-features validator rejects — e.g. a missing timezone/schedule-type field). API diagnostics 404 (operation_id ≠ pub_key), as a prior OS-DPL-50205 memory predicted. | **OPEN (wall)** | (a) Isolate platform-vs-authoring: author a recurrent Timer in ODC Studio by hand — if it deploys, it's a Model-API authoring gap; fix the `scheduled-timer` recipe's schedule properties. (b) Until resolved, the `scheduled-timer` recipe's recurrent path is deploy-blocked; add a caveat + prefer a WhenPublished belt-and-suspenders. Memory: `odc-recurrent-timer-deploy-wall-os-dpl-50205`. |
+| W1-restresp | The `rest-consume` recipe instructs "map the response to the named Structure `ScoreResp`", but Mentor correctly gave the consumed method **its own auto-generated response structure** (standard ODC behavior — a consumed REST endpoint generates its response structure from the JSON), leaving the app-level `ScoreResp` unused. | **FIX RECIPE** | `rest_consume` should describe the RESPONSE as auto-generated by the integration (name it, don't pre-create/map an app Structure); a request BODY structure is still authored. Minor prompt edit. |
+| W1-fork | **A fresh Mentor session (`mentor_start` with `app_key`) forks from the latest MODEL revision, NOT the deployed revision.** An undeployed/broken model rev (the recurrent Timer at rev 5) POISONED every downstream publish (S5's screen publish failed OS-DPL-50205 carrying the bad timer) until the timer was fixed in-session. | **DOCTRINE** | When a committing edit lands in the model but FAILS to deploy, it is NOT isolated — it blocks all subsequent publishes on that app. Fix or remove the offending element before continuing; do not assume "the running app is still clean" means the next fresh session starts clean. Cap-note: also means you can't sidestep a bad model rev by starting a fresh session. |
+| W1-autodeploy | Confirmed: **Mentor authoring auto-deploys** (every explicit publish after a successful author read `no_changes_detected:true` at the just-authored revision), and **context_* reads lag minutes** (context_entities/actions returned empty then populated on a later poll). | **DOCTRINE (confirms matrix inv. #6)** | Trust the published revision + a lagged context re-poll as the landed signal; an explicit publish is still worth doing to force+confirm the revision and surface a deploy-time failure (which is exactly how the recurrent-timer wall surfaced — authoring's silent auto-deploy of the bad timer would otherwise have hidden it). |
+

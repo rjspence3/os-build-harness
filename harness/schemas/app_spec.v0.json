@@ -143,11 +143,18 @@
     "libraryImport": {
       "$ref": "#/$defs/libraryImportBlock",
       "description": "Library import block (Core layer). Emitted by expand.py when the Core owns library entities and the domain has a bulk-load integration. plan_from_spec emits a library-import step."
+    },
+    "timers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/timer"
+      },
+      "description": "M1 Wave 1 (RECIPE_GAPS B2-2): scheduled/recurrent Timers. plan_from_spec emits one `scheduled-timer` step each, after the logic units."
     }
   },
   "$defs": {
     "odcDataType": {
-      "description": "ALLOW-LIST = buildable surface for attribute types. Complete/trim from the ODC catalog in the MCP doctrine notes. Anything outside this set is, by construction, a spec-gap.",
+      "description": "ALLOW-LIST = buildable surface for attribute types. Complete/trim from the ODC catalog in the MCP doctrine notes. Anything outside this set is, by construction, a spec-gap. NOTE (RECIPE_GAPS B1): the set is deliberately SCALAR — ODC entity/structure attributes cannot be list/array-valued. An array shape ('Text[]', 'Image[]', 'List<Text>') must be modeled as a CHILD ENTITY (one row per element, FK to the parent) or a denormalized CSV Text column; harness-verify --phase spec emits that actionable guidance (the _datamodel_lint) instead of only a cryptic enum failure.",
       "enum": [
         "Text",
         "Integer",
@@ -675,6 +682,14 @@
           },
           "description": "PRODUCT-UI: for type Sidebar/Navigation \u2014 the app-shell nav items."
         },
+        "visibleWhen": {
+          "type": "string",
+          "description": "M1 Wave 1 (RECIPE_GAPS B2-4): an OutSystems boolean expression gating this component's visibility (conditional render). plan_from_spec emits a `conditional` step; authored as the widget's client-reactive Visible expression."
+        },
+        "computed": {
+          "type": "string",
+          "description": "M1 Wave 1 (RECIPE_GAPS B2-5): an OutSystems expression for a DERIVED/computed display value (e.g. 'Assets - Liabilities'). plan_from_spec emits a `derived-field` step rendering it as an Expression widget (a Text widget is literal-only)."
+        },
         "props": {
           "type": "object",
           "additionalProperties": true
@@ -1121,7 +1136,7 @@
         "kind"
       ],
       "additionalProperties": false,
-      "description": "An external system/connector. MINIMAL v1 (HD D3).",
+      "description": "An external system/connector. REST only (HD D3). M1 Wave 1 (RECIPE_GAPS B2-1) widened it with `direction` (consume vs expose) + `methods` so plan_from_spec can emit a `rest-consume` step; a consume integration with methods is authored as a CONSUMED REST API this app CALLS from server logic.",
       "properties": {
         "name": {
           "type": "string"
@@ -1132,11 +1147,96 @@
           ],
           "description": "v1 models REST only \u2014 the only connector kind home_banking would use. Widen (SOAP, SAP, \u2026) as real apps need."
         },
+        "direction": {
+          "enum": [
+            "consume",
+            "expose"
+          ],
+          "default": "consume",
+          "description": "consume = this app CALLS an external REST service (plan emits `rest-consume`); expose = this app publishes an endpoint. Absent \u21d2 consume."
+        },
         "baseUrl": {
           "type": "string"
         },
+        "auth": {
+          "type": "string",
+          "description": "Authentication scheme note for a consume integration, e.g. 'None' | 'ApiKey' | 'OAuth'."
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "http"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "http": {
+                "enum": [
+                  "GET",
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE"
+                ]
+              },
+              "path": {
+                "type": "string"
+              },
+              "requestStruct": {
+                "type": "string",
+                "description": "Structure name the request body maps to (must exist in top-level structures)."
+              },
+              "responseStruct": {
+                "type": "string",
+                "description": "Structure name the response body maps to."
+              },
+              "isList": {
+                "type": "boolean",
+                "description": "Response is an array \u2192 a List of responseStruct."
+              }
+            }
+          },
+          "description": "Methods of a CONSUMED REST integration; each becomes a server-callable action under the integration."
+        },
         "description": {
           "type": "string"
+        }
+      }
+    },
+    "timer": {
+      "type": "object",
+      "required": [
+        "name",
+        "action"
+      ],
+      "additionalProperties": false,
+      "description": "M1 Wave 1 (RECIPE_GAPS B2-2): a Timer running a server action on a schedule. ODC Timers support a RECURRENT schedule (daily/weekly/interval) \u2014 not just WhenPublished. The action must be idempotent (ODC auto-retries a Timer that exceeds its 60-min cap). plan_from_spec emits a `scheduled-timer` step after the logic units (the action must already exist).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "description": "The server action the Timer runs (must exist \u2014 e.g. authored via logic/seed)."
+        },
+        "schedule": {
+          "enum": [
+            "whenPublished",
+            "daily",
+            "weekly",
+            "interval"
+          ],
+          "default": "daily",
+          "description": "Recurrence. whenPublished = run once on publish; daily/weekly = recur (optionally at `at`); interval = fixed interval."
+        },
+        "at": {
+          "type": "string",
+          "description": "Time-of-day for daily/weekly, e.g. '02:00'."
         }
       }
     },
@@ -1582,8 +1682,10 @@
             "serviceAction",
             "clientAction",
             "sqlAction",
-            "globalEvent"
-          ]
+            "globalEvent",
+            "excelImport"
+          ],
+          "description": "…`excelImport` (M1 Wave 1, RECIPE_GAPS B2-3) = a bulk Excel-to-entity import server action; its unit carries `targetEntity` + `rowStructure` and plan_from_spec emits an `excel-import` step."
         },
         "name": {
           "type": "string"
