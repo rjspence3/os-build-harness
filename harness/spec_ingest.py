@@ -609,7 +609,7 @@ def extract_screens(sections: list[Section], report: ParseReport) -> list[dict]:
     carry the tables. This extractor handles both cases:
       - A section that directly owns a Field+InputType table.
       - A section (candidate) whose immediately-following deeper sections are named
-        'Data Table' or 'Actions' (the BASF spec pattern).
+        'Data Table' or 'Actions' (a common prose-spec pattern).
 
     The 'Input Type' cell drives ``infer_component_type``. The ``does`` field is
     intentionally OMITTED from actions — Stage B flags the write-path gap.
@@ -744,7 +744,7 @@ def extract_integrations(
     Scans the 'External Integrations' section and any 'Business Rules' / appendix
     sections for SAP/REST/API keywords (-> RestApi consume) and Excel/batch/import
     keywords (-> excelImport logic unit). This extractor is inherently lower-fidelity
-    than table-based extraction — the BASF spec expresses these in prose.
+    than table-based extraction — many specs express these in prose.
     """
     integrations: list[dict] = []
     logic_units: list[dict] = []

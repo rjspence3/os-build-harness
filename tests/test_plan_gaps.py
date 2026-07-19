@@ -2,7 +2,7 @@
 gap surfacer, four-verdict taxonomy (ODC-only; never O11).
 
 The failure it guards against: a spec that asks for behavior the harness can't build
-used to be SILENTLY DROPPED, yielding a hollow plan with no warning (the BASF/Wyandotte
+used to be SILENTLY DROPPED, yielding a hollow plan with no warning (a rich prose-capabilities spec (the
 case: eight screens, zero data bindings, no forms).
 
 Each gap carries one of four verdicts so the fix is unambiguous:
@@ -62,7 +62,7 @@ def test_form_affordance_without_write_action_is_spec_wiring():
 
 
 def test_capabilities_only_flags_hollow_plan_as_spec_wiring():
-    """The BASF signature: rich capabilities[] prose, no screen component boundTo anything."""
+    """A prose-capabilities signature: rich capabilities[] prose, no screen component boundTo anything."""
     spec = {"capabilities": [{"name": "Browse"}, {"name": "Create"}],
             "screens": [{"id": "list", "components": [{"id": "t", "type": "Table", "label": "Rows"}]}]}
     assert _by_cap(pr.plan_gaps_from_spec(spec), "capabilities-only")["kind"] == "spec-wiring"

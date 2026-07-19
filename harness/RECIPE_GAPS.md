@@ -34,7 +34,7 @@ agentic-loop shape, and it surfaces the agentic gaps the three BRDs missed (N1/N
 ---
 
 ## B0 — Binding-layer gaps (the "recipes generate blind" class) — schema-aware + rolling recipes
-Surfaced end-to-end by the Wyandotte production build (2026-07-19). These are NOT missing recipes —
+Surfaced end-to-end by a dense production build (2026-07-19). These are NOT missing recipes —
 the recipes existed but emitted prompts that didn't match the entity SCHEMA or what PRIOR steps
 actually built, because `plan_from_spec` rendered every step's params statically from the spec up
 front, and the pure recipes never read the schema. Root cause + fix now landed in two layers:

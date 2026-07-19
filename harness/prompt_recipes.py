@@ -2664,9 +2664,12 @@ def _excel_import_params(spec: dict, unit: dict) -> dict:
     """Decide the excel-import shape from the row structure vs the target entity (WALL-005). If the
     structure cannot satisfy the target's mandatory create fields, it is a lookup-and-UPDATE (bulk
     close/status change), not an insert — emit mode=bulk_update with a lookup key + update fields."""
-    entity = unit["targetEntity"]
-    p = {"name": unit["name"], "target_entity": entity, "row_structure": unit["rowStructure"]}
-    sfields = _structure_fields(spec, unit["rowStructure"])
+    # Robust to a logic unit extracted from PROSE (not a table): targetEntity / rowStructure / name
+    # may be absent. Default gracefully rather than KeyError — the corpus invariants caught this.
+    entity = unit.get("targetEntity") or ""
+    p = {"name": unit.get("name") or "BulkImport", "target_entity": entity,
+         "row_structure": unit.get("rowStructure") or ""}
+    sfields = _structure_fields(spec, p["row_structure"])
     ent_attrs = _entities_map(spec).get(entity, {}).get("attributes", [])
     attr_names = {a["name"] for a in ent_attrs}
     mand_create = [a["name"] for a in ent_attrs if a.get("mandatory") and not a.get("isIdentifier")]
@@ -3275,8 +3278,11 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
     for unit in spec.get("logic", []) or []:
         # M1 Wave 1: Excel bulk-import (B2-3) — maps its own camelCase spec fields to recipe params.
         if unit.get("kind") == "excelImport":
-            steps.append({"recipe": "excel-import", "why": f"excel import -> {unit.get('targetEntity', '')}",
-                          "params": _excel_import_params(spec, unit)})
+            # A prose-extracted import may not name a target entity/structure — can't author a bulk
+            # import blindly, so skip the step (the gap detector surfaces it) rather than emit a broken one.
+            if unit.get("targetEntity"):
+                steps.append({"recipe": "excel-import", "why": f"excel import -> {unit.get('targetEntity')}",
+                              "params": _excel_import_params(spec, unit)})
             continue
         recipe = _LOGIC_KIND.get(unit.get("kind"))
         if not recipe:

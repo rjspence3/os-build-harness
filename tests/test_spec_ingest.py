@@ -2,7 +2,7 @@
 
 Style mirrors test_prompt_step.py + test_verify.py: offline, deterministic,
 no MCP, pure unit + integration tests. The fixture at
-tests/fixtures/basf_trimmed_spec.md drives e2e tests.
+A synthetic corpus fixture (tests/corpus/) drives the e2e tests — never a client spec.
 """
 from __future__ import annotations
 
@@ -39,7 +39,10 @@ from harness.spec_ingest import (
 from harness.prompt_recipes import plan_gaps_from_spec
 from harness.verify import _schema_findings
 
-_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "basf_trimmed_spec.md"
+# A SYNTHETIC corpus fixture drives the e2e ingest tests — never a client-derived spec. It's one of
+# several diverse specs under tests/corpus/ (see harness/corpus.py); the invariant tests in
+# test_corpus.py run over ALL of them, so these name-specific assertions don't over-index the engine.
+_FIXTURE = Path(__file__).resolve().parent / "corpus" / "grant_review_spec.md"
 
 
 def _fixture_md() -> str:
@@ -99,9 +102,9 @@ def test_parse_sections_flat_by_heading():
 @pytest.mark.parametrize("raw,expected_type,expected_ref,expected_id", [
     ("Auto Number", "Identifier", None, True),
     ("User Id", "Text", None, False),
-    ("Building Id", "Identifier", "Building", False),
-    ("RequestStatus Id", "Identifier", "RequestStatus", False),
-    ("CostCenterApproval Id", "Identifier", "CostCenterApproval", False),
+    ("Program Id", "Identifier", "Program", False),
+    ("ApplicationStatus Id", "Identifier", "ApplicationStatus", False),
+    ("ReviewOutcome Id", "Identifier", "ReviewOutcome", False),
     ("Text (200)", "Text", None, False),
     ("Text (unlimited)", "Text", None, False),
     ("Text", "Text", None, False),
@@ -148,23 +151,23 @@ def test_extract_entities_from_fixture():
     report = ParseReport()
     entities = extract_entities(secs, report)
     names = [e["name"] for e in entities]
-    assert "MaintenanceRequest" in names
-    assert "Building" in names
+    assert "GrantApplication" in names
+    assert "Program" in names
 
-    mr = next(e for e in entities if e["name"] == "MaintenanceRequest")
-    # Status should be Identifier referencing RequestStatus.
-    status = next(a for a in mr["attributes"] if a["name"] == "Status")
+    ga = next(e for e in entities if e["name"] == "GrantApplication")
+    # Status should be Identifier referencing the ApplicationStatus static entity.
+    status = next(a for a in ga["attributes"] if a["name"] == "Status")
     assert status["dataType"] == "Identifier"
-    assert status.get("references") == "RequestStatus"
+    assert status.get("references") == "ApplicationStatus"
     assert not status.get("isIdentifier", False)
 
     # Id should be isIdentifier=True.
-    id_attr = next(a for a in mr["attributes"] if a["name"] == "Id")
+    id_attr = next(a for a in ga["attributes"] if a["name"] == "Id")
     assert id_attr["isIdentifier"] is True
     assert id_attr["dataType"] == "Identifier"
 
-    # Description should have length 2000.
-    desc = next(a for a in mr["attributes"] if a["name"] == "Description")
+    # Abstract should have length 2000.
+    desc = next(a for a in ga["attributes"] if a["name"] == "Abstract")
     assert desc["dataType"] == "Text"
     assert desc.get("length") == 2000
 
@@ -198,22 +201,22 @@ def test_extract_static_entities_with_records():
     report = ParseReport()
     static_entities = extract_static_entities(secs, report)
     names = [e["name"] for e in static_entities]
-    assert "RequestStatus" in names
-    assert "RequestType" in names
+    assert "ApplicationStatus" in names
+    assert "ReviewOutcome" in names
 
-    rs = next(e for e in static_entities if e["name"] == "RequestStatus")
+    rs = next(e for e in static_entities if e["name"] == "ApplicationStatus")
     assert rs.get("isStatic") is True
-    assert len(rs.get("records", [])) == 6
+    assert len(rs.get("records", [])) == 5
     # Check specific record.
     draft = rs["records"][0]
     assert draft["Record"] == "Draft"
     assert draft["Label"] == "Draft"
     assert draft.get("Order") == 1
-    # RequestStatus has an Order attribute.
+    # ApplicationStatus has an Order attribute.
     assert any(a["name"] == "Order" for a in rs["attributes"])
 
-    # RequestType has no Order column — should have no Order attribute.
-    rt = next(e for e in static_entities if e["name"] == "RequestType")
+    # ReviewOutcome has no Order column — should have no Order attribute.
+    rt = next(e for e in static_entities if e["name"] == "ReviewOutcome")
     assert not any(a["name"] == "Order" for a in rt["attributes"])
 
 
@@ -242,18 +245,17 @@ def test_extract_roles_strips_emphasis_and_reads_matrix():
     report = ParseReport()
     roles, permissions = extract_roles(secs, report)
     # Bold markers should be stripped.
-    assert "Requester" in roles
-    assert "Maintenance Planner" in roles
-    assert "Maintenance Scheduler" in roles
+    assert "Applicant" in roles
+    assert "Reviewer" in roles
     assert "Administrator" in roles
     # No raw bold markers in role names.
     assert not any("**" in r for r in roles)
 
-    # 'Accept request' should only be permitted for Maintenance Planner.
-    accept = next((p for p in permissions if p["action"] == "Accept request"), None)
-    assert accept is not None
-    assert "Maintenance Planner" in accept["roles"]
-    assert "Requester" not in accept["roles"]
+    # 'Record review' should only be permitted for Reviewer.
+    review = next((p for p in permissions if p["action"] == "Record review"), None)
+    assert review is not None
+    assert "Reviewer" in review["roles"]
+    assert "Applicant" not in review["roles"]
 
 
 # ── Screens ───────────────────────────────────────────────────────────────────
@@ -263,16 +265,16 @@ def test_extract_screens_infers_components_from_data_table():
     report = ParseReport()
     screens = extract_screens(secs, report)
     assert len(screens) >= 1
-    create_screen = next((s for s in screens if "MaintenanceRequestCreate" in s["id"]), None)
+    create_screen = next((s for s in screens if "GrantApplicationCreate" in s["id"]), None)
     assert create_screen is not None
 
     comp_map = {c["id"]: c for c in create_screen["components"]}
     # Dropdown input type.
-    assert comp_map.get("requestType", {}).get("type") == "Dropdown"
+    assert comp_map.get("programId", {}).get("type") == "Dropdown"
     # Date picker -> DatePicker.
-    assert comp_map.get("dateNeeded", {}).get("type") == "DatePicker"
+    assert comp_map.get("decisionBy", {}).get("type") == "DatePicker"
     # Multi-line text -> Input.
-    assert comp_map.get("description", {}).get("type") == "Input"
+    assert comp_map.get("abstract", {}).get("type") == "Input"
     # No component has a boundTo (Stage B gap).
     assert not any(c.get("boundTo") for c in create_screen["components"])
 
@@ -281,7 +283,7 @@ def test_extract_screens_actions_have_no_does():
     secs = parse_sections(_fixture_md())
     report = ParseReport()
     screens = extract_screens(secs, report)
-    create_screen = next((s for s in screens if "MaintenanceRequestCreate" in s["id"]), None)
+    create_screen = next((s for s in screens if "GrantApplicationCreate" in s["id"]), None)
     assert create_screen is not None
     for action in create_screen.get("actions", []):
         assert "does" not in action, f"action {action['name']!r} should not have 'does'"

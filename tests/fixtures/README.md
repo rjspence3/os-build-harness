@@ -1,26 +1,15 @@
 # Test Fixtures
 
-## basf_trimmed_spec.md
+Static fixtures for the offline unit/integration suite (`domain_*.json`, `system_*.json`,
+entity snapshots). No client-derived material lives here.
 
-A trimmed slice of the BASF Wyandotte Maintenance Requests specification
-(`BASF-Modernized-Spec.md`), hand-curated for deterministic unit and integration
-testing of `harness/spec_ingest.py`.
+## Spec-ingest fixtures → `tests/corpus/`
 
-The trim preserves:
-- H1 title + `**Application**:` line
-- `#### Entities` / `##### MaintenanceRequest` (~10 attrs covering the full type
-  variety the mapper tests need: Auto Number, FK patterns, User Id, Text (2000),
-  Text (unlimited), Date, Date Time, Boolean, Text (N)) + `##### Building`
-- `#### Static Entities` / `##### RequestStatus` (Record|Label|Order, 6 rows)
-  + `##### RequestType` (Record|Label only)
-- `### Roles` / `#### Role Definitions` (bold names) + `#### Permissions Matrix`
-- `#### MaintenanceRequestCreate` with Data Table (8 rows spanning Dropdown,
-  DatePicker, Read-only badge, Text, Radio, User picker) + Actions table
-- Short SAP + Excel-batch prose (for integration extraction)
-- `**Transition rules:**` table (for workflow-note extraction)
+The markdown spec-document fixtures that drive `harness/spec_ingest.py`'s end-to-end tests are the
+**synthetic corpus** under `tests/corpus/` — several independently-authored specs from *different*
+domains and structures. They are deliberately diverse so the parser/planner is validated against
+variety + invariants (see `harness/corpus.py` and `tests/test_corpus.py`), never over-indexed on one
+spec's quirks. Adding a fixture there extends coverage with no new hand-written assertions.
 
-**Not** a faithful reproduction of the full spec — sections are dropped or
-abbreviated to keep the fixture small and test-deterministic. Do not use this
-file to understand the real application requirements.
-
-Provenance: trimmed from `BASF-Modernized-Spec.md` (internal, not checked in).
+The corpus is client-agnostic by construction: real build specs (which name real tenants/apps) live
+only in the private build lab, run through the *same* invariant framework — they never enter this repo.
