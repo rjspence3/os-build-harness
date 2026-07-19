@@ -142,6 +142,34 @@ def _run(coro):
     return asyncio.run(coro)
 
 
+def test_driver_reconcile_hook_selfheals_absent_conditional_widget(tmp_path):
+    """WALL-006 end-to-end at the driver seam: a conditional targets MOCTracking, but the LIVE screen
+    read shows only descriptioninput was authored. The reconcile pass must patch the params with
+    ensure_widgets bound to the form record BEFORE render — so the fired prompt self-heals."""
+    mcp = FakeMCP()
+    mcp.screen_reads = [{"items": [{"name": "reqCreate", "components": [{"id": "descriptioninput"}]}]}]
+    driver = SpecDriver(mcp, tmp_path / "p")
+    driver._spec = {"screens": [{"id": "reqCreate", "components": [
+        {"id": "descriptioninput", "type": "Input", "boundTo": "MaintenanceRequest.Description"},
+        {"id": "MOCTracking", "type": "Input", "boundTo": "MaintenanceRequest.MOCTrackingNumber",
+         "visibleWhen": "MOCRequired = True"}]}]}
+    params = {"screen": "reqCreate", "component_id": "MOCTracking", "visible_when": "MOCRequired = True"}
+    out, notes = _run(driver._reconcile_step("conditional", params, "app-key"))
+    assert out["record"] == "NewMaintenanceRequest"
+    assert any(w["id"] == "MOCTracking" for w in out["ensure_widgets"])
+    assert notes and mcp.screen_reads == []          # the live read was consumed
+
+
+def test_driver_reconcile_hook_is_noop_for_non_reconcile_recipe(tmp_path):
+    """A recipe that renders identically regardless of build state must NOT trigger a live read."""
+    mcp = FakeMCP()
+    driver = SpecDriver(mcp, tmp_path / "p")
+    driver._spec = {}
+    p = {"block_name": "SidebarNav"}
+    out, notes = _run(driver._reconcile_step("nav-block", p, "app-key"))
+    assert out == p and notes == []
+
+
 def test_step_target_is_stable_and_disambiguated_by_phase():
     a = _step_target({"recipe": "create-form", "params": {"screen": "s", "entity": "Case", "phase": "action"}}, 3)
     b = _step_target({"recipe": "create-form", "params": {"screen": "s", "entity": "Case", "phase": "combined"}}, 3)

@@ -210,7 +210,8 @@ def test_plan_seeds_fk_set_as_one_graph_parents_first():
     order = [e["name"] for e in ents]
     assert order.index("Supplier") < order.index("Part")              # parent before child
     part = next(e for e in ents if e["name"] == "Part")
-    assert part["fk_refs"] == [{"attr": "SupplierId", "parent": "Supplier", "parent_key": "Code"}]
+    assert part["fk_refs"] == [{"attr": "SupplierId", "parent": "Supplier", "parent_key": "Code",
+                                "mandatory": False}]
     supplier = next(e for e in ents if e["name"] == "Supplier")
     assert supplier["fk_refs"] == [] and supplier["natural_key"] == "Code"
     # the rendered prompt captures parent Ids from CreateAction return (no aggregate lookup)
@@ -680,6 +681,152 @@ def test_create_form_action_phase_forbids_identifier_change():
         assert "OS-DPL-RDBS-40020" in p
         assert "do NOT rename, re-key, add, or change" in p
         assert "touch no entity schema" in p
+
+
+def test_mandatory_defaults_computed_from_schema():
+    """WALL-007: the create form collects only some fields, but the entity has OTHER mandatory
+    attributes (a Status FK to a static entity, a mandatory audit Date). _mandatory_defaults must
+    surface them with type-correct defaults so CreateAction does not fail on a missing value."""
+    spec = {"dataModel": {"entities": [
+        {"name": "RequestStatus", "isStatic": True, "records": [
+            {"Record": "Submitted", "Order": 2}, {"Record": "Draft", "Order": 1}]},
+        {"name": "Req", "attributes": [
+            {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+            {"name": "Title", "dataType": "Text", "mandatory": True},
+            {"name": "Status", "dataType": "Identifier", "references": "RequestStatus", "mandatory": True},
+            {"name": "DateCreated", "dataType": "Date", "mandatory": True},
+            {"name": "CreatedBy", "dataType": "Text", "mandatory": True},
+            {"name": "Note", "dataType": "Text", "mandatory": False}]}]}}
+    defs = pr._mandatory_defaults(spec, "Req", fields=["Title"])
+    by = {d["field"]: d for d in defs}
+    assert set(by) == {"Status", "DateCreated", "CreatedBy"}          # Id/Title/Note excluded
+    assert by["Status"]["value"] == "Entities.RequestStatus.Draft"    # initial static record (lowest Order/hint)
+    assert by["DateCreated"]["value"] == "CurrDate()"                 # type-correct date default
+    assert by["CreatedBy"]["value"] == '""'                           # mandatory Text -> empty value
+
+
+def test_create_form_action_emits_mandatory_defaults():
+    """The action phase (Save<Entity>Record) must DEFAULT the uncollected mandatory fields in the
+    CREATE branch so a submit persists (WALL-007). Live-proven fix folded into the recipe."""
+    p = pr.render("create-form", {"screen": "reqCreate", "entity": "Req", "fields": ["Title"],
+                                   "phase": "action", "mandatory_defaults": [
+                                       {"field": "Status", "value": "Entities.RequestStatus.Draft", "note": "initial RequestStatus"},
+                                       {"field": "DateCreated", "value": "CurrDate()", "note": None}]})
+    assert "CREATE branch" in p and "Status = Entities.RequestStatus.Draft" in p
+    assert "DateCreated = CurrDate()" in p
+    assert "UPDATE branch untouched" in p
+
+
+def test_plan_threads_mandatory_defaults_into_create_form():
+    """End-to-end: a spec whose create entity has a mandatory static-FK status yields a create-form
+    step carrying mandatory_defaults, so the reduced-form/omitted-mandatory bug (WALL-007) cannot recur."""
+    spec = {"specVersion": "0.2", "app": {"name": "t", "roles": ["U"]},
+            "dataModel": {"entities": [
+                {"name": "St", "isStatic": True, "records": [{"Record": "Open", "Order": 1}]},
+                {"name": "Req", "attributes": [
+                    {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                    {"name": "Title", "dataType": "Text", "mandatory": True},
+                    {"name": "Status", "dataType": "Identifier", "references": "St", "mandatory": True}]}]},
+            "screens": [{"id": "reqCreate", "name": "RC",
+                         "components": [{"id": "l", "type": "List", "boundTo": "Req"}],
+                         "actions": [{"name": "New", "trigger": {"onComponent": "b", "event": "onClick"},
+                                      "does": ["CreateEntity"]}],
+                         "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "l"}]}}]}
+    action = next(s for s in pr.plan_from_spec(spec)
+                  if s["recipe"] == "create-form" and s["params"].get("phase") == "action")
+    mdef = {d["field"]: d for d in action["params"]["mandatory_defaults"]}
+    assert mdef["Status"]["value"] == "Entities.St.Open"
+
+
+def test_row_actions_edit_navigates_to_separate_edit_screen():
+    """WALL-004: when the edit form is on a SEPARATE detail screen, the row Edit must NAVIGATE there
+    with the row Id, not do an inline same-screen assign (which targets a record var that isn't here)."""
+    nav = pr.render("row-actions", {"screen": "reqList", "entity": "Req", "phase": "edit",
+                                    "edit_screen": "reqDetail"})
+    assert "NAVIGATES to the reqDetail screen" in nav and "Id input parameter" in nav
+    inline = pr.render("row-actions", {"screen": "reqList", "entity": "Req", "phase": "edit"})
+    assert "SINGLE Assign" in inline and "SAME SCREEN" in inline        # legacy inline path preserved
+
+
+def test_plan_row_actions_edit_targets_detail_screen():
+    spec = {"specVersion": "0.2", "app": {"name": "t"},
+            "dataModel": {"entities": [{"name": "Req", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                {"name": "Title", "dataType": "Text"}]}]},
+            "screens": [
+                {"id": "reqList", "components": [{"id": "t", "type": "Table", "boundTo": "Req"}],
+                 "actions": [{"name": "Upd", "trigger": {"onComponent": "t", "event": "onClick"},
+                              "does": ["UpdateEntity"]}],
+                 "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "t"}]}},
+                {"id": "reqDetail", "inputParameters": [{"name": "Id", "references": "Req"}],
+                 "components": [{"id": "b", "type": "Button", "label": "Save"}],
+                 "acceptance": {"assertions": [{"kind": "componentPresent", "componentId": "b"}]}}]}
+    ra = next(s for s in pr.plan_from_spec(spec)
+              if s["recipe"] == "row-actions" and s["params"].get("phase") == "edit")
+    assert ra["params"]["edit_screen"] == "reqDetail"
+
+
+def test_excel_import_bulk_update_mode_and_public_false():
+    """WALL-005: a {key, date} row structure cannot create the target (mandatory create fields absent),
+    so it must be a lookup-and-UPDATE. The recipe must be NON-PUBLIC and fetch-then-modify."""
+    p = pr.render("excel-import", {"name": "BulkClose", "target_entity": "Req", "row_structure": "BulkRow",
+                                   "mode": "bulk_update", "key_field": "NotificationNumber",
+                                   "key_target_attr": "NotificationNumber", "update_fields": ["ClosureDate"]})
+    assert "Public=FALSE" in p and "OS-DPL-50205" in p
+    assert "LOOKUP-AND-UPDATE" in p and "FETCH-THEN-MODIFY" in p
+    assert "NotificationNumber" in p and "UpdateAction" in p
+    assert "CreateAction" not in p                                    # not a create flow
+
+
+def test_plan_excel_import_picks_bulk_update_from_structure():
+    """The planner detects create-vs-update: a 2-field key/date structure over an entity with several
+    mandatory create fields is a bulk update, not an insert."""
+    spec = {"structures": [{"name": "BulkRow", "attributes": [
+                {"name": "NotificationNumber", "dataType": "Text"}, {"name": "ClosureDate", "dataType": "Date"}]}],
+            "dataModel": {"entities": [{"name": "Req", "attributes": [
+                {"name": "Id", "dataType": "Identifier", "isIdentifier": True, "mandatory": True},
+                {"name": "Title", "dataType": "Text", "mandatory": True},
+                {"name": "NotificationNumber", "dataType": "Text"},
+                {"name": "Status", "dataType": "Text", "mandatory": True}]}]},
+            "logic": [{"kind": "excelImport", "name": "BulkClose", "targetEntity": "Req", "rowStructure": "BulkRow"}]}
+    step = next(s for s in pr.plan_from_spec(spec) if s["recipe"] == "excel-import")
+    assert step["params"]["mode"] == "bulk_update"
+    assert step["params"]["key_field"] == "NotificationNumber"
+    assert step["params"]["update_fields"] == ["ClosureDate"]
+
+
+def test_seed_values_are_type_correct():
+    """WALL-005: a DateTime column must get CurrDateTime(), a Boolean True/False (unquoted), a number
+    unquoted — never a string literal. _typed_seed_value + the seed recipes must honor `types`."""
+    assert pr._typed_seed_value("DateTime", "whatever") == "CurrDateTime()"
+    assert pr._typed_seed_value("Date", "x") == "CurrDate()"
+    assert pr._typed_seed_value("Boolean", "true") == "True"
+    assert pr._typed_seed_value("Integer", "5") == "5"
+    assert pr._typed_seed_value("Text", 'a"b') == '"a\'b"'
+    p = pr.render("seed-graph", {"entities": [
+        {"name": "Doc", "rows": [{"Title": "How-to", "Modified": "x"}],
+         "natural_key": "Title", "fk_refs": [],
+         "types": {"Title": "Text", "Modified": "DateTime"}}]})
+    assert 'Title = "How-to"' in p and "Modified = CurrDateTime()" in p    # not Modified = "x"
+
+
+def test_seed_graph_flags_missing_mandatory_fk():
+    """A mandatory FK absent from a seed row is called out (a null mandatory FK fails CreateAction)."""
+    p = pr.render("seed-graph", {"entities": [
+        {"name": "Parent", "rows": [{"Name": "P"}], "natural_key": "Name", "fk_refs": [], "types": {"Name": "Text"}},
+        {"name": "Child", "rows": [{"Label": "C"}], "natural_key": "Label", "types": {"Label": "Text"},
+         "fk_refs": [{"attr": "ParentId", "parent": "Parent", "parent_key": "Name", "mandatory": True}]}]})
+    assert "MANDATORY FK" in p and "ParentId" in p
+
+
+def test_create_form_edit_prefill_uses_onafterfetch_not_oninitialize():
+    """Live-proven persistence-timing fix: an edit form prefilled in OnInitialize races the aggregate
+    fetch (record empty -> Update blanks mandatory fields). The recipe must direct the prefill into the
+    aggregate's OnAfterFetch and explicitly forbid OnInitialize for it."""
+    p = pr.render("create-form", {"screen": "reqDetail", "entity": "Req", "fields": ["Title"],
+                                  "id_param": "Id", "phase": "combined"})
+    assert "OnAfterFetch" in p
+    assert "do NOT use OnInitialize" in p
 
 
 def test_plan_emits_write_path_step_from_actions_does():

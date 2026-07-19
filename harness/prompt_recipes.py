@@ -434,6 +434,46 @@ def login(params: dict) -> str:
     )
 
 
+def _typed_seed_value(dtype: str, raw) -> str:
+    """The OutSystems value expression for a raw seed value given the attribute's data type — so a
+    DateTime column is not assigned a string literal and a Boolean/number is not quoted (WALL-005).
+    FK/Identifier values are resolved by the caller's natural-key capture, never here."""
+    dt = dtype or "Text"
+    if dt in ("Integer", "LongInteger"):
+        try:
+            return str(int(raw))
+        except (TypeError, ValueError):
+            return "0"
+    if dt in ("Decimal", "Currency"):
+        try:
+            return str(float(raw))
+        except (TypeError, ValueError):
+            return "0.0"
+    if dt == "Boolean":
+        return "True" if str(raw).strip().lower() in ("1", "true", "yes", "y", "t") else "False"
+    if dt == "Date":
+        return "CurrDate()"
+    if dt == "DateTime":
+        return "CurrDateTime()"
+    if dt == "Time":
+        return "CurrTime()"
+    return '"' + str(raw).replace('"', "'") + '"'    # Text/Email/Phone/... -> quoted literal
+
+
+def _seed_assigns(row: dict, fk_by_attr: dict, types: dict) -> list:
+    """Per-attribute assign strings for one seed row: FK attrs resolve to the captured parent Id;
+    every other attr gets a TYPE-CORRECT value expression (via _typed_seed_value)."""
+    out = []
+    for k, v in row.items():
+        if k in fk_by_attr:
+            fk = fk_by_attr[k]
+            out.append(f"{k} = the captured local {fk['parent']}_{_slug(v)}_Id "
+                       f"(the {fk['parent']} whose {fk['parent_key']}=\"{v}\")")
+        else:
+            out.append(f"{k} = {_typed_seed_value(types.get(k), v)}")
+    return out
+
+
 def seed_entity(params: dict) -> str:
     """Seed sample rows for an entity via a LoadSampleData orchestrator — deterministically.
     params: entity, rows:[{...}], fk_refs?:[{attr,parent,parent_key}] (SEED-A: FK attrs whose row
@@ -453,7 +493,10 @@ def seed_entity(params: dict) -> str:
     fk_notes = _p(params, "fk_notes", "")
     fk_refs = _p(params, "fk_refs", []) or []
     bootstrap = _p(params, "bootstrap_screens", []) or []
-    rows_txt = "\n".join(f"   - {json_1line(r)}" for r in rows)
+    types = _p(params, "types", {}) or {}            # {attr: dataType} — WALL-005 type-correct values
+    _fk_by_attr = {r["attr"]: r for r in fk_refs}
+    rows_txt = "\n".join(
+        f"   - {entity} {{ {'; '.join(_seed_assigns(r, _fk_by_attr, types))} }}" for r in rows)
     fk_parts = []
     if fk_refs:
         mapping = "; ".join(
@@ -520,23 +563,24 @@ def seed_graph(params: dict) -> str:
         name = e["name"]
         nkey = e.get("natural_key")
         fk_by_attr = {r["attr"]: r for r in (e.get("fk_refs") or [])}
+        types = e.get("types", {}) or {}             # {attr: dataType} — WALL-005 type-correct values
+        # mandatory FK attrs that MUST be set on every row (a null mandatory FK fails CreateAction).
+        mand_fks = [r["attr"] for r in (e.get("fk_refs") or []) if r.get("mandatory")]
         row_lines = []
         for r in e.get("rows", []):
             nk_val = r.get(nkey) if nkey else None
             id_local = f"{name}_{_slug(nk_val)}_Id" if (name in parents and nk_val) else None
-            assigns = []
-            for k, v in r.items():
-                if k in fk_by_attr:
-                    fk = fk_by_attr[k]
-                    assigns.append(f"{k} = the captured local {fk['parent']}_{_slug(v)}_Id "
-                                   f"(the {fk['parent']} whose {fk['parent_key']}=\"{v}\")")
-                else:
-                    assigns.append(f'{k} = "{v}"')
+            assigns = _seed_assigns(r, fk_by_attr, types)
             capture = f", then CAPTURE its returned Id into local {id_local}" if id_local else ""
             row_lines.append(f"      • {name} {{ {'; '.join(assigns)} }} -> {name}.CreateAction{capture}")
+        missing_mand = [a for a in mand_fks if any(a not in r for r in e.get("rows", []))]
+        mand_note = (f" NOTE: {name}.{{{', '.join(missing_mand)}}} is a MANDATORY FK — every row MUST set "
+                     f"it to a captured parent Id or CreateAction fails." if missing_mand else "")
         blocks.append(
             f"   - INDEPENDENT guard: aggregate (max 1) — if {name} has 0 rows, seed these (each via a typed "
-            f"local {name} + one Assign per attribute, then {name}.CreateAction):\n" + "\n".join(row_lines))
+            f"local {name} + one Assign per attribute, using type-correct values — a DateTime uses CurrDateTime(), "
+            f"a Date uses CurrDate(), a Boolean is True/False (unquoted), a number is unquoted — then "
+            f"{name}.CreateAction):{mand_note}\n" + "\n".join(row_lines))
     body = "\n".join(blocks)
     ent_names = ", ".join(e["name"] for e in entities)
     bootstrap_txt = (
@@ -613,6 +657,10 @@ def create_form(params: dict) -> str:
     ctx = _p(params, "context_fk")                 # {"attr","from_param"} mandatory parent FK from a screen param
     creator = _p(params, "creator_attr")           # e.g. CreatorId — set from session identity
     phase = _p(params, "phase")
+    # WALL-007: mandatory entity attributes the form does not collect, each with a type-correct
+    # default so CreateAction does not fail on a missing mandatory value. Computed by the planner
+    # (or the live reconciler) via _mandatory_defaults; [{field, value|None, note, unresolved?}].
+    mandatory_defaults = _p(params, "mandatory_defaults", []) or []
     # W4: declared button overrides the legacy generated id/label.
     button_id = _p(params, "button_id")
     button_label = _p(params, "button_label")
@@ -635,10 +683,17 @@ def create_form(params: dict) -> str:
         id_set_txt = f"sets its Id from {id_param} (use LongIntegerToIdentifier(TextToLongInteger(...)) if a cast is needed)"
         # EDIT support (the write-path is create OR update): without prefilling the form from the existing
         # record, an edit opens a BLANK form and the save blanks every field. Load the record on screen-init.
+        # EDIT PREFILL must run in the aggregate's OnAfterFetch, NOT OnInitialize: in ODC Reactive
+        # OnInitialize runs BEFORE the aggregate has fetched, so the record local is still empty and
+        # the Update then writes a record with mandatory fields unset -> the edit does not persist
+        # (live-proven; the platform even flags OnInitialize aggregate access as a coherence warning).
         id_prefill_txt = (
-            f" EDIT PREFILL — add a screen aggregate Get{entity}ById filtered by Id = {id_param}; on screen "
-            f"initialize, WHEN {id_param} is a real (non-empty) identifier, Assign {local} = Get{entity}ById.List.Current "
-            f"so the Form shows that {entity}'s CURRENT values (edit); when {id_param} is empty leave {local} empty (create).")
+            f" EDIT PREFILL — add a screen aggregate Get{entity}ById filtered by Id = {id_param}. Populate the form in "
+            f"Get{entity}ById's OnAfterFetch event handler (do NOT use OnInitialize — it runs before the aggregate "
+            f"fetches, so the record is still empty and the save blanks mandatory fields): in OnAfterFetch, WHEN "
+            f"{id_param} is a real (non-empty) identifier AND Get{entity}ById.List is not empty, Assign {local} = "
+            f"Get{entity}ById.List.Current so the Form shows that {entity}'s CURRENT values (edit); when {id_param} is "
+            f"empty leave {local} empty (create).")
         id_assign_txt = (f"Assign {local}.Id = {id_param} when it is a real identifier — so Save{entity}Record calls "
                          f"UpdateAction and EDITS in place — else NullIdentifier() to create (cast with "
                          f"LongIntegerToIdentifier(TextToLongInteger(...)) if needed)")
@@ -650,11 +705,32 @@ def create_form(params: dict) -> str:
         id_assign_txt = f"Assign {local}.Id = NullIdentifier()"
     ret_txt = f" After saving, Destination back to the {ret} screen." if ret else " After saving, RefreshData the screen's list aggregate."
 
+    # WALL-007: default the mandatory attributes the form never collects, IN THE CREATE BRANCH,
+    # BEFORE CreateAction, and only when unset — so a submit persists instead of failing on a
+    # missing mandatory value. Fetch-safe: these are set on the incoming record's create path only.
+    _resolved_defaults = [d for d in mandatory_defaults if d.get("value")]
+    _unresolved_defaults = [d for d in mandatory_defaults if d.get("unresolved")]
+    if _resolved_defaults:
+        _defs = "; ".join(
+            f"{d['field']} = {d['value']}" + (f" ({d['note']})" if d.get("note") else "")
+            for d in _resolved_defaults)
+        defaults_txt = (
+            f" In the CREATE branch ({entity}Record.Id = NullIdentifier()), BEFORE calling CreateAction, "
+            f"DEFAULT these mandatory attributes WHEN they are empty/unset so the create never fails on a "
+            f"missing mandatory value: {_defs}. Set each only if its current value is empty/null (use an "
+            f"If()/NullIdentifier()/NullDate() guard); leave the UPDATE branch untouched.")
+    else:
+        defaults_txt = ""
+    if _unresolved_defaults:
+        _unres = ", ".join(f"{d['field']} ({d['note']})" for d in _unresolved_defaults)
+        defaults_txt += (
+            f" NOTE — these mandatory references have NO safe default and MUST be supplied by the caller "
+            f"(navigation context / a form input): {_unres}. If none is available this is a spec gap.")
     action_step = (
         f"Author a server action Save{entity}Record with Public=FALSE (a Public server action fails to publish, "
         f"OS-BLD-40409). Input: a {entity} record named {entity}Record. Inside: an If on {entity}Record.Id = "
         f"NullIdentifier() — True branch calls {entity}.CreateAction, False branch calls {entity}.UpdateAction — "
-        f"return the resulting Id as an output. Build any record with a TYPED LOCAL variable + one Assign PER "
+        f"return the resulting Id as an output.{defaults_txt} Build any record with a TYPED LOCAL variable + one Assign PER "
         f"attribute; NEVER an inline record literal (they fail on fresh apps). "
         f"Do NOT modify the {entity} ENTITY itself in any way — in particular do NOT rename, re-key, add, or change "
         f"its identifier/Id attribute (the identifier is already settled; changing an entity identifier after its "
@@ -1277,16 +1353,29 @@ def row_actions(params: dict) -> str:
     entity = _p(params, "entity", required=True)
     phase = _p(params, "phase", "delete")
     save_action = _p(params, "save_action", f"Save{entity}Record")
+    # WALL-004: when the edit form lives on a SEPARATE detail screen (has its own Id input param), the
+    # row Edit must NAVIGATE there passing the row Id — an inline `Assign New<entity> = ...` only works
+    # when the form is on THIS list screen. The planner sets edit_screen when a distinct edit screen
+    # exists; absent => the legacy same-screen inline-edit assign.
+    edit_screen = _p(params, "edit_screen")
     lentity = entity.lower()
     local = f"New{entity}"
-    if phase == "edit":
+    if phase == "edit" and edit_screen and edit_screen != screen:
+        body = (
+            f"On the {screen} screen's {entity} table, ADD an \"Edit\" Link to EACH row (set data-spec-id="
+            f"\"edit{lentity}btn\"). Do NOT rebuild the table or aggregate — only add the link cell. Its OnClick "
+            f"NAVIGATES to the {edit_screen} screen, passing that row's {entity}.Id as {edit_screen}'s Id input "
+            f"parameter — that screen loads the record by Id (in its aggregate's OnAfterFetch) and edits it in place. "
+            f"If the new Link ships a default literal placeholder text widget (often \"link\"), remove it so the only "
+            f"text is \"Edit\".")
+    elif phase == "edit":
         body = (
             f"On the {screen} screen's {entity} table, ADD an \"Edit\" Link to EACH row (set data-spec-id="
             f"\"edit{lentity}btn\"). Do NOT rebuild the table or aggregate — only add the link cell. Its OnClick "
             f"screen action does a SINGLE Assign: {local} = <the table's aggregate>.List.Current.{entity} (the whole "
-            f"row record, incl. its Id) — so the create/edit form is prefilled AND its Id is set. Because "
-            f"{save_action} calls UpdateAction when the record's Id is not NullIdentifier(), a subsequent Save then "
-            f"UPDATES that row. Do not change {save_action} or the form inputs; only add the Edit link + its action.")
+            f"row record, incl. its Id) — so the create/edit form (ON THIS SAME SCREEN) is prefilled AND its Id is "
+            f"set. Because {save_action} calls UpdateAction when the record's Id is not NullIdentifier(), a subsequent "
+            f"Save then UPDATES that row. Do not change {save_action} or the form inputs; only add the Edit link + its action.")
     else:
         body = (
             f"On the {screen} screen's {entity} table, ADD a \"Delete\" Button to EACH row (set data-spec-id="
@@ -1763,22 +1852,49 @@ def scheduled_timer(params: dict) -> str:
 
 
 def excel_import(params: dict) -> str:
-    """B2-3: a bulk-import server action — parse an uploaded Excel binary into rows, then insert each. params:
-    name, target_entity, row_structure(a Structure matching the sheet columns), fields?. ExcelToRecordList needs
-    a STRUCTURE to type the rows — a Structure CANNOT be created in a BusinessProcess/Workflow app (keep this in a
-    normal app or a Core — see the BPT-app-cannot-contain-Structures rule)."""
+    """B2-3: a bulk-import server action — parse an uploaded Excel binary, then per row CREATE a new
+    record OR look up an existing one and UPDATE it. params: name, target_entity, row_structure,
+    mode ("create"|"bulk_update"), key_field?, key_target_attr?, update_fields?.
+
+    `mode` (WALL-005): a row structure that carries only a KEY + a few fields (e.g. {NotificationNumber,
+    ClosureDate}) CANNOT create a record — it lacks the target's mandatory create fields — so it is a
+    lookup-and-UPDATE (a bulk close/status change), not an insert. The planner picks the mode by
+    checking whether the row structure can satisfy the target's mandatory create fields; when it can't,
+    it emits bulk_update with the key/update fields. ExcelToRecordList needs a STRUCTURE to type the
+    rows — a Structure CANNOT be created in a BusinessProcess/Workflow app (keep this in a normal app
+    or a Core). A bulk writer WRITES entities, so it is Public=FALSE (a public entity-writer trips
+    OS-DPL-50205)."""
     name = _p(params, "name", required=True)
     entity = _p(params, "target_entity", required=True)
     struct = _p(params, "row_structure", required=True)
-    return (f"{_PREAMBLE}\n\n"
-            f"Author a server action {name} that bulk-imports rows from an uploaded Excel file into {entity}. Input: "
-            f"a BinaryData parameter (the uploaded .xlsx bytes). Flow: (1) call the built-in Excel 'Excel to Record "
-            f"List' action, mapping the sheet to a List of the Structure {struct} — this Structure types the columns "
-            f"and MUST exist in THIS app; a Structure cannot be created in a BusinessProcess-kind app, so keep this "
-            f"import logic in a normal app or a Core. (2) a ForEach over that list; (3) inside the loop, create one "
-            f"{entity} row via its CreateAction using a typed local {entity} + one Assign PER attribute (NEVER an "
-            f"inline record literal — it fails on fresh apps). Add an output count of rows inserted. After authoring, "
-            f"run model validation. Do not publish.")
+    mode = _p(params, "mode", "create")
+    key_field = _p(params, "key_field")
+    key_target = _p(params, "key_target_attr") or key_field
+    update_fields = _p(params, "update_fields", []) or []
+    preamble = (
+        f"Author a NON-PUBLIC server action {name} (a bulk entity-writer must be Public=FALSE, or it "
+        f"fails to publish with OS-DPL-50205) that bulk-processes rows from an uploaded Excel file against "
+        f"{entity}. Input: a BinaryData parameter (the uploaded .xlsx bytes). Output: an Integer count of "
+        f"rows affected. Flow: (1) call the built-in Excel 'Excel to Record List' action, mapping the sheet "
+        f"to a List of the Structure {struct} — this Structure types the columns and MUST exist in THIS app "
+        f"(a Structure cannot be created in a BusinessProcess-kind app, so keep this in a normal app or a "
+        f"Core). (2) a ForEach over that list. Build every record with a typed local + one Assign PER "
+        f"attribute (NEVER an inline record literal — it fails on fresh apps).")
+    if mode == "bulk_update":
+        upd = ", ".join(update_fields) or "the row's fields"
+        body = (
+            f" (3) inside the loop this is a LOOKUP-AND-UPDATE (the row structure carries a key + change "
+            f"fields, not a full record, so it CANNOT create): use an aggregate (max 1) to find the {entity} "
+            f"whose {key_target} = the row's {key_field}. If none is found, SKIP the row (do not create a "
+            f"partial record). If found, FETCH-THEN-MODIFY: assign the aggregate's full current record into a "
+            f"typed {entity} local, THEN overwrite only {upd} from the row (a bare {{Id, changed-field}} record "
+            f"blanks every other column on Update), THEN call {entity}.UpdateAction. Increment the count for each "
+            f"row updated.")
+    else:
+        body = (
+            f" (3) inside the loop, CREATE one {entity} row via its CreateAction from a typed {entity} local "
+            f"(one Assign per attribute). Increment the count for each row inserted.")
+    return f"{_PREAMBLE}\n\n{preamble}{body} After authoring, run model validation. Do not publish."
 
 
 def conditional(params: dict) -> str:
@@ -1789,12 +1905,27 @@ def conditional(params: dict) -> str:
     screen = _p(params, "screen", required=True)
     comp = _p(params, "component_id", required=True)
     expr = _p(params, "visible_when", required=True)
+    # WALL-003 self-heal: when the live reconciler (or planner) reports the target widget — or the
+    # control its condition reads — was never authored (e.g. a reduced create-form omitted them),
+    # ensure_widgets lists {id, attr, type} to create-if-absent inside the form bound to `record`,
+    # so the conditional does not target a phantom. Empty => the classic "set Visible on the existing
+    # widget" behaviour (backward-compatible).
+    ensure = _p(params, "ensure_widgets", []) or []
+    record = _p(params, "record")
+    if ensure and record:
+        widgets = "; ".join(
+            f'a {w.get("type", "Input")} bound to {record}.{w["attr"]} (data-spec-id="{w["id"]}")' for w in ensure)
+        ensure_txt = (
+            f"First, inside the existing Form whose Source record is {record}, ENSURE these inputs exist — CREATE any "
+            f"that are missing (do not duplicate ones already present): {widgets}. Then ")
+    else:
+        ensure_txt = ""
     return (f"{_PREAMBLE}\n\n"
-            f"On the {screen} screen, make the widget whose data-spec-id is \"{comp}\" render CONDITIONALLY: set its "
-            f"Visible property to the expression: {expr}. Use SetVisible with that expression (Visible is a client-"
-            f"reactive IExpression, re-evaluated when its inputs change) — do NOT delete and recreate the widget. If "
-            f"the conditional region spans several widgets, wrap them in ONE Container and set the Container's Visible "
-            f"instead. After authoring, run model validation. Do not publish.")
+            f"On the {screen} screen, {ensure_txt}make the widget whose data-spec-id is \"{comp}\" render CONDITIONALLY: "
+            f"set its Visible property to the expression: {expr}. Use SetVisible with that expression (Visible is a client-"
+            f"reactive IExpression, re-evaluated when its inputs change) — do NOT delete and recreate a widget that "
+            f"already exists. If the conditional region spans several widgets, wrap them in ONE Container and set the "
+            f"Container's Visible instead. After authoring, run model validation. Do not publish.")
 
 
 def derived_field(params: dict) -> str:
@@ -2515,6 +2646,44 @@ def _natural_key(spec: dict, entity: str) -> str:
     return "Name"
 
 
+def _attr_types(spec: dict, entity: str) -> dict:
+    """{attribute name -> dataType} for an entity, so the seed recipe can emit type-correct value
+    expressions instead of quoting every value as a string (WALL-005)."""
+    return {a["name"]: a.get("dataType", "Text")
+            for a in _entities_map(spec).get(entity, {}).get("attributes", [])}
+
+
+def _structure_fields(spec: dict, struct_name: str) -> list:
+    for st in spec.get("structures", []) or []:
+        if st.get("name") == struct_name:
+            return [a["name"] for a in (st.get("attributes") or st.get("fields") or [])]
+    return []
+
+
+def _excel_import_params(spec: dict, unit: dict) -> dict:
+    """Decide the excel-import shape from the row structure vs the target entity (WALL-005). If the
+    structure cannot satisfy the target's mandatory create fields, it is a lookup-and-UPDATE (bulk
+    close/status change), not an insert — emit mode=bulk_update with a lookup key + update fields."""
+    entity = unit["targetEntity"]
+    p = {"name": unit["name"], "target_entity": entity, "row_structure": unit["rowStructure"]}
+    sfields = _structure_fields(spec, unit["rowStructure"])
+    ent_attrs = _entities_map(spec).get(entity, {}).get("attributes", [])
+    attr_names = {a["name"] for a in ent_attrs}
+    mand_create = [a["name"] for a in ent_attrs if a.get("mandatory") and not a.get("isIdentifier")]
+    slower = {f.lower() for f in sfields}
+    can_create = all(m.lower() in slower for m in mand_create) if mand_create else True
+    if not can_create and sfields:
+        matches = [f for f in sfields if f in attr_names]
+        key = next((f for f in matches
+                    if any(t in f.lower() for t in ("number", "code", "key")) or f.lower().endswith("id")),
+                   matches[0] if matches else sfields[0])
+        p.update(mode="bulk_update", key_field=key, key_target_attr=key,
+                 update_fields=[f for f in sfields if f != key])
+    else:
+        p["mode"] = "create"
+    return p
+
+
 def _fk_refs(spec: dict, entity: str) -> list:
     """FK attributes on `entity`, each paired with its parent + the parent's natural key. Lets the seed
     resolve a natural-key value carried in a child row to the parent's real Id (SEED-A). Returns
@@ -2523,8 +2692,76 @@ def _fk_refs(spec: dict, entity: str) -> list:
     for a in _entities_map(spec).get(entity, {}).get("attributes", []):
         parent = a.get("references")
         if parent and not a.get("isIdentifier"):
-            refs.append({"attr": a["name"], "parent": parent, "parent_key": _natural_key(spec, parent)})
+            refs.append({"attr": a["name"], "parent": parent, "parent_key": _natural_key(spec, parent),
+                         "mandatory": bool(a.get("mandatory"))})
     return refs
+
+
+# ── schema-aware defaults (Layer 1: compute from the spec at plan time) ──────────
+# A mandatory FK to a lifecycle/status static entity defaults to the record that reads
+# like the INITIAL state; else the lowest-Order record. Domain-general heuristic.
+_INITIAL_STATE_HINTS = ("draft", "new", "open", "pending", "todo", "backlog", "created", "unassigned")
+
+
+def _static_entity(spec: dict, name: str) -> dict | None:
+    e = _entities_map(spec).get(name)
+    return e if e and e.get("isStatic") else None
+
+
+def _static_first_record(spec: dict, name: str) -> str | None:
+    """The Record name of a static entity's INITIAL row (an initial-state-looking record, else the
+    lowest `Order`, else the first declared). None when `name` is not a static entity with records."""
+    e = _static_entity(spec, name)
+    recs = (e or {}).get("records") or []
+    if not recs:
+        return None
+    ordered = sorted(recs, key=lambda r: r.get("Order", 1_000_000))
+    for r in ordered:
+        if str(r.get("Record", "")).lower() in _INITIAL_STATE_HINTS:
+            return r.get("Record")
+    return ordered[0].get("Record")
+
+
+def _default_value_expr(a: dict) -> str:
+    """A type-correct OutSystems default expression for a mandatory scalar attribute the create
+    form does not collect (WALL-007). Dates/times use Curr* so a mandatory audit date is never null;
+    Text uses "" (a value, so the mandatory check passes) — callers may override for real identity."""
+    return {
+        "DateTime": "CurrDateTime()", "Date": "CurrDate()", "Time": "CurrTime()",
+        "Boolean": "False", "Integer": "0", "LongInteger": "0",
+        "Decimal": "0.0", "Currency": "0.0",
+    }.get(a.get("dataType"), '""')
+
+
+def _mandatory_defaults(spec: dict, entity: str, fields: list,
+                        context_fk: dict | None = None, creator_attr: str | None = None) -> list:
+    """Mandatory attributes on `entity` the create form neither collects nor sets elsewhere — each
+    paired with a type-correct default so CreateAction never fails on a missing mandatory value
+    (WALL-007). Excludes the identifier, the editable `fields`, the context FK, and the creator FK.
+    A mandatory FK to a STATIC entity defaults to its initial record; a mandatory FK to a REGULAR
+    entity has no safe default and is returned with `unresolved: True` so the caller can flag it.
+    Returns [{field, value|None, note, unresolved?}]."""
+    covered = set(fields or [])
+    if context_fk:
+        covered.add(context_fk.get("attr"))
+    if creator_attr:
+        covered.add(creator_attr)
+    out = []
+    for a in _entities_map(spec).get(entity, {}).get("attributes", []):
+        name = a["name"]
+        if a.get("isIdentifier") or name in covered or not a.get("mandatory"):
+            continue
+        ref = a.get("references")
+        if ref:
+            rec = _static_first_record(spec, ref)
+            if rec:
+                out.append({"field": name, "value": f"Entities.{ref}.{rec}", "note": f"initial {ref}"})
+            else:
+                out.append({"field": name, "value": None,
+                            "note": f"mandatory FK to non-static {ref} (no default source)", "unresolved": True})
+            continue
+        out.append({"field": name, "value": _default_value_expr(a), "note": None})
+    return out
 
 
 def _seed_topo_order(names: list, spec: dict) -> list:
@@ -2785,6 +3022,10 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                 creator = _creator_attr(spec, entity, auth.get("userEntity"))
                 if creator:
                     p["creator_attr"] = creator
+                # WALL-007: mandatory attributes the form doesn't collect, defaulted in the create branch.
+                mdef = _mandatory_defaults(spec, entity, p["fields"], ctx, creator)
+                if mdef:
+                    p["mandatory_defaults"] = mdef
                 ret = _list_screen_for_entity(spec, entity, exclude=s["id"])
                 if ret:
                     p["return_screen"] = ret
@@ -2823,8 +3064,15 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                            and (c.get("boundTo") or "").split(".")[0] == entity
                            for c in s.get("components", []))
             if has_list and "UpdateEntity" in does_all:
-                steps.append({"recipe": "row-actions", "why": f"{s['id']} UpdateEntity {entity} (per-row Edit)",
-                              "params": {"screen": s["id"], "entity": entity, "phase": "edit"}})
+                rp = {"screen": s["id"], "entity": entity, "phase": "edit"}
+                # WALL-004: if a SEPARATE edit/detail screen (its own Id-of-entity input) exists, the row
+                # Edit navigates there instead of an inline same-screen assign.
+                es = next((o["id"] for o in screens if o["id"] != s["id"]
+                           and any(ip.get("references") == entity for ip in o.get("inputParameters", []) or [])), None)
+                if es:
+                    rp["edit_screen"] = es
+                steps.append({"recipe": "row-actions",
+                              "why": f"{s['id']} UpdateEntity {entity} (per-row Edit)", "params": rp})
             if has_list and "DeleteEntity" in does_all:
                 steps.append({"recipe": "row-actions", "why": f"{s['id']} DeleteEntity {entity} (per-row Delete)",
                               "params": {"screen": s["id"], "entity": entity, "phase": "delete"}})
@@ -2951,7 +3199,7 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
         rows = _sample_rows(spec, ent)
         if rows:
             seed_ents.append({"name": ent, "rows": rows, "natural_key": _natural_key(spec, ent),
-                              "fk_refs": _fk_refs(spec, ent)})
+                              "fk_refs": _fk_refs(spec, ent), "types": _attr_types(spec, ent)})
     if any(e["fk_refs"] for e in seed_ents) and len(seed_ents) > 1:
         p = {"entities": seed_ents}
         if default_screen:
@@ -2960,7 +3208,7 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
                       "why": f"FK-linked seed graph ({', '.join(e['name'] for e in seed_ents)})", "params": p})
     else:
         for e in seed_ents:
-            p = {"entity": e["name"], "rows": e["rows"]}
+            p = {"entity": e["name"], "rows": e["rows"], "types": e["types"]}
             if e["fk_refs"]:
                 p["fk_refs"] = e["fk_refs"]
             if default_screen:
@@ -3028,8 +3276,7 @@ def plan_from_spec(spec: dict, *, kpi_model_api_fallback: bool = False) -> list[
         # M1 Wave 1: Excel bulk-import (B2-3) — maps its own camelCase spec fields to recipe params.
         if unit.get("kind") == "excelImport":
             steps.append({"recipe": "excel-import", "why": f"excel import -> {unit.get('targetEntity', '')}",
-                          "params": {"name": unit["name"], "target_entity": unit["targetEntity"],
-                                     "row_structure": unit["rowStructure"]}})
+                          "params": _excel_import_params(spec, unit)})
             continue
         recipe = _LOGIC_KIND.get(unit.get("kind"))
         if not recipe:

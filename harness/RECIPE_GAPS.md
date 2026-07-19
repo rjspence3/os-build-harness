@@ -33,6 +33,43 @@ agentic-loop shape, and it surfaces the agentic gaps the three BRDs missed (N1/N
 
 ---
 
+## B0 — Binding-layer gaps (the "recipes generate blind" class) — schema-aware + rolling recipes
+Surfaced end-to-end by the Wyandotte production build (2026-07-19). These are NOT missing recipes —
+the recipes existed but emitted prompts that didn't match the entity SCHEMA or what PRIOR steps
+actually built, because `plan_from_spec` rendered every step's params statically from the spec up
+front, and the pure recipes never read the schema. Root cause + fix now landed in two layers:
+
+- **Layer 1 — schema-aware planning (pure, in `plan_from_spec` + `prompt_recipes`):** compute correct
+  params from the spec at plan time. LANDED:
+  - `_mandatory_defaults()` → `create_form` defaults the entity's uncollected mandatory attributes in
+    the CREATE branch (Status FK → static entity's initial record; Date → CurrDate(); Text → "") so a
+    submit persists. Fixes **WALL-007** (create NO_PERSIST). Tests in test_prompt_step.py.
+  - `create_form` edit-prefill now directs the record load into the aggregate's **OnAfterFetch** (not
+    OnInitialize, which races the fetch and blanks mandatory fields on Update). Live-proven fix.
+- **Layer 2 — rolling reconcile (`harness/reconcile.py` + `SpecDriver._reconcile_step` hook):** patch
+  params against the LIVE model right before firing, so a step reflects what prior steps built. LANDED:
+  - `conditional` self-heal: if the target widget (or the control its `visible_when` reads) is absent
+    from the live screen, emit `ensure_widgets` bound to the form record → the recipe creates them
+    instead of targeting a phantom. Fixes **WALL-003**.
+  - `list-screen`: resolve a placeholder column set from live/spec entity attributes; set
+    `detail_takes_id` from the detail screen's real input params. Fixes **WALL-003** nav.
+  - `create-form`: refresh `mandatory_defaults` from live entity attributes.
+  - `LiveModel` wraps context_entities/screens/actions defensively; unknown recipe / absent read /
+    any error = safe no-op. Tests in test_reconcile.py + test_run_build.py.
+  - `seed_graph`/`seed_entity` now emit TYPE-CORRECT values via `_typed_seed_value` + `_attr_types`
+    (DateTime→CurrDateTime(), Date→CurrDate(), Boolean True/False unquoted, numbers unquoted, FK via
+    captured Id) and flag any missing MANDATORY FK. Fixes **WALL-005** (seed).
+  - `excel_import` now branches create-vs-update: the planner (`_excel_import_params`) checks whether
+    the row structure can satisfy the target's mandatory create fields; if not, it emits
+    `mode=bulk_update` (lookup by key → fetch-then-modify UpdateAction), and the action is Public=FALSE.
+    Fixes **WALL-005** (excel).
+  - `row_actions` edit now navigates to a SEPARATE edit/detail screen (passing the row Id) when one
+    exists, instead of an inline same-screen assign against a record var on another screen. Fixes
+    **WALL-004**. (`detail` binds display aggregates directly — read-only, no prefill race.)
+- **RESIDUAL (not this class):** none of the B0 binding gaps remain open; the two-layer design
+  (schema-aware planning + rolling reconcile) covers create-form, conditional, list-screen, seed,
+  excel-import, row-actions. Extending reconcilers to more recipes is incremental.
+
 ## B1 — Genuine ODC platform constraints (spec-gap; no recipe can fix)
 
 | # | Construct | Spec source | Verdict + evidence | Harness action |

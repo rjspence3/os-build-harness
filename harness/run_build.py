@@ -300,6 +300,7 @@ class SpecDriver:
         steps = plan_from_spec(spec)
         if max_steps is not None:
             steps = steps[:max_steps]
+        self._spec = spec                 # kept for the rolling reconcile pass (WALL-006)
         self.prompts_dir.mkdir(parents=True, exist_ok=True)
 
         # Targets that repeat in THIS plan (e.g. two list-screens bound to the same entity on
@@ -357,8 +358,15 @@ class SpecDriver:
         transient/hang/phantom, confirming via an independent read each success. This is the adaptive
         core — the reproducible version of what a build-root session does by hand."""
         recipe = step["recipe"]
+        # WALL-006 rolling reconcile: patch params against the LIVE model before rendering so the step
+        # reflects what prior steps actually built (self-heal a phantom-target conditional, resolve a
+        # detail-screen's real Id signature, refresh mandatory defaults). Safe no-op if the MCP lacks
+        # read methods, the recipe has no reconciler, or anything errors.
+        params, notes = await self._reconcile_step(recipe, step.get("params", {}), app_key)
+        for n in notes:
+            print(f"          ↻ {n}")
         try:
-            prompt = render(recipe, step.get("params", {}))
+            prompt = render(recipe, params)
         except Exception as exc:  # a bad param dict is a plan bug, not a Mentor failure
             return StepResult(index, recipe, target, f"render error: {exc}")
         prompt_path = self.prompts_dir / f"{index:03d}_{_slug(target, str(index))}.prompt.txt"
@@ -507,6 +515,47 @@ class SpecDriver:
             await cancel(run_id)
         except Exception:
             pass
+
+    # recipes whose params depend on prior BUILD STATE — only these trigger a live read (keeps the
+    # reconcile pass cheap: no context_* call for steps that render identically regardless of state).
+    _RECONCILE_RECIPES = {"conditional", "list-screen", "create-form"}
+
+    async def _reconcile_step(self, recipe: str, params: dict, app_key: str):
+        """Rolling reconcile (WALL-006): patch params against the live model before rendering.
+        Returns (params, notes). Safe no-op when the recipe needs no reconcile, the MCP lacks read
+        methods, or anything errors — reconciliation only ever ADDS certainty, never breaks a step."""
+        if recipe not in self._RECONCILE_RECIPES:
+            return params, []
+        try:
+            from harness.reconcile import reconcile_params
+            live = await self._fetch_live_state(app_key)
+            if live is None:
+                return params, []
+            return reconcile_params(recipe, params, live, getattr(self, "_spec", {}))
+        except Exception as exc:
+            return params, [f"reconcile skipped ({recipe}): {exc!r}"]
+
+    async def _fetch_live_state(self, app_key: str):
+        """Build a LiveModel from best-effort context_* reads. Returns None if no read method exists
+        (so reconcile degrades to a no-op). Read-back lag is real, but a stale read only misses a
+        heal, never invents a wrong one."""
+        from harness.reconcile import LiveModel
+
+        async def _read(name):
+            fn = getattr(self.mcp, name, None)
+            if fn is None:
+                return None
+            try:
+                return await fn(app_key)
+            except Exception:
+                return None
+
+        ents = await _read("context_entities")
+        scrs = await _read("context_screens")
+        acts = await _read("context_actions")
+        if ents is None and scrs is None and acts is None:
+            return None
+        return LiveModel.from_payloads(entities=ents, screens=scrs, actions=acts)
 
     async def _verify_step(self, step: dict, app_key: str) -> Optional[str]:
         """Independent read confirming the step actually LANDED (§Turn 5 + R9). Returns a defect
